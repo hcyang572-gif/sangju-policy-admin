@@ -74,6 +74,50 @@ function closeModal(modal) {
   _lastFocus = null;
 }
 
+// ---------- 버전 정보 + 버전별 개선사항(체인지로그) ----------
+// 데이터 단일 소스: version.js의 window.APP_VERSION / window.APP_CHANGELOG.
+function renderChangelog() {
+  const box = $("#changelogBody");
+  if (!box) return;
+  const logs = window.APP_CHANGELOG || [];
+  box.innerHTML = "";
+  logs.forEach((e) => {
+    const entry = document.createElement("div");
+    entry.className = "cl-entry";
+
+    const head = document.createElement("div");
+    head.className = "cl-head";
+    const ver = document.createElement("span");
+    ver.className = "cl-ver";
+    ver.textContent = "v" + (e.version || "");
+    head.appendChild(ver);
+    if (e.date) {
+      const date = document.createElement("span");
+      date.className = "cl-date";
+      date.textContent = e.date;
+      head.appendChild(date);
+    }
+    entry.appendChild(head);
+
+    if (e.title) {
+      const t = document.createElement("div");
+      t.className = "cl-title";
+      t.textContent = e.title;
+      entry.appendChild(t);
+    }
+
+    const ul = document.createElement("ul");
+    ul.className = "cl-items";
+    (e.items || []).forEach((it) => {
+      const li = document.createElement("li");
+      li.textContent = it;
+      ul.appendChild(li);
+    });
+    entry.appendChild(ul);
+    box.appendChild(entry);
+  });
+}
+
 // 기존 세션 있으면 바로 앱
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
@@ -213,6 +257,21 @@ function bindUI() {
     $("#btnPrivacy").onclick = () => openModal(pp);
     $("#ppClose").onclick = () => closeModal(pp);
     pp.addEventListener("click", (e) => { if (e.target.id === "ppModal") closeModal(pp); });
+  }
+
+  // 버전 라벨 + 버전별 개선사항(체인지로그) 모달 — Esc는 공통 트랩에서 처리
+  const vm = $("#versionModal");
+  const vbtn = $("#btnVersion");
+  const ver = window.APP_VERSION || "";
+  if (vbtn && ver) {
+    vbtn.textContent = "v" + ver;                // 단일 소스에서 버전 주입
+    vbtn.setAttribute("aria-label", "현재 버전 " + ver + ", 버전별 개선사항 보기");
+  }
+  if (vm && vbtn) {
+    renderChangelog();
+    vbtn.onclick = () => openModal(vm);
+    $("#vmClose").onclick = () => closeModal(vm);
+    vm.addEventListener("click", (e) => { if (e.target.id === "versionModal") closeModal(vm); });
   }
 }
 
