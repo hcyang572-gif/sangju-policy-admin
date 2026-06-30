@@ -110,8 +110,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .guest-banner .gb-close{flex:0 0 auto;border:none;background:transparent;color:#7A5B00;font-size:16px;font-weight:800;cursor:pointer;padding:2px 6px;}
 
 /* 인앱 브라우저(카톡·네이버 등) 안내 배너 — 공무원앱 남색 정체성, 게스트띠보다 강조.
-   body 최상단 고정 위치(로그인·앱 어느 화면 위에서도 동일 노출). */
-.inapp-banner{display:flex;align-items:flex-start;gap:9px;width:100%;padding:11px 16px;
+   ⚠ 로그인 화면(.login-screen)이 position:fixed;inset:0 전체화면 오버레이라,
+      문서 흐름(static) 배너는 그 아래 깔려 안 보였다 → fixed+z-index로 최상단 고정.
+      (모달 backdrop z-index:100 보다 낮춰 모달이 배너를 덮도록 90 사용) */
+.inapp-banner{position:fixed;top:0;left:0;right:0;z-index:90;
+  display:flex;align-items:flex-start;gap:9px;width:100%;padding:11px 16px;
   background:linear-gradient(135deg,#1B2A4A,#10192E);color:#fff;
   box-shadow:0 3px 10px rgba(16,25,46,.30);}
 .inapp-emoji{font-size:20px;flex-shrink:0;line-height:1.4;}
