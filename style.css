@@ -1,7 +1,34 @@
 /* 상주시 정책 플랫폼 — 클라우드(곶감 테마, 반응형) */
+/* ═══════════════════════════════════════════════════════════════
+   공통 접근성 팔레트 (시민앱(모바일웹) · 공무원앱(cloudui) · PC앱(webui) 3종 동일 값)
+   ─────────────────────────────────────────────────────────────
+   토큰 대응표 (이름은 각 앱 기존 체계 유지, 값만 일치)
+     역할                     값        cloudui      시민앱             대비(흰 기준)
+     장식·테두리 전용         #E66B3A   --gotgam     --primary          3.22 (흰글자 배경 금지)
+     흰 글자 얹는 배경 전용   #C2501F   --gotgam-d   --primary-hover    4.71
+     밝은 배경 위 주황 글자   #A8431A   --gotgam-t   --accent-text      6.03
+     보조 텍스트              #7A6152   --sub        --muted            5.74
+     비활성·빈상태 텍스트     #6F6A63   --dim        --disabled         5.36
+     경계선                   #F0E0D5   --line       --border           (비텍스트)
+   ⚠ #E66B3A 위에 흰 글자를 얹으면 3.22:1 로 AA(4.5) 미달 → 반드시 --gotgam-d 사용
+   ⚠ --gotgam-d 를 «밝은 배경 위 글자색»으로 쓰면 4.3~4.5 경계 → 글자는 --gotgam-t 사용
+   ═══════════════════════════════════════════════════════════════ */
 :root{
-  --gotgam:#E66B3A; --gotgam-d:#C24E20; --gotgam-l:#FBE3D4; --gotgam-ll:#FFF1E8;
-  --ink:#4A3B32; --sub:#8A6A55; --cream:#FFF7F0; --line:#F0E0D5; --card:#FFFFFF;
+  /* 장식·테두리 전용(흰 글자 배경 금지) */
+  --gotgam:#E66B3A;
+  /* 흰 글자를 얹는 배경 전용 — 흰 대비 4.71:1 */
+  --gotgam-d:#C2501F;
+  /* 밝은 배경 위 주황 «글자» 전용 — 흰 6.03 · #FBE3D4 4.89 · #FFF1E8 5.46 · #F0E0D5 4.69 */
+  --gotgam-t:#A8431A;
+  --gotgam-l:#FBE3D4; --gotgam-ll:#FFF1E8;
+  --ink:#4A3B32;
+  /* 보조 텍스트 — 흰 5.74 · 크림 5.41 */
+  --sub:#7A6152;
+  /* 비활성·빈상태 텍스트 — 흰 5.36 */
+  --dim:#6F6A63;
+  --cream:#FFF7F0; --line:#F0E0D5; --card:#FFFFFF;
+  /* 흰 글자를 얹는 위험(삭제) 배경 — 흰 대비 5.44:1 */
+  --danger:#C0392B;
   --shadow:0 6px 18px rgba(170,90,45,.13);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -9,48 +36,55 @@ html,body{height:100%;}
 body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;background:var(--cream);color:var(--ink);}
 .hidden{display:none !important;}
 
+/* 건너뛰기 링크(KWCAG 2.2 «반복 영역 건너뛰기»): 평소엔 화면 밖, 키보드 포커스 시에만 노출 */
+.skip-link{position:absolute;left:8px;top:-60px;z-index:999;padding:10px 16px;
+  background:var(--gotgam-d);color:#fff;font-size:15px;font-weight:800;
+  border-radius:0 0 10px 10px;text-decoration:none;transition:top .12s ease;}  /* 흰글자 4.71:1 */
+.skip-link:focus{top:0;}
+
 /* 스크린리더 전용(화면엔 숨김, 보조기기엔 노출) */
 .sr-only{position:absolute !important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 /* 키보드 포커스 가시성(KWCAG) */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,
-[role="button"]:focus-visible{outline:3px solid var(--gotgam-d);outline-offset:2px;}
+[role="button"]:focus-visible{outline:3px solid var(--gotgam-t);outline-offset:2px;}
 /* 카드(role=button)의 키보드 포커스 — 곶감/남색 톤 구분 */
-.card[role="button"]:focus-visible{outline:3px solid var(--gotgam-d);outline-offset:2px;}
+.card[role="button"]:focus-visible{outline:3px solid var(--gotgam-t);outline-offset:2px;}
 .pcard[role="button"]:focus-visible{outline:3px solid var(--navy);outline-offset:2px;}
 
 /* C12: 인라인 style 대체 클래스 */
 .mb-10{margin-bottom:10px;}
 .mt-8{margin-top:8px;}
-.req-note{color:#C0392B;font-weight:700;}
-.muted-date{opacity:.6;}
+.req-note{color:var(--danger);font-weight:700;}  /* 흰 5.44:1 */
+/* opacity .6 은 #FFF5F5 위에서 2.33:1 로 AA 미달 → 불투명 회색(5.36:1)으로 대체 */
+.muted-date{color:var(--dim);}
 
 /* 로그인 */
 .login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#FFF3EA,#FFE2CE);padding:20px;}
 .login-card{background:#fff;width:100%;max-width:380px;padding:38px 32px;border-radius:24px;box-shadow:0 18px 50px rgba(170,90,45,.22);text-align:center;}
 .login-logo{height:62px;width:auto;max-width:78%;object-fit:contain;display:block;margin:0 auto;}
-.login-title{font-size:22px;color:var(--gotgam);font-weight:800;margin-top:10px;}
+.login-title{font-size:22px;color:var(--gotgam-t);font-weight:800;margin-top:10px;}  /* 흰 6.03:1 */
 .login-sub{font-size:12.5px;color:var(--sub);font-weight:700;margin:4px 0 20px;display:inline-flex;align-items:center;gap:5px;}
 .login-gotgam{width:16px;height:16px;object-fit:contain;}
 .login-input{width:100%;height:46px;border:2px solid var(--gotgam-l);border-radius:12px;text-align:center;font-size:15px;outline:none;margin-bottom:10px;}
 .login-input:focus{border-color:var(--gotgam);}
-.login-btn{width:100%;height:48px;margin-top:8px;border:none;border-radius:12px;background:var(--gotgam);color:#fff;font-size:16px;font-weight:800;cursor:pointer;}
-.login-btn:hover{background:var(--gotgam-d);}
+.login-btn{width:100%;height:48px;margin-top:8px;border:none;border-radius:12px;background:var(--gotgam-d);color:#fff;font-size:16px;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
+.login-btn:hover{background:var(--gotgam-t);}  /* 흰글자 6.03:1 */
 .login-err{color:#C62828;font-size:13px;font-weight:700;margin-top:10px;min-height:18px;}
 
 /* 앱 */
 .app{min-height:100vh;display:flex;flex-direction:column;}
 .topbar{background:#fff;display:flex;align-items:center;gap:12px;padding:12px 20px;}
 .brand-logo{height:34px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));}
-.brand-title{font-size:20px;font-weight:800;color:var(--gotgam);line-height:1.1;}
+.brand-title{font-size:20px;font-weight:800;color:var(--gotgam-t);line-height:1.1;}  /* 흰 6.03:1 */
 .brand-sub{font-size:12px;font-weight:700;color:var(--sub);margin-top:2px;}
 .top-actions{margin-left:auto;display:flex;align-items:center;gap:8px;}
-.rt-dot{color:#2E9E5B;font-size:12px;}
-.rt-dot.off{color:#bbb;}
+.rt-dot{color:#1F7A41;font-size:12px;}      /* 흰 5.36:1 */
+.rt-dot.off{color:var(--dim);}              /* 흰 5.36:1 (기존 #bbb 는 1.92:1) */
 .top-btn{border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;}
-.top-btn.solid{background:var(--gotgam);color:#fff;}
-.top-btn.solid:hover{background:var(--gotgam-d);}
-.top-btn.ghost{background:var(--gotgam-ll);color:var(--gotgam-d);}
-.top-btn.danger{background:#E74C3C;color:#fff;}
+.top-btn.solid{background:var(--gotgam-d);color:#fff;}          /* 흰글자 4.71:1 */
+.top-btn.solid:hover{background:var(--gotgam-t);}               /* 흰글자 6.03:1 */
+.top-btn.ghost{background:var(--gotgam-ll);color:var(--gotgam-t);}  /* #FFF1E8 위 5.46:1 */
+.top-btn.danger{background:var(--danger);color:#fff;}           /* 흰글자 5.44:1 */
 .topline{height:3px;background:var(--gotgam);}
 
 .content{flex:1;padding:18px 20px 30px;max-width:1100px;width:100%;margin:0 auto;}
@@ -60,12 +94,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .search-input.wide{flex:1;min-width:200px;}
 .search-input:focus{border-color:var(--gotgam);}
 .sort-select{height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 10px;font-size:13px;font-weight:700;background:#fff;cursor:pointer;}
-.count{font-size:14px;font-weight:800;color:var(--gotgam);margin-left:auto;}
+.count{font-size:14px;font-weight:800;color:var(--gotgam-t);margin-left:auto;}  /* 흰 6.03:1 */
 
 .chips{display:flex;gap:8px;}
 .chips.wrap{flex-wrap:wrap;}
-.chip{border:1.5px solid var(--gotgam-l);background:#fff;color:var(--gotgam-d);border-radius:18px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;}
-.chip.on{background:var(--gotgam);color:#fff;border-color:var(--gotgam);}
+.chip{border:1.5px solid var(--gotgam-l);background:#fff;color:var(--gotgam-t);border-radius:18px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;}  /* 흰 6.03:1 */
+.chip.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 4.71:1 */
 
 .cardlist{display:flex;flex-direction:column;gap:12px;}
 .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;display:flex;align-items:center;gap:14px;border-left:5px solid var(--gotgam);cursor:pointer;transition:transform .12s;}
@@ -73,25 +107,34 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .card-main{flex:1;min-width:0;}
 .card-title{font-size:16px;font-weight:800;margin-bottom:5px;}
 .card-desc{font-size:13px;color:#7a6f66;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.badge{font-size:12px;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-d);white-space:nowrap;}
-.badge.warn{background:#FFEBEE;color:#E53935;}
-.empty{text-align:center;color:#766458;font-size:15px;padding:46px 0;line-height:1.7;}
+.badge{font-size:12px;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);white-space:nowrap;}  /* #FBE3D4 위 4.89:1 */
+.badge.warn{background:#FFEBEE;color:#C62828;}   /* #FFEBEE 위 4.92:1 (기존 #E53935 는 3.70) */
+.empty{text-align:center;color:var(--dim);font-size:15px;padding:46px 0;line-height:1.7;}  /* 흰 5.36:1 */
+
+/* 오류 안내 — 원인(연결/권한/미설정)에 따라 문구가 달라지고 «다시 시도»를 제공 */
+.err-box{padding:40px 16px;text-align:center;}
+.err-title{font-size:16px;font-weight:800;color:var(--ink);margin-bottom:8px;line-height:1.5;}
+.err-desc{font-size:14px;color:var(--sub);line-height:1.7;}   /* 흰 5.74:1 */
+.err-retry{margin-top:16px;font-family:inherit;font-size:14px;font-weight:800;padding:11px 20px;
+  border:none;border-radius:10px;background:var(--gotgam-d);color:#fff;cursor:pointer;}  /* 흰글자 4.71:1 */
+.err-retry:hover{background:var(--gotgam-t);}
 
 .pager-wrap{display:flex;justify-content:center;margin-top:18px;}
 .pager{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
-.page-btn{min-width:38px;height:38px;padding:0 6px;border:none;border-radius:9px;background:#F0E0D5;color:var(--gotgam-d);font-size:14px;font-weight:800;cursor:pointer;}
-.page-btn.on{background:var(--gotgam);color:#fff;}
+.page-btn{min-width:38px;height:38px;padding:0 6px;border:none;border-radius:9px;background:#F0E0D5;color:var(--gotgam-t);font-size:14px;font-weight:800;cursor:pointer;}  /* #F0E0D5 위 4.69:1 */
+.page-btn.on{background:var(--gotgam-d);color:#fff;}  /* 흰글자 4.71:1 */
 .page-btn:disabled{opacity:.4;}
 
 /* 모달 */
 .modal-backdrop{position:fixed;inset:0;background:rgba(60,40,30,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;}
 .modal{background:#fff;width:100%;max-width:600px;max-height:88vh;border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.32);display:flex;flex-direction:column;overflow:hidden;}
-.modal-head{background:var(--gotgam);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.modal-head{background:var(--gotgam-d);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}  /* 흰글자 4.71:1 */
 .modal-title{font-size:17px;font-weight:800;}
-.modal-close{background:rgba(255,255,255,.25);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;}
+/* 헤더 위 «흰 반투명»은 배경을 밝혀 흰 ✕ 글자가 3.12:1 로 떨어짐 → 검정 반투명으로 어둡게(6.96:1) */
+.modal-close{background:rgba(0,0,0,.22);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;}
 .modal-body{padding:22px;overflow-y:auto;}
 .field{margin-bottom:15px;}
-.field-label{font-size:13px;font-weight:800;color:var(--gotgam-d);margin-bottom:5px;}
+.field-label{font-size:13px;font-weight:800;color:var(--gotgam-t);margin-bottom:5px;}  /* 흰 6.03:1 */
 .field-value{font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
 .form-input{width:100%;height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 12px;font-size:14px;font-family:inherit;outline:none;}
 .form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
@@ -101,7 +144,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .modal-actions .top-btn.danger{flex:0 0 100px;}
 
 /* 로그인 없이 입장(임시 공개) 버튼 */
-.guest-btn{width:100%;height:44px;margin-top:10px;border:2px dashed var(--gotgam-l);border-radius:12px;background:#fff;color:var(--gotgam-d);font-size:13.5px;font-weight:800;cursor:pointer;line-height:1.25;}
+.guest-btn{width:100%;height:44px;margin-top:10px;border:2px dashed var(--gotgam-l);border-radius:12px;background:#fff;color:var(--gotgam-t);font-size:13.5px;font-weight:800;cursor:pointer;line-height:1.25;}  /* 흰 6.03:1 */
 .guest-btn:hover{background:var(--gotgam-ll);border-color:var(--gotgam);}
 
 /* 임시 공개 안내 배너 */
@@ -132,12 +175,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* 푸터(상주 곶감 은은한 포인트) */
 .appfoot{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:16px;color:var(--sub);font-size:12px;font-weight:700;border-top:1px solid var(--line);}
 .foot-gotgam{width:20px;height:20px;object-fit:contain;opacity:.85;}
-.foot-link{border:none;background:transparent;color:var(--gotgam-d);font-size:12px;font-weight:800;cursor:pointer;text-decoration:underline;padding:4px 6px;border-radius:6px;}
-.foot-link:hover{color:var(--gotgam);}
+.foot-link{border:none;background:transparent;color:var(--gotgam-t);font-size:12px;font-weight:800;cursor:pointer;text-decoration:underline;padding:4px 6px;border-radius:6px;}  /* 크림 5.69:1 */
+.foot-link:hover{color:var(--ink);}   /* hover 도 AA 유지(크림 8.4:1) — 기존 --gotgam 은 3.03 */
 
 /* 개인정보 처리방침 본문 */
 .pp-intro{font-size:14px;line-height:1.7;color:var(--ink);margin-bottom:14px;}
-.pp-h{font-size:14.5px;font-weight:800;color:var(--gotgam-d);margin:16px 0 6px;}
+.pp-h{font-size:14.5px;font-weight:800;color:var(--gotgam-t);margin:16px 0 6px;}  /* 흰 6.03:1 */
 .pp-p{font-size:13.5px;line-height:1.7;color:var(--ink);}
 .pp-list{margin:0 0 4px;padding-left:20px;font-size:13.5px;line-height:1.7;color:var(--ink);}
 .pp-list li{margin-bottom:4px;}
@@ -147,7 +190,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .cl-entry{padding:14px 2px;border-bottom:1px solid var(--line);}
 .cl-entry:last-child{border-bottom:none;}
 .cl-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
-.cl-ver{font-size:13px;font-weight:800;color:#fff;background:var(--gotgam);border-radius:7px;padding:3px 9px;}
+.cl-ver{font-size:13px;font-weight:800;color:#fff;background:var(--gotgam-d);border-radius:7px;padding:3px 9px;}  /* 흰글자 4.71:1 */
 .cl-date{font-size:12px;color:var(--sub);font-weight:700;}
 .cl-title{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:8px;}
 .cl-items{list-style:disc;margin:0;padding-left:20px;}
@@ -160,14 +203,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .tabbar{display:flex;gap:8px;max-width:1100px;width:100%;margin:0 auto;padding:12px 20px 0;}
 .tab-btn{flex:0 0 auto;border:1.5px solid var(--line);border-bottom:none;background:#fff;color:var(--sub);
   border-radius:12px 12px 0 0;padding:11px 20px;font-size:14px;font-weight:800;cursor:pointer;}
-.tab-btn.on{background:var(--gotgam);color:#fff;border-color:var(--gotgam);}
+.tab-btn.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 4.71:1 */
 #tabProposals.on{background:var(--navy);border-color:var(--navy);}
 
 /* 정책제안 카드 */
 .pcard{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:14px 18px;display:flex;
   align-items:center;gap:14px;border-left:5px solid var(--navy);cursor:pointer;transition:transform .12s;}
 .pcard:hover{transform:translateY(-2px);}
-.pcard.hidden-row{opacity:.6;border-left-color:#9AA4B8;background:#FAFBFD;}
+/* 숨김(블라인드) 글: opacity .6 이면 본문이 3.36:1 로 AA 미달 → .75(4.99:1)로 완화 */
+.pcard.hidden-row{opacity:.75;border-left-color:#9AA4B8;background:#FAFBFD;}
 .pcard-main{flex:1;min-width:0;}
 .pcard-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px;}
 .pcard-title{font-size:16px;font-weight:800;}
@@ -180,10 +224,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .st-반영{background:#E3F6EA;color:#1F7A41;}
 .st-불채택{background:#FDE7E7;color:#C0392B;}
 .st-보류{background:#ECEFF3;color:#5A6678;}
-.cat-tag{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-d);}
+.cat-tag{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);}  /* #FBE3D4 위 4.89:1 */
 .hide-tag{font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:8px;background:#37404F;color:#fff;}
 .like-tag{font-weight:800;color:var(--navy);}
-.report-tag{font-weight:800;color:#C0392B;}
+.report-tag{font-weight:800;color:var(--danger);}  /* 흰 5.44:1 */
 
 /* 정책제안 모달 헤더 = 남색 */
 .modal-head.admin{background:var(--navy);}
@@ -222,4 +266,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   .content{max-width:1320px;}
   .tabbar{max-width:1320px;}
   .cardlist{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+
+/* ── 움직임 최소화(KWCAG 2.2 «깜빡임과 번쩍임 사용 제한»·OS 접근성 설정 존중) ──
+ * 운영체제에서 "동작 줄이기"를 켠 사용자에게는 전환·호버 이동을 사실상 제거한다.
+ * PC앱(webui/style.css)과 동일 규약. 공무원앱에서 실제로 쓰는 움직임:
+ *   .card / .pcard 의 hover translateY, .inapp-btn 의 active scale, .skip-link 의 top 전환 */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001s !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001s !important;
+    scroll-behavior:auto !important;
+  }
+  .card:hover,.pcard:hover{transform:none;}
+  .inapp-btn:active{transform:none;}
 }

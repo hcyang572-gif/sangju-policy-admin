@@ -277,7 +277,12 @@ function bindUI() {
 
 async function loadBenefits() {
   const { data, error } = await sb.from("benefits").select("*").order("seq", { nullsFirst: false }).order("id");
-  if (error) { console.error(error); $("#list").innerHTML = `<div class="empty">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  if (error) {
+    console.error(error);
+    // 원인(연결/권한/미설정)별 안내 + 다시 시도 — "불러오기 실패"만 뜨던 문제 개선
+    showLoadError("#list", error, "listRetry", loadBenefits);
+    return;
+  }
   ALL = data || [];
   CATS = [...new Set(ALL.flatMap((r) => r.categories || []))].sort();
   $("#dbInfo").textContent = `사업 ${ALL.length}건 · 실시간`;
@@ -350,15 +355,28 @@ function render() {
   renderPager(rows.length, pages);
 }
 
+// 페이지 이동(KWCAG 2.2 «레이블 제공»·«명확한 지시») — PC앱 webui/app.js renderPager 와 동일 방식.
+//  · 래퍼를 <nav aria-label="페이지 이동"> 으로 두어 보조기기가 영역을 인지
+//  · ‹ / › 는 기호뿐이라 화면낭독기가 읽을 수 없음 → aria-label 로 "이전/다음 페이지"
+//  · 숫자 버튼은 "N 페이지", 현재 페이지는 aria-current="page"
 function renderPager(total, pages) {
   const wrap = $("#pager"); wrap.innerHTML = "";
   if (pages <= 1) return;
-  const bar = el("div", "pager");
-  const mk = (label, p, dis, act) => { const b = el("button", "page-btn" + (act ? " on" : "")); b.textContent = label; if (dis) b.disabled = true; else b.onclick = () => { page = p; render(); }; bar.appendChild(b); };
-  mk("‹", page - 1, page <= 0);
+  const bar = el("nav", "pager");
+  bar.setAttribute("aria-label", "페이지 이동");
+  const mk = (label, p, dis, act, aria) => {
+    const b = el("button", "page-btn" + (act ? " on" : ""));
+    b.type = "button";
+    b.textContent = label;
+    b.setAttribute("aria-label", aria);
+    if (act) b.setAttribute("aria-current", "page");
+    if (dis) b.disabled = true; else b.onclick = () => { page = p; render(); };
+    bar.appendChild(b);
+  };
+  mk("‹", page - 1, page <= 0, false, "이전 페이지");
   let s = Math.max(0, page - 4), e = Math.min(pages, s + 9); s = Math.max(0, e - 9);
-  for (let p = s; p < e; p++) mk(String(p + 1), p, false, p === page);
-  mk("›", page + 1, page >= pages - 1);
+  for (let p = s; p < e; p++) mk(String(p + 1), p, false, p === page, `${p + 1} 페이지`);
+  mk("›", page + 1, page >= pages - 1, false, "다음 페이지");
   wrap.appendChild(bar);
 }
 
@@ -369,7 +387,74 @@ const FIELDS = [
   ["사업 내용", "content", true], ["이용 방법", "method", true], ["필요 서류", "documents", true],
 ];
 // 저장/삭제 실패 메시지: RLS(권한) 거부면 임시공개 안내로 친절하게.
+// ───────── 오류 원인 분류 ─────────
+// 무료 플랜 일시정지로 클라우드가 통째로 멈췄을 때 화면엔 "불러오기 실패"만 떠서
+// 원인 파악이 불가능했던 사고가 있었다 → 연결/권한/미설정을 문구로 구분한다.
+//   conn  : 네트워크·서버 미응답(오프라인, fetch 실패, 5xx, 프로젝트 일시정지)
+//   perm  : 권한(RLS)·인증 거부
+//   setup : 테이블·함수 미생성(스키마 미적용)
+//   other : 그 밖
+function errKind(error) {
+  if (!error) return "other";
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return "conn";
+  const msg = String(error.message || error || "").toLowerCase();
+  const code = String(error.code || error.status || "");
+  if (error.name === "TypeError" && msg.indexOf("fetch") >= 0) return "conn";
+  if (/failed to fetch|networkerror|network error|load failed|timeout|timed out|econnrefused|fetch failed/.test(msg)) return "conn";
+  if (/^(5\d\d|0|429)$/.test(code)) return "conn";
+  if (/service unavailable|bad gateway|gateway timeout|temporarily unavailable|paused|infrastructure/.test(msg)) return "conn";
+  if (code === "42501" || code === "401" || code === "403" ||
+      /row-level security|\brls\b|permission|policy|not authorized|violates|jwt|api key/.test(msg)) return "perm";
+  if (code === "42P01" || code === "42883" || code === "PGRST202" || code === "PGRST205" ||
+      /does not exist|could not find the (table|function)|schema cache/.test(msg)) return "setup";
+  return "other";
+}
+
+// 목록 자리에 넣을 오류 안내 HTML(원인별 문구 + 다시 시도 버튼)
+function errBoxHtml(error, retryId) {
+  const kind = errKind(error);
+  const btn = retryId ? `<button id="${retryId}" class="err-retry" type="button">🔄 다시 시도</button>` : "";
+  if (kind === "conn") {
+    return `<div class="err-box" role="alert">
+      <div class="err-title">⏸ 클라우드 서비스가 일시적으로 응답하지 않습니다.</div>
+      <div class="err-desc">잠시 후 다시 시도해 주세요.<br>계속되면 인터넷 연결 또는 Supabase 프로젝트 상태를 확인해 주세요.</div>
+      ${btn}</div>`;
+  }
+  if (kind === "perm") {
+    return `<div class="err-box" role="alert">
+      <div class="err-title">🔒 접근 권한이 없어 불러오지 못했습니다.</div>
+      <div class="err-desc">로그인이 필요하거나 RLS 권한이 열려 있지 않습니다.<br>관리자에게 권한 개방을 요청해 주세요.</div>
+      ${btn}</div>`;
+  }
+  if (kind === "setup") {
+    return `<div class="err-box" role="alert">
+      <div class="err-title">🛠 DB 설정이 아직 적용되지 않았습니다.</div>
+      <div class="err-desc">필요한 테이블·함수(SQL)를 먼저 적용해 주세요.</div>
+      ${btn}</div>`;
+  }
+  return `<div class="err-box" role="alert">
+    <div class="err-title">불러오지 못했습니다.</div>
+    <div class="err-desc">${esc(error && error.message ? error.message : "알 수 없는 오류")}</div>
+    ${btn}</div>`;
+}
+
+// 오류 박스를 그리고 «다시 시도» 버튼에 재조회 함수를 연결
+function showLoadError(boxSel, error, retryId, retryFn) {
+  const box = $(boxSel);
+  if (!box) return;
+  box.innerHTML = errBoxHtml(error, retryId);
+  const b = $("#" + retryId);
+  if (b) b.onclick = retryFn;
+  announce(errKind(error) === "conn"
+    ? "클라우드 서비스가 일시적으로 응답하지 않습니다."
+    : "목록을 불러오지 못했습니다.");
+}
+
 function writeErrMsg(error, verb) {
+  // 연결 자체가 안 되는 경우를 권한 문제와 구분(원인 오인 방지)
+  if (errKind(error) === "conn") {
+    return "⏸ 클라우드 서비스가 일시적으로 응답하지 않습니다.\n잠시 후 다시 시도해 주세요.\n(계속되면 인터넷 연결 또는 Supabase 프로젝트 상태를 확인해 주세요.)";
+  }
   const msg = (error && error.message ? error.message : "").toLowerCase();
   const code = error && error.code ? String(error.code) : "";
   const isPerm =
@@ -465,6 +550,9 @@ function switchTab(which) {
   $("#tabProposals").setAttribute("aria-selected", onBenefits ? "false" : "true");
   $("#secBenefits").classList.toggle("hidden", !onBenefits);
   $("#secProposals").classList.toggle("hidden", onBenefits);
+  // 건너뛰기 링크 목적지를 현재 보이는 본문으로 맞춘다(숨겨진 main 으로 점프 방지)
+  const skip = $(".skip-link");
+  if (skip) skip.setAttribute("href", onBenefits ? "#secBenefits" : "#secProposals");
   if (!onBenefits && !P_LOADED) loadProposals();
 }
 
@@ -473,7 +561,7 @@ async function loadProposals() {
   const { data, error } = await sb.from("proposals").select("*").order("created_at", { ascending: false });
   if (error) {
     console.error(error);
-    $("#pList").innerHTML = `<div class="empty">불러오기 실패: ${esc(writeErrMsg(error, "불러오기"))}</div>`;
+    showLoadError("#pList", error, "pListRetry", loadProposals);
     return;
   }
   PALL = data || [];
@@ -589,19 +677,25 @@ function renderProposals() {
   renderPPager(rows.length, pages);
 }
 
+// 정책제안 목록 페이지 이동 — 위 renderPager 와 동일한 접근성 규약(nav·aria-label·aria-current)
 function renderPPager(total, pages) {
   const wrap = $("#pPager"); wrap.innerHTML = "";
   if (pages <= 1) return;
-  const bar = el("div", "pager");
-  const mk = (label, p, dis, act) => {
-    const b = el("button", "page-btn" + (act ? " on" : "")); b.textContent = label;
+  const bar = el("nav", "pager");
+  bar.setAttribute("aria-label", "페이지 이동");
+  const mk = (label, p, dis, act, aria) => {
+    const b = el("button", "page-btn" + (act ? " on" : ""));
+    b.type = "button";
+    b.textContent = label;
+    b.setAttribute("aria-label", aria);
+    if (act) b.setAttribute("aria-current", "page");
     if (dis) b.disabled = true; else b.onclick = () => { pPage = p; renderProposals(); };
     bar.appendChild(b);
   };
-  mk("‹", pPage - 1, pPage <= 0);
+  mk("‹", pPage - 1, pPage <= 0, false, "이전 페이지");
   let s = Math.max(0, pPage - 4), e = Math.min(pages, s + 9); s = Math.max(0, e - 9);
-  for (let p = s; p < e; p++) mk(String(p + 1), p, false, p === pPage);
-  mk("›", pPage + 1, pPage >= pages - 1);
+  for (let p = s; p < e; p++) mk(String(p + 1), p, false, p === pPage, `${p + 1} 페이지`);
+  mk("›", pPage + 1, pPage >= pages - 1, false, "다음 페이지");
   wrap.appendChild(bar);
 }
 

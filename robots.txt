@@ -1,0 +1,6 @@
+# 상주정책(공무원용) — 상주시 공무원 전용 관리 도구
+# 검색엔진 색인 대상이 아니다. 전 경로 수집 거부.
+# (시민앱 robots.txt 의 "Disallow: /admin/" 은 공무원앱을 별도 출처
+#  sangju-policy-admin 으로 분리한 뒤 더 이상 이 사이트에 적용되지 않는다.)
+User-agent: *
+Disallow: /
