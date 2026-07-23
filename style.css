@@ -33,12 +33,17 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
+/* 글꼴 크기 기준(rem) — 사용자가 브라우저·OS에서 지정한 기본 글꼴 크기를 그대로 존중한다.
+   ⚠ 루트(html)에는 rem 을 쓰지 말 것(루트의 rem 은 사용자 설정이 아닌 초기값 16px 를 가리킴). */
+html{font-size:100%;}
 body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;background:var(--cream);color:var(--ink);}
 .hidden{display:none !important;}
+/* hidden 속성은 display 를 지정한 요소(.rt-banner 등)에서도 항상 우선 */
+[hidden]{display:none !important;}
 
 /* 건너뛰기 링크(KWCAG 2.2 «반복 영역 건너뛰기»): 평소엔 화면 밖, 키보드 포커스 시에만 노출 */
 .skip-link{position:absolute;left:8px;top:-60px;z-index:999;padding:10px 16px;
-  background:var(--gotgam-d);color:#fff;font-size:15px;font-weight:800;
+  background:var(--gotgam-d);color:#fff;font-size:0.9375rem;font-weight:800;
   border-radius:0 0 10px 10px;text-decoration:none;transition:top .12s ease;}  /* 흰글자 4.71:1 */
 .skip-link:focus{top:0;}
 
@@ -62,93 +67,104 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#FFF3EA,#FFE2CE);padding:20px;}
 .login-card{background:#fff;width:100%;max-width:380px;padding:38px 32px;border-radius:24px;box-shadow:0 18px 50px rgba(170,90,45,.22);text-align:center;}
 .login-logo{height:62px;width:auto;max-width:78%;object-fit:contain;display:block;margin:0 auto;}
-.login-title{font-size:22px;color:var(--gotgam-t);font-weight:800;margin-top:10px;}  /* 흰 6.03:1 */
-.login-sub{font-size:12.5px;color:var(--sub);font-weight:700;margin:4px 0 20px;display:inline-flex;align-items:center;gap:5px;}
+.login-title{font-size:1.375rem;color:var(--gotgam-t);font-weight:800;margin-top:10px;}  /* 흰 6.03:1 */
+.login-sub{font-size:0.78125rem;color:var(--sub);font-weight:700;margin:4px 0 20px;display:inline-flex;align-items:center;gap:5px;}
 .login-gotgam{width:16px;height:16px;object-fit:contain;}
-.login-input{width:100%;height:46px;border:2px solid var(--gotgam-l);border-radius:12px;text-align:center;font-size:15px;outline:none;margin-bottom:10px;}
+.login-input{width:100%;height:46px;border:2px solid var(--gotgam-l);border-radius:12px;text-align:center;font-size:0.9375rem;outline:none;margin-bottom:10px;}
 .login-input:focus{border-color:var(--gotgam);}
-.login-btn{width:100%;height:48px;margin-top:8px;border:none;border-radius:12px;background:var(--gotgam-d);color:#fff;font-size:16px;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
+.login-btn{width:100%;height:48px;margin-top:8px;border:none;border-radius:12px;background:var(--gotgam-d);color:#fff;font-size:1rem;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
 .login-btn:hover{background:var(--gotgam-t);}  /* 흰글자 6.03:1 */
-.login-err{color:#C62828;font-size:13px;font-weight:700;margin-top:10px;min-height:18px;}
+.login-err{color:#C62828;font-size:0.8125rem;font-weight:700;margin-top:10px;min-height:18px;}
 
 /* 앱 */
 .app{min-height:100vh;display:flex;flex-direction:column;}
 .topbar{background:#fff;display:flex;align-items:center;gap:12px;padding:12px 20px;}
 .brand-logo{height:34px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));}
-.brand-title{font-size:20px;font-weight:800;color:var(--gotgam-t);line-height:1.1;}  /* 흰 6.03:1 */
-.brand-sub{font-size:12px;font-weight:700;color:var(--sub);margin-top:2px;}
+/* line-height 1.1 은 한글 글자상자(약 1.2em)보다 좁아 글자가 줄상자 밖으로 삐져나왔다(기본 2px·200% 5px).
+   1.2 로 올려 글자를 줄상자 안에 담고, 늘어난 2px 만큼 아래 .brand-sub 의 margin-top(2px)을 없애
+   헤더 전체 높이(64px)와 부제 위치는 그대로 유지한다. */
+.brand-title{font-size:1.25rem;font-weight:800;color:var(--gotgam-t);line-height:1.2;}  /* 흰 6.03:1 */
+.brand-sub{font-size:0.75rem;font-weight:700;color:var(--sub);margin-top:0;}
 .top-actions{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .rt-dot{color:#1F7A41;font-size:12px;}      /* 흰 5.36:1 */
 .rt-dot.off{color:var(--dim);}              /* 흰 5.36:1 (기존 #bbb 는 1.92:1) */
-.top-btn{border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;}
+.top-btn{border:none;border-radius:10px;padding:10px 14px;font-size:0.8125rem;font-weight:700;cursor:pointer;}
 .top-btn.solid{background:var(--gotgam-d);color:#fff;}          /* 흰글자 4.71:1 */
 .top-btn.solid:hover{background:var(--gotgam-t);}               /* 흰글자 6.03:1 */
 .top-btn.ghost{background:var(--gotgam-ll);color:var(--gotgam-t);}  /* #FFF1E8 위 5.46:1 */
 .top-btn.danger{background:var(--danger);color:#fff;}           /* 흰글자 5.44:1 */
 .topline{height:3px;background:var(--gotgam);}
 
+/* 탭 패널 2개를 감싸는 유일한 <main> — 예전에 .content 가 직접 하던 «남은 높이 채우기»를
+   그대로 이어받아(세로 flex + flex:1) 푸터 위치가 달라지지 않게 한다(레이아웃 무변화). */
+#main{flex:1;display:flex;flex-direction:column;}
 .content{flex:1;padding:18px 20px 30px;max-width:1100px;width:100%;margin:0 auto;}
-.search-hint{font-size:13.5px;font-weight:700;color:var(--sub);margin-bottom:12px;}
+.search-hint{font-size:0.84375rem;font-weight:700;color:var(--sub);margin-bottom:12px;}
 .toolbar{display:flex;align-items:center;gap:10px;margin:12px 0 14px;flex-wrap:wrap;}
-.search-input{height:42px;border:1.5px solid var(--gotgam-l);border-radius:12px;padding:0 14px;font-size:14px;outline:none;background:#fff;}
+.search-input{height:42px;border:1.5px solid var(--gotgam-l);border-radius:12px;padding:0 14px;font-size:0.875rem;outline:none;background:#fff;}
 .search-input.wide{flex:1;min-width:200px;}
 .search-input:focus{border-color:var(--gotgam);}
-.sort-select{height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 10px;font-size:13px;font-weight:700;background:#fff;cursor:pointer;}
-.count{font-size:14px;font-weight:800;color:var(--gotgam-t);margin-left:auto;}  /* 흰 6.03:1 */
+.sort-select{height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 10px;font-size:0.8125rem;font-weight:700;background:#fff;cursor:pointer;}
+.count{font-size:0.875rem;font-weight:800;color:var(--gotgam-t);margin-left:auto;}  /* 흰 6.03:1 */
 
 .chips{display:flex;gap:8px;}
 .chips.wrap{flex-wrap:wrap;}
-.chip{border:1.5px solid var(--gotgam-l);background:#fff;color:var(--gotgam-t);border-radius:18px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;}  /* 흰 6.03:1 */
+.chip{border:1.5px solid var(--gotgam-l);background:#fff;color:var(--gotgam-t);border-radius:18px;padding:7px 14px;font-size:0.8125rem;font-weight:700;cursor:pointer;}  /* 흰 6.03:1 */
 .chip.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 4.71:1 */
 
 .cardlist{display:flex;flex-direction:column;gap:12px;}
 .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;display:flex;align-items:center;gap:14px;border-left:5px solid var(--gotgam);cursor:pointer;transition:transform .12s;}
 .card:hover{transform:translateY(-2px);}
 .card-main{flex:1;min-width:0;}
-.card-title{font-size:16px;font-weight:800;margin-bottom:5px;}
-.card-desc{font-size:13px;color:#7a6f66;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.badge{font-size:12px;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);white-space:nowrap;}  /* #FBE3D4 위 4.89:1 */
+.card-title{font-size:1rem;font-weight:800;margin-bottom:5px;}
+.card-desc{font-size:0.8125rem;color:#7a6f66;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.badge{font-size:0.75rem;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);white-space:nowrap;}  /* #FBE3D4 위 4.89:1 */
 .badge.warn{background:#FFEBEE;color:#C62828;}   /* #FFEBEE 위 4.92:1 (기존 #E53935 는 3.70) */
-.empty{text-align:center;color:var(--dim);font-size:15px;padding:46px 0;line-height:1.7;}  /* 흰 5.36:1 */
+.empty{text-align:center;color:var(--dim);font-size:0.9375rem;padding:46px 0;line-height:1.7;}  /* 흰 5.36:1 */
 
 /* 오류 안내 — 원인(연결/권한/미설정)에 따라 문구가 달라지고 «다시 시도»를 제공 */
 .err-box{padding:40px 16px;text-align:center;}
-.err-title{font-size:16px;font-weight:800;color:var(--ink);margin-bottom:8px;line-height:1.5;}
-.err-desc{font-size:14px;color:var(--sub);line-height:1.7;}   /* 흰 5.74:1 */
-.err-retry{margin-top:16px;font-family:inherit;font-size:14px;font-weight:800;padding:11px 20px;
+.err-title{font-size:1rem;font-weight:800;color:var(--ink);margin-bottom:8px;line-height:1.5;}
+.err-desc{font-size:0.875rem;color:var(--sub);line-height:1.7;}   /* 흰 5.74:1 */
+.err-retry{margin-top:16px;font-family:inherit;font-size:0.875rem;font-weight:800;padding:11px 20px;
   border:none;border-radius:10px;background:var(--gotgam-d);color:#fff;cursor:pointer;}  /* 흰글자 4.71:1 */
 .err-retry:hover{background:var(--gotgam-t);}
 
 .pager-wrap{display:flex;justify-content:center;margin-top:18px;}
 .pager{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
-.page-btn{min-width:38px;height:38px;padding:0 6px;border:none;border-radius:9px;background:#F0E0D5;color:var(--gotgam-t);font-size:14px;font-weight:800;cursor:pointer;}  /* #F0E0D5 위 4.69:1 */
+.page-btn{min-width:38px;height:38px;padding:0 6px;border:none;border-radius:9px;background:#F0E0D5;color:var(--gotgam-t);font-size:0.875rem;font-weight:800;cursor:pointer;}  /* #F0E0D5 위 4.69:1 */
 .page-btn.on{background:var(--gotgam-d);color:#fff;}  /* 흰글자 4.71:1 */
 .page-btn:disabled{opacity:.4;}
 
 /* 모달 */
+/* 모달 — .modal 이 max-height:88vh + .modal-body 내부 스크롤 구조라 글꼴을 키워도 화면 안에 들어온다
+   (200% 확대 실측에서도 넘침 없음). 스크롤이 뒤 본문으로 번지지 않게만 보강(.modal-body). */
 .modal-backdrop{position:fixed;inset:0;background:rgba(60,40,30,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;}
 .modal{background:#fff;width:100%;max-width:600px;max-height:88vh;border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.32);display:flex;flex-direction:column;overflow:hidden;}
 .modal-head{background:var(--gotgam-d);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}  /* 흰글자 4.71:1 */
-.modal-title{font-size:17px;font-weight:800;}
+.modal-title{font-size:1.0625rem;font-weight:800;}
 /* 헤더 위 «흰 반투명»은 배경을 밝혀 흰 ✕ 글자가 3.12:1 로 떨어짐 → 검정 반투명으로 어둡게(6.96:1) */
 .modal-close{background:rgba(0,0,0,.22);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;}
-.modal-body{padding:22px;overflow-y:auto;}
+.modal-body{padding:22px;overflow-y:auto;overscroll-behavior:contain;}
 .field{margin-bottom:15px;}
-.field-label{font-size:13px;font-weight:800;color:var(--gotgam-t);margin-bottom:5px;}  /* 흰 6.03:1 */
-.field-value{font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
-.form-input{width:100%;height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 12px;font-size:14px;font-family:inherit;outline:none;}
-.form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
+.field-label{font-size:0.8125rem;font-weight:800;color:var(--gotgam-t);margin-bottom:5px;}  /* 흰 6.03:1 */
+.field-value{font-size:0.875rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+.form-input{width:100%;height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 12px;font-size:0.875rem;font-family:inherit;outline:none;}
+.form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:10px 12px;font-size:0.875rem;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
 .form-input:focus,.form-textarea:focus{border-color:var(--gotgam);}
 .modal-actions{display:flex;gap:10px;margin-top:8px;}
-.modal-actions .top-btn{flex:1;height:46px;font-size:15px;}
+/* height 고정이면 글꼴 확대 시 글자가 버튼 밖으로 잘린다(200% 실측) → 최소 높이로 */
+.modal-actions .top-btn{flex:1;min-height:46px;font-size:0.9375rem;}
 .modal-actions .top-btn.danger{flex:0 0 100px;}
 
 /* 로그인 없이 입장(임시 공개) 버튼 */
+/* ⚠ font-size 는 px 유지(예외) — 높이 44px 고정 + 2줄(line-height 1.25) 버튼이라
+   글꼴 확대 시 글자가 버튼 밖으로 3px 넘쳤음(20px 기준 검증). 임시 공개용 버튼이라 현행 유지 */
 .guest-btn{width:100%;height:44px;margin-top:10px;border:2px dashed var(--gotgam-l);border-radius:12px;background:#fff;color:var(--gotgam-t);font-size:13.5px;font-weight:800;cursor:pointer;line-height:1.25;}  /* 흰 6.03:1 */
 .guest-btn:hover{background:var(--gotgam-ll);border-color:var(--gotgam);}
 
 /* 임시 공개 안내 배너 */
-.guest-banner{display:flex;align-items:center;gap:10px;margin:0;padding:10px 16px;background:#FFF3CD;border-bottom:1px solid #F0DDA0;color:#7A5B00;font-size:13px;font-weight:700;}
+.guest-banner{display:flex;align-items:center;gap:10px;margin:0;padding:10px 16px;background:#FFF3CD;border-bottom:1px solid #F0DDA0;color:#7A5B00;font-size:0.8125rem;font-weight:700;}
 .guest-banner .gb-text{flex:1;}
 .guest-banner .gb-close{flex:0 0 auto;border:none;background:transparent;color:#7A5B00;font-size:16px;font-weight:800;cursor:pointer;padding:2px 6px;}
 
@@ -162,47 +178,54 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   box-shadow:0 3px 10px rgba(16,25,46,.30);}
 .inapp-emoji{font-size:20px;flex-shrink:0;line-height:1.4;}
 .inapp-body{flex:1;min-width:0;}
-.inapp-text{font-size:14px;font-weight:700;line-height:1.5;}
+.inapp-text{font-size:0.875rem;font-weight:700;line-height:1.5;}
 .inapp-text b{text-decoration:underline;}
 .inapp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;}
-.inapp-btn{font-family:inherit;font-size:13px;font-weight:800;padding:8px 14px;border-radius:9px;
+.inapp-btn{font-family:inherit;font-size:0.8125rem;font-weight:800;padding:8px 14px;border-radius:9px;
   cursor:pointer;background:#fff;color:#10192E;border:none;}
 .inapp-btn:active{transform:scale(.98);}
 .inapp-btn.ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.75);}
+/* 손가락 조작 최소 크기 24x24 CSS px 확보(실측 19.4x23.6 로 미달) */
 .inapp-close{font-size:14px;color:rgba(255,255,255,.9);padding:2px 4px;flex-shrink:0;cursor:pointer;
-  background:none;border:none;font-family:inherit;line-height:1.4;}
+  background:none;border:none;font-family:inherit;line-height:1.4;
+  min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center;}
 
 /* 푸터(상주 곶감 은은한 포인트) */
-.appfoot{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:16px;color:var(--sub);font-size:12px;font-weight:700;border-top:1px solid var(--line);}
+.appfoot{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:16px;color:var(--sub);font-size:0.75rem;font-weight:700;border-top:1px solid var(--line);}
 .foot-gotgam{width:20px;height:20px;object-fit:contain;opacity:.85;}
-.foot-link{border:none;background:transparent;color:var(--gotgam-t);font-size:12px;font-weight:800;cursor:pointer;text-decoration:underline;padding:4px 6px;border-radius:6px;}  /* 크림 5.69:1 */
-.foot-link:hover{color:var(--ink);}   /* hover 도 AA 유지(크림 8.4:1) — 기존 --gotgam 은 3.03 */
+.foot-link{border:none;background:transparent;color:var(--gotgam-t);font-size:0.75rem;font-weight:800;cursor:pointer;text-decoration:underline;padding:4px 6px;border-radius:6px;}  /* 크림 5.69:1 */
+.foot-link:hover{color:var(--ink);}
+/* 푸터 문의 창구(시민앱과 동일 문구·위치) */
+.foot-mail{color:var(--gotgam-t);font-weight:800;text-decoration:underline;}  /* 크림 5.69:1 */
+.foot-mail:hover{color:var(--ink);}   /* hover 도 AA 유지(크림 8.4:1) — 기존 --gotgam 은 3.03 */
 
 /* 개인정보 처리방침 본문 */
-.pp-intro{font-size:14px;line-height:1.7;color:var(--ink);margin-bottom:14px;}
-.pp-h{font-size:14.5px;font-weight:800;color:var(--gotgam-t);margin:16px 0 6px;}  /* 흰 6.03:1 */
-.pp-p{font-size:13.5px;line-height:1.7;color:var(--ink);}
-.pp-list{margin:0 0 4px;padding-left:20px;font-size:13.5px;line-height:1.7;color:var(--ink);}
+.pp-intro{font-size:0.875rem;line-height:1.7;color:var(--ink);margin-bottom:14px;}
+.pp-h{font-size:0.90625rem;font-weight:800;color:var(--gotgam-t);margin:16px 0 6px;}  /* 흰 6.03:1 */
+.pp-p{font-size:0.84375rem;line-height:1.7;color:var(--ink);}
+.pp-list{margin:0 0 4px;padding-left:20px;font-size:0.84375rem;line-height:1.7;color:var(--ink);}
 .pp-list li{margin-bottom:4px;}
-.pp-foot{margin-top:18px;font-size:12.5px;line-height:1.6;color:var(--sub);border-top:1px dashed var(--line);padding-top:12px;}
+.pp-foot{margin-top:18px;font-size:0.78125rem;line-height:1.6;color:var(--sub);border-top:1px dashed var(--line);padding-top:12px;}
 
 /* 버전별 개선사항(체인지로그) 모달 본문 */
 .cl-entry{padding:14px 2px;border-bottom:1px solid var(--line);}
 .cl-entry:last-child{border-bottom:none;}
 .cl-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
-.cl-ver{font-size:13px;font-weight:800;color:#fff;background:var(--gotgam-d);border-radius:7px;padding:3px 9px;}  /* 흰글자 4.71:1 */
-.cl-date{font-size:12px;color:var(--sub);font-weight:700;}
-.cl-title{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:8px;}
+.cl-ver{font-size:0.8125rem;font-weight:800;color:#fff;background:var(--gotgam-d);border-radius:7px;padding:3px 9px;}  /* 흰글자 4.71:1 */
+.cl-date{font-size:0.75rem;color:var(--sub);font-weight:700;}
+.cl-title{font-size:0.9375rem;font-weight:800;color:var(--ink);margin-bottom:8px;}
 .cl-items{list-style:disc;margin:0;padding-left:20px;}
-.cl-items li{font-size:13.5px;line-height:1.7;color:var(--ink);margin-bottom:5px;}
+.cl-items li{font-size:0.84375rem;line-height:1.7;color:var(--ink);margin-bottom:5px;}
 
 /* ── 정책제안 관리(관리자 남색 톤) ── */
 :root{ --navy:#1B2A4A; --navy-d:#10192E; --navy-l:#E3E8F2; --navy-ll:#F1F4FA; }
 
 /* 상단 탭바 */
-.tabbar{display:flex;gap:8px;max-width:1100px;width:100%;margin:0 auto;padding:12px 20px 0;}
+/* 좁은 화면 + 큰 글꼴에서 탭이 한 줄에 안 들어가면 가로 스크롤이 생기므로 줄바꿈을 허용한다.
+   줄바꿈됐을 때 위아래 탭이 붙어 한 덩어리로 보이도록 세로 간격은 0(가로만 8px). */
+.tabbar{display:flex;flex-wrap:wrap;column-gap:8px;row-gap:0;max-width:1100px;width:100%;margin:0 auto;padding:12px 20px 0;}
 .tab-btn{flex:0 0 auto;border:1.5px solid var(--line);border-bottom:none;background:#fff;color:var(--sub);
-  border-radius:12px 12px 0 0;padding:11px 20px;font-size:14px;font-weight:800;cursor:pointer;}
+  border-radius:12px 12px 0 0;padding:11px 20px;font-size:0.875rem;font-weight:800;cursor:pointer;}
 .tab-btn.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 4.71:1 */
 #tabProposals.on{background:var(--navy);border-color:var(--navy);}
 
@@ -214,18 +237,18 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .pcard.hidden-row{opacity:.75;border-left-color:#9AA4B8;background:#FAFBFD;}
 .pcard-main{flex:1;min-width:0;}
 .pcard-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px;}
-.pcard-title{font-size:16px;font-weight:800;}
-.pcard-meta{font-size:12.5px;color:#7a6f66;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.pcard-title{font-size:1rem;font-weight:800;}
+.pcard-meta{font-size:0.78125rem;color:#7a6f66;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 
 /* 상태 뱃지 */
-.st-badge{font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:8px;white-space:nowrap;}
+.st-badge{font-size:0.71875rem;font-weight:800;padding:4px 10px;border-radius:8px;white-space:nowrap;}
 .st-접수{background:#E3E8F2;color:#1B2A4A;}
 .st-검토중{background:#FFF3CD;color:#7A5B00;}
 .st-반영{background:#E3F6EA;color:#1F7A41;}
 .st-불채택{background:#FDE7E7;color:#C0392B;}
 .st-보류{background:#ECEFF3;color:#5A6678;}
-.cat-tag{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);}  /* #FBE3D4 위 4.89:1 */
-.hide-tag{font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:8px;background:#37404F;color:#fff;}
+.cat-tag{font-size:0.71875rem;font-weight:700;padding:4px 9px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);}  /* #FBE3D4 위 4.89:1 */
+.hide-tag{font-size:0.71875rem;font-weight:800;padding:4px 9px;border-radius:8px;background:#37404F;color:#fff;}
 .like-tag{font-weight:800;color:var(--navy);}
 .report-tag{font-weight:800;color:var(--danger);}  /* 흰 5.44:1 */
 
@@ -233,26 +256,35 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .modal-head.admin{background:var(--navy);}
 .tab-btn:focus-visible,.st-select:focus{outline:2px solid var(--navy);}
 .st-select{width:100%;height:42px;border:1.5px solid var(--navy-l);border-radius:10px;padding:0 12px;
-  font-size:14px;font-weight:700;font-family:inherit;background:#fff;cursor:pointer;outline:none;}
-.modal-actions .nav-btn{flex:1;height:46px;font-size:15px;border:none;border-radius:10px;font-weight:800;cursor:pointer;
+  font-size:0.875rem;font-weight:700;font-family:inherit;background:#fff;cursor:pointer;outline:none;}
+.modal-actions .nav-btn{flex:1;min-height:46px;font-size:0.9375rem;border:none;border-radius:10px;font-weight:800;cursor:pointer;
   background:var(--navy);color:#fff;}
 .modal-actions .nav-btn:hover{background:var(--navy-d);}
-.pm-body-text{font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+.pm-body-text{font-size:0.875rem;line-height:1.7;white-space:pre-wrap;word-break:break-word;
   background:var(--navy-ll);border:1px solid var(--navy-l);border-radius:10px;padding:12px 14px;}
-.pm-reports{background:#FFF5F5;border:1px solid #F3CFCF;border-radius:10px;padding:10px 12px;font-size:13px;color:#8A3A30;}
+.pm-reports{background:#FFF5F5;border:1px solid #F3CFCF;border-radius:10px;padding:10px 12px;font-size:0.8125rem;color:#8A3A30;}
 .pm-reports .pm-rep-item{padding:4px 0;border-bottom:1px dashed #EDC9C9;}
 .pm-reports .pm-rep-item:last-child{border-bottom:none;}
-.toggle-line{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer;}
+.toggle-line{display:flex;align-items:center;gap:8px;font-size:0.84375rem;font-weight:700;color:var(--ink);cursor:pointer;}
+
+/* 실시간 변경 알림 띠 — 화면을 저절로 갈아끼우는 대신 «새로고침»을 사용자가 누르게 한다 */
+.rt-banner{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:10px 14px;
+  background:var(--gotgam-ll);border:1.5px solid var(--gotgam-l);border-radius:12px;
+  color:var(--ink);font-size:0.875rem;font-weight:700;}
+.rt-banner-text{flex:1;min-width:0;}
+.rt-banner-btn{flex-shrink:0;border:none;border-radius:9px;padding:8px 14px;min-height:24px;
+  background:var(--gotgam-d);color:#fff;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
+.rt-banner-btn:hover{background:var(--gotgam-t);}  /* 흰글자 6.03:1 */
 
 /* 반응형(핸드폰) */
 @media (max-width:600px){
   .topbar{flex-wrap:wrap;padding:10px 14px;}
-  .brand-title{font-size:18px;}
+  .brand-title{font-size:1.125rem;}
   .top-actions{width:100%;margin-left:0;}
   .top-btn{flex:1;text-align:center;}
   .content{padding:14px;}
   .card{padding:14px;}
-  .card-title{font-size:15px;}
+  .card-title{font-size:0.9375rem;}
 }
 
 /* 반응형(공무원 PC·넓은 화면) — 목록 2단, 여백 활용 */

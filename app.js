@@ -72,6 +72,9 @@ function closeModal(modal) {
   if (_activeModal === modal) _activeModal = null;
   if (_lastFocus && typeof _lastFocus.focus === "function") { try { _lastFocus.focus(); } catch (e) {} }
   _lastFocus = null;
+  // ★ 모달이 열려 있는 동안 도착한 알림은 rtBusy() 때문에 띠가 «숨겨진 채» 카운트만 쌓인다.
+  //   닫을 때 다시 계산해 주지 않으면 다음 실시간 이벤트가 올 때까지 알림이 영영 안 뜬다.
+  try { syncRtBanners(); } catch (e) { /* 초기화 전이면 무시 */ }
 }
 
 // ---------- 버전 정보 + 버전별 개선사항(체인지로그) ----------
@@ -265,7 +268,8 @@ function bindUI() {
   const ver = window.APP_VERSION || "";
   if (vbtn && ver) {
     vbtn.textContent = "v" + ver;                // 단일 소스에서 버전 주입
-    vbtn.setAttribute("aria-label", "현재 버전 " + ver + ", 버전별 개선사항 보기");
+    // 음성 명령이 «보이는 글자»로 눌리도록 접근명 맨 앞에 화면 텍스트(v0.0.2 등)를 그대로 둔다
+    vbtn.setAttribute("aria-label", "v" + ver + " — 버전별 개선사항 보기");
   }
   if (vm && vbtn) {
     renderChangelog();
@@ -284,15 +288,44 @@ async function loadBenefits() {
     return;
   }
   ALL = data || [];
+  RT_PENDING = 0; syncRtBanners();     // 새로 불러왔으니 «밀린 알림»도 지운다
   CATS = [...new Set(ALL.flatMap((r) => r.categories || []))].sort();
   $("#dbInfo").textContent = `사업 ${ALL.length}건 · 실시간`;
   renderCats();
   render();
 }
 
+// ── 실시간 변경 «알림»(자동 갱신 아님) ────────────────────────────────
+// 예전에는 새 데이터가 오면 목록을 즉시 갈아끼웠다. 보고 있던 위치가 사라지고,
+// 모달을 열어 편집하는 중에도 뒤 목록이 바뀌어 «정지 기능»(KWCAG 6.2.2)이 필요한
+// 자동 변경이었다. → 이제는 누적 건수만 띠로 알리고, 갱신은 사용자가 누를 때만 한다.
+let RT_PENDING = 0, PRT_PENDING = 0;
+
+// 모달이 열려 있으면(=편집 중) 알림 띠도 띄우지 않는다 — 작업 방해 금지
+function rtBusy() {
+  return ["#modal", "#pModal", "#ppModal", "#versionModal"]
+    .some((s) => { const m = $(s); return m && !m.classList.contains("hidden"); });
+}
+
+function syncRtBanners() {
+  const busy = rtBusy();
+  const b = $("#rtBanner"), p = $("#pRtBanner");
+  if (b) {
+    const show = RT_PENDING > 0 && !busy;
+    if (show) $("#rtText").textContent = `사업 정보 변경 ${RT_PENDING}건이 있습니다`;
+    b.hidden = !show;
+  }
+  if (p) {
+    const show = PRT_PENDING > 0 && !busy;
+    if (show) $("#pRtText").textContent = `새 제안·변경 ${PRT_PENDING}건이 있습니다`;
+    p.hidden = !show;
+  }
+}
+
 function subscribeRealtime() {
   sb.channel("benefits-rt")
-    .on("postgres_changes", { event: "*", schema: "public", table: "benefits" }, () => loadBenefits())
+    .on("postgres_changes", { event: "*", schema: "public", table: "benefits" },
+        () => { RT_PENDING += 1; syncRtBanners(); })   // 화면은 그대로, «알림»만
     .subscribe((status) => { $("#realtimeDot").classList.toggle("off", status !== "SUBSCRIBED"); });
 }
 
@@ -532,8 +565,28 @@ let P_REPORTS = {}; // proposal_id -> 신고 건수
 let pCurrentTab = "benefits";
 
 function bindProposalsUI() {
-  $("#tabBenefits").onclick = () => switchTab("benefits");
-  $("#tabProposals").onclick = () => switchTab("proposals");
+  // 실시간 알림 띠의 «새로고침» — 목록 갱신은 오직 이 클릭으로만 일어난다
+  const rtb = $("#rtBtn"); if (rtb) rtb.onclick = () => { RT_PENDING = 0; syncRtBanners(); loadBenefits(); };
+  const prtb = $("#pRtBtn"); if (prtb) prtb.onclick = () => { PRT_PENDING = 0; syncRtBanners(); loadProposals(); };
+
+  // 탭: 클릭 + 좌우/Home/End 화살표 이동(WAI-ARIA tablist 표준 조작).
+  // PC앱(webui)과 같은 규약 — 탭바는 Tab 키 «한 번»으로 진입하고(로빙 tabindex),
+  // 그 안에서는 화살표로 이동한다. 마우스 없이도 탭을 모두 쓸 수 있게 하는 것이 목적.
+  const TABS = [$("#tabBenefits"), $("#tabProposals")];
+  TABS.forEach((t, i) => {
+    t.onclick = () => switchTab(i === 0 ? "benefits" : "proposals");
+    t.addEventListener("keydown", (e) => {
+      let j = -1;
+      if (e.key === "ArrowRight") j = (i + 1) % TABS.length;
+      else if (e.key === "ArrowLeft") j = (i - 1 + TABS.length) % TABS.length;
+      else if (e.key === "Home") j = 0;
+      else if (e.key === "End") j = TABS.length - 1;
+      if (j < 0) return;
+      e.preventDefault();
+      TABS[j].focus();
+      TABS[j].click();
+    });
+  });
   $("#pSearch").addEventListener("input", debounce(() => { pPage = 0; renderProposals(); }, 300));
   $("#pSortSel").addEventListener("change", () => { pSort = $("#pSortSel").value; renderProposals(); });
   $("#pmClose").onclick = () => closeModal($("#pModal"));
@@ -548,11 +601,15 @@ function switchTab(which) {
   $("#tabProposals").classList.toggle("on", !onBenefits);
   $("#tabBenefits").setAttribute("aria-selected", onBenefits ? "true" : "false");
   $("#tabProposals").setAttribute("aria-selected", onBenefits ? "false" : "true");
+  // 로빙 tabindex: 선택된 탭만 Tab 키 순서에 남긴다(탭바 전체가 Tab 한 번으로 진입)
+  $("#tabBenefits").tabIndex = onBenefits ? 0 : -1;
+  $("#tabProposals").tabIndex = onBenefits ? -1 : 0;
+  // 보이는 쪽만 남긴다. class(스타일) + hidden 속성(보조기기·검사기) 둘 다 맞춰 준다.
   $("#secBenefits").classList.toggle("hidden", !onBenefits);
   $("#secProposals").classList.toggle("hidden", onBenefits);
-  // 건너뛰기 링크 목적지를 현재 보이는 본문으로 맞춘다(숨겨진 main 으로 점프 방지)
-  const skip = $(".skip-link");
-  if (skip) skip.setAttribute("href", onBenefits ? "#secBenefits" : "#secProposals");
+  $("#secBenefits").hidden = !onBenefits;
+  $("#secProposals").hidden = onBenefits;
+  // 건너뛰기 링크는 유일한 <main id="main"> 으로 고정 — 탭이 바뀌어도 목적지가 항상 유효하다.
   if (!onBenefits && !P_LOADED) loadProposals();
 }
 
@@ -565,6 +622,7 @@ async function loadProposals() {
     return;
   }
   PALL = data || [];
+  PRT_PENDING = 0; syncRtBanners();    // 새로 불러왔으니 «밀린 알림»도 지운다
   PCATS = [...new Set(PALL.map((r) => r.category).filter(Boolean))].sort();
   P_LOADED = true;
   await loadReportCounts();
@@ -585,7 +643,8 @@ async function loadReportCounts() {
 
 function subscribeProposalsRealtime() {
   sb.channel("proposals-rt")
-    .on("postgres_changes", { event: "*", schema: "public", table: "proposals" }, () => { if (P_LOADED) loadProposals(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "proposals" },
+        () => { if (P_LOADED) { PRT_PENDING += 1; syncRtBanners(); } })   // 화면은 그대로, «알림»만
     .subscribe();
 }
 
