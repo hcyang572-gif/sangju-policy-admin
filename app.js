@@ -279,6 +279,45 @@ function bindUI() {
   }
 }
 
+/* 📌 접수 안내(엑셀 «비고» 열 = benefits.note) — 세 앱 공통 규약
+   «비고»에는 "2026년 접수 마감(매년 3~5월 접수)"처럼 지금 신청할 수 있는지가 담긴다.
+   안 보이면 이미 마감된 사업을 민원인에게 안내하게 되므로 목록·상세(수정)에 모두 노출한다.
+   ★ 아이콘 «📌» + 문구 «접수 안내» 는 시민앱(모바일웹)·PC앱(webui)과 글자 단위로 동일(임의 변경 금지).
+   ★ 색만으로 알리지 않는다 — 배경색과 별개로 «📌 접수 안내» 라는 글자를 항상 함께 쓴다.
+
+   ⚠ note 컬럼은 Supabase 대시보드에서 사람이 직접 추가한다(supabase/add_note_column.sql).
+     아직 없을 수 있으므로 «있으면 쓰고 없으면 조용히 빠진다»를 원칙으로 한다.
+       · 읽기 : select("*") 결과에 키가 없으면 undefined → 배지 미표시(그대로 안전)
+       · 쓰기 : 없는 컬럼을 insert/update 에 넣으면 PGRST204 로 «저장 자체»가 실패한다
+                → NOTE_OK 가 참일 때만 입력칸을 만들고, 만일을 대비해 저장 실패 시 1회 재시도 */
+const NOTE_KEY = "note";
+const NOTE_LABEL = "📌 접수 안내";
+let NOTE_OK = false;   // benefits.note 컬럼 존재 여부(런타임 감지)
+
+function noteText(r) {
+  const v = String((r && r[NOTE_KEY]) || "").replace(/\s+/g, " ").trim();
+  return (v && v !== "nan" && v !== "null" && v !== "undefined") ? v : "";
+}
+
+// 컬럼 존재 감지: 행이 있으면 키 유무로 판정(추가 요청 0회),
+// 행이 하나도 없을 때만 가벼운 probe 질의를 한 번 던진다.
+async function detectNoteColumn(rows) {
+  if (rows && rows.length) {
+    NOTE_OK = Object.prototype.hasOwnProperty.call(rows[0], NOTE_KEY);
+    return;
+  }
+  const { error } = await sb.from("benefits").select(NOTE_KEY).limit(1);
+  NOTE_OK = !error;
+}
+
+// 저장 payload 에서 note 를 제거해야 하는 오류인지(컬럼 미생성) 판정
+function isMissingNoteColumn(error) {
+  if (!error) return false;
+  const code = String(error.code || "");
+  const msg = String(error.message || "").toLowerCase();
+  return code === "PGRST204" || (msg.includes("note") && /column|schema cache/.test(msg));
+}
+
 async function loadBenefits() {
   const { data, error } = await sb.from("benefits").select("*").order("seq", { nullsFirst: false }).order("id");
   if (error) {
@@ -288,6 +327,7 @@ async function loadBenefits() {
     return;
   }
   ALL = data || [];
+  await detectNoteColumn(ALL);          // 📌 접수 안내 컬럼이 준비됐는지 확인
   RT_PENDING = 0; syncRtBanners();     // 새로 불러왔으니 «밀린 알림»도 지운다
   CATS = [...new Set(ALL.flatMap((r) => r.categories || []))].sort();
   $("#dbInfo").textContent = `사업 ${ALL.length}건 · 실시간`;
@@ -362,14 +402,18 @@ function render() {
   slice.forEach((r) => {
     const team = (r.team || "").trim();
     const content = (r.content || "").replace(/\s+/g, " ").trim();
+    const note = noteText(r);          // 📌 접수 안내(비고). 컬럼이 없으면 항상 ""
     const card = el("div", "card");
     // C1: 키보드 접근 — 버튼 의미 부여 + Enter/Space 동작 + 접근명
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-label", `${r.name || "사업"} 수정`);
+    // 색만으로 알리지 않도록 접근명에도 «접수 안내»를 함께 넣는다
+    card.setAttribute("aria-label",
+      `${r.name || "사업"}${note ? `, 접수 안내 ${note}` : ""} 수정`);
     card.innerHTML = `<div class="card-main">
         <div class="card-title">📂 ${esc(r.name)}</div>
         <div class="card-desc">${esc(content.slice(0, 90)) || "—"}</div>
+        ${note ? `<div class="card-note">${NOTE_LABEL} · ${esc(note)}</div>` : ""}
       </div>
       <span class="badge ${team ? "" : "warn"}">${team ? esc(team) : "담당팀 확인 필요"}</span>`;
     // 담당팀 색 구분: 팀명별 결정적 색을 배지에 적용(시민앱과 동일). null이면 중립 유지.
@@ -414,11 +458,22 @@ function renderPager(total, pages) {
 }
 
 // 추가/수정/삭제
+// [화면 라벨, 컬럼명, 여러 줄 여부, 도움말(선택), 강조박스 여부(선택)]
+// ※ 📌 접수 안내(note)는 «지금 신청 가능한지»를 좌우하므로 긴 본문 칸보다 «위»에 둔다
+//    (PC앱 webui/app.js EDIT_FIELDS 와 같은 순서·같은 라벨).
 const FIELDS = [
   ["사업명", "name", false], ["담당팀", "team", false], ["담당 연락처", "contact", false],
-  ["담당자 이메일", "manager_email", false], ["지원 대상", "target", true],
+  ["담당자 이메일", "manager_email", false],
+  [NOTE_LABEL + " (비고)", NOTE_KEY, true,
+   "접수 마감·재접수 시기 등 지금 신청할 수 있는지에 대한 안내. 입력하면 목록과 시민 앱에 함께 표시됩니다.", true],
+  ["지원 대상", "target", true],
   ["사업 내용", "content", true], ["이용 방법", "method", true], ["필요 서류", "documents", true],
 ];
+// 실제로 그릴 입력칸 — note 컬럼이 아직 없으면 그 칸을 통째로 뺀다.
+// (없는 컬럼을 payload 에 담으면 PGRST204 로 «저장 자체»가 실패하기 때문)
+function editFields() {
+  return FIELDS.filter(([, key]) => key !== NOTE_KEY || NOTE_OK);
+}
 // 저장/삭제 실패 메시지: RLS(권한) 거부면 임시공개 안내로 친절하게.
 // ───────── 오류 원인 분류 ─────────
 // 무료 플랜 일시정지로 클라우드가 통째로 멈췄을 때 화면엔 "불러오기 실패"만 떠서
@@ -507,13 +562,16 @@ function writeErrMsg(error, verb) {
 function openEdit(r) {
   $("#mTitle").textContent = r ? "✏ 사업 수정" : "➕ 새 사업 추가";
   let html = "";
-  FIELDS.forEach(([label, key, multi]) => {
+  editFields().forEach(([label, key, multi, hint, notice]) => {
     const v = r ? (r[key] || "") : "";
     // C8: field-label → <label for> 로 input/textarea id와 연결
-    const fid = `f_${key}`;
-    html += `<div class="field"><label class="field-label" for="${fid}">${label}</label>` +
-      (multi ? `<textarea id="${fid}" class="form-textarea" data-k="${key}">${esc(v)}</textarea>`
-             : `<input id="${fid}" class="form-input" data-k="${key}" value="${esc(v)}">`) + `</div>`;
+    const fid = `f_${key}`, hid = hint ? `h_${key}` : "";
+    const aria = hint ? ` aria-describedby="${hid}"` : "";
+    html += `<div class="field${notice ? " notice-field" : ""}">` +
+      `<label class="field-label" for="${fid}">${label}</label>` +
+      (hint ? `<p class="field-hint" id="${hid}">${esc(hint)}</p>` : ``) +
+      (multi ? `<textarea id="${fid}" class="form-textarea" data-k="${key}"${aria}>${esc(v)}</textarea>`
+             : `<input id="${fid}" class="form-input" data-k="${key}"${aria} value="${esc(v)}">`) + `</div>`;
   });
   html += `<div class="modal-actions"><button id="mSave" class="top-btn solid">💾 저장</button>` +
     (r ? `<button id="mDel" class="top-btn danger">🗑 삭제</button>` : ``) + `</div>`;
@@ -524,8 +582,15 @@ function openEdit(r) {
     if (!(obj.name || "").trim()) { announce("사업명을 입력하세요."); alert("사업명을 입력하세요."); const nm = $("#f_name"); if (nm) nm.focus(); return; }
     if (r) {
       // 낙관적 잠금: 내가 연 이후 다른 담당자가 먼저 수정했는지 updated_at으로 확인
-      const { data, error } = await sb.from("benefits")
+      let { data, error } = await sb.from("benefits")
         .update(obj).eq("id", r.id).eq("updated_at", r.updated_at).select();
+      // 📌 접수 안내 컬럼이 그사이 사라졌거나 감지가 어긋난 경우 — note 를 빼고 1회만 재시도.
+      // (사업 내용 전체가 저장 실패로 날아가는 것보다, 접수 안내만 못 담는 편이 낫다)
+      if (error && isMissingNoteColumn(error) && NOTE_KEY in obj) {
+        NOTE_OK = false; delete obj[NOTE_KEY];
+        ({ data, error } = await sb.from("benefits")
+          .update(obj).eq("id", r.id).eq("updated_at", r.updated_at).select());
+      }
       if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
       if (!data || !data.length) {
         announce("다른 담당자가 먼저 수정했습니다. 새로고침합니다.");
@@ -535,7 +600,11 @@ function openEdit(r) {
         return;
       }
     } else {
-      const { error } = await sb.from("benefits").insert(obj);
+      let { error } = await sb.from("benefits").insert(obj);
+      if (error && isMissingNoteColumn(error) && NOTE_KEY in obj) {
+        NOTE_OK = false; delete obj[NOTE_KEY];
+        ({ error } = await sb.from("benefits").insert(obj));
+      }
       if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
     }
     closeModal($("#modal"));
