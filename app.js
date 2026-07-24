@@ -2,6 +2,8 @@
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // 📎 서식 스토리지 공용 헬퍼(forms.js)가 같은 클라이언트를 쓰도록 넘겨준다(중복 생성 방지).
 if (window.SangjuForms) SangjuForms.useClient(sb);
+// 📥 신청 접수 공용 헬퍼(apply_client.js)도 같은 클라이언트를 쓰도록 넘겨준다.
+if (window.SangjuApply) SangjuApply.useClient(sb);
 const $ = (s) => document.querySelector(s);
 
 let ALL = [], CATS = [], SELCATS = new Set(), sortKey = "seq", page = 0;
@@ -237,10 +239,14 @@ async function showApp() {
   }
   bindUI();
   bindProposalsUI();
+  bindApplicationsUI();
   await loadBenefits();
   subscribeRealtime();
   // 정책제안: 탭 진입 시 1회 로드(초기엔 비활성 섹션이라 미로드 → 첫 탭 전환에서 로드)
   subscribeProposalsRealtime();
+  // 📥 신청 접수: 공무원 1순위 업무 → 기본(첫) 탭. 즉시 로드 + 실시간 구독.
+  subscribeApplicationsRealtime();
+  loadApplications();
 }
 
 function bindUI() {
@@ -341,17 +347,17 @@ async function loadBenefits() {
 // 예전에는 새 데이터가 오면 목록을 즉시 갈아끼웠다. 보고 있던 위치가 사라지고,
 // 모달을 열어 편집하는 중에도 뒤 목록이 바뀌어 «정지 기능»(KWCAG 6.2.2)이 필요한
 // 자동 변경이었다. → 이제는 누적 건수만 띠로 알리고, 갱신은 사용자가 누를 때만 한다.
-let RT_PENDING = 0, PRT_PENDING = 0;
+let RT_PENDING = 0, PRT_PENDING = 0, ART_PENDING = 0;
 
 // 모달이 열려 있으면(=편집 중) 알림 띠도 띄우지 않는다 — 작업 방해 금지
 function rtBusy() {
-  return ["#modal", "#pModal", "#ppModal", "#versionModal"]
+  return ["#modal", "#pModal", "#aModal", "#ppModal", "#versionModal"]
     .some((s) => { const m = $(s); return m && !m.classList.contains("hidden"); });
 }
 
 function syncRtBanners() {
   const busy = rtBusy();
-  const b = $("#rtBanner"), p = $("#pRtBanner");
+  const b = $("#rtBanner"), p = $("#pRtBanner"), a = $("#aRtBanner");
   if (b) {
     const show = RT_PENDING > 0 && !busy;
     if (show) $("#rtText").textContent = `사업 정보 변경 ${RT_PENDING}건이 있습니다`;
@@ -361,6 +367,11 @@ function syncRtBanners() {
     const show = PRT_PENDING > 0 && !busy;
     if (show) $("#pRtText").textContent = `새 제안·변경 ${PRT_PENDING}건이 있습니다`;
     p.hidden = !show;
+  }
+  if (a) {
+    const show = ART_PENDING > 0 && !busy;
+    if (show) $("#aRtText").textContent = `새 접수·변경 ${ART_PENDING}건이 있습니다`;
+    a.hidden = !show;
   }
 }
 
@@ -735,13 +746,15 @@ function bindProposalsUI() {
   // 실시간 알림 띠의 «새로고침» — 목록 갱신은 오직 이 클릭으로만 일어난다
   const rtb = $("#rtBtn"); if (rtb) rtb.onclick = () => { RT_PENDING = 0; syncRtBanners(); loadBenefits(); };
   const prtb = $("#pRtBtn"); if (prtb) prtb.onclick = () => { PRT_PENDING = 0; syncRtBanners(); loadProposals(); };
+  const artb = $("#aRtBtn"); if (artb) artb.onclick = () => { ART_PENDING = 0; syncRtBanners(); loadApplications(); };
 
   // 탭: 클릭 + 좌우/Home/End 화살표 이동(WAI-ARIA tablist 표준 조작).
   // PC앱(webui)과 같은 규약 — 탭바는 Tab 키 «한 번»으로 진입하고(로빙 tabindex),
   // 그 안에서는 화살표로 이동한다. 마우스 없이도 탭을 모두 쓸 수 있게 하는 것이 목적.
-  const TABS = [$("#tabBenefits"), $("#tabProposals")];
+  const WHICH = ["applications", "benefits", "proposals"];
+  const TABS = [$("#tabApplications"), $("#tabBenefits"), $("#tabProposals")];
   TABS.forEach((t, i) => {
-    t.onclick = () => switchTab(i === 0 ? "benefits" : "proposals");
+    t.onclick = () => switchTab(WHICH[i]);
     t.addEventListener("keydown", (e) => {
       let j = -1;
       if (e.key === "ArrowRight") j = (i + 1) % TABS.length;
@@ -763,21 +776,27 @@ function bindProposalsUI() {
 
 function switchTab(which) {
   pCurrentTab = which;
-  const onBenefits = which === "benefits";
-  $("#tabBenefits").classList.toggle("on", onBenefits);
-  $("#tabProposals").classList.toggle("on", !onBenefits);
-  $("#tabBenefits").setAttribute("aria-selected", onBenefits ? "true" : "false");
-  $("#tabProposals").setAttribute("aria-selected", onBenefits ? "false" : "true");
-  // 로빙 tabindex: 선택된 탭만 Tab 키 순서에 남긴다(탭바 전체가 Tab 한 번으로 진입)
-  $("#tabBenefits").tabIndex = onBenefits ? 0 : -1;
-  $("#tabProposals").tabIndex = onBenefits ? -1 : 0;
-  // 보이는 쪽만 남긴다. class(스타일) + hidden 속성(보조기기·검사기) 둘 다 맞춰 준다.
-  $("#secBenefits").classList.toggle("hidden", !onBenefits);
-  $("#secProposals").classList.toggle("hidden", onBenefits);
-  $("#secBenefits").hidden = !onBenefits;
-  $("#secProposals").hidden = onBenefits;
+  // 탭 3종: 신청 접수 · 사업 관리 · 정책제안 관리. 선택된 하나만 보이고 나머지는 숨긴다.
+  const MAP = {
+    applications: { tab: "#tabApplications", sec: "#secApplications" },
+    benefits:     { tab: "#tabBenefits",     sec: "#secBenefits" },
+    proposals:    { tab: "#tabProposals",    sec: "#secProposals" },
+  };
+  Object.keys(MAP).forEach((k) => {
+    const on = k === which;
+    const t = $(MAP[k].tab), s = $(MAP[k].sec);
+    if (t) {
+      t.classList.toggle("on", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      // 로빙 tabindex: 선택된 탭만 Tab 키 순서에 남긴다(탭바 전체가 Tab 한 번으로 진입)
+      t.tabIndex = on ? 0 : -1;
+    }
+    // class(스타일) + hidden 속성(보조기기·검사기) 둘 다 맞춰 준다.
+    if (s) { s.classList.toggle("hidden", !on); s.hidden = !on; }
+  });
   // 건너뛰기 링크는 유일한 <main id="main"> 으로 고정 — 탭이 바뀌어도 목적지가 항상 유효하다.
-  if (!onBenefits && !P_LOADED) loadProposals();
+  if (which === "proposals" && !P_LOADED) loadProposals();
+  if (which === "applications" && !A_LOADED) loadApplications();
 }
 
 async function loadProposals() {
@@ -995,4 +1014,216 @@ async function loadReportDetail(proposalId) {
   box.innerHTML = data.map((x) =>
     `<div class="pm-rep-item">• ${esc(x.reason || "(사유 없음)")} <span class="muted-date">(${esc(fmtDate(x.created_at))})</span></div>`
   ).join("");
+}
+
+/* ============================================================
+   📥 신청 접수 관리 (「앱 직접 접수(실시간)」 ②단계) — applications
+   시민앱 신청이 Supabase 로 «직접» 들어와 여기서 실시간 접수·처리된다.
+   공용 헬퍼: window.SangjuApply (apply_client.js). 상태값 4종은 PC와 동일.
+   메일(Web3Forms→PC 자동접수) 경로와 «독립» — 이 모듈은 클라우드 접수만 다룬다.
+   ============================================================ */
+// ⚠ 상태값은 «접수/심사중/승인/반려» 4값(PC config.APPLICATION_STATUSES·SQL CHECK 와 동일)
+const A_STATUSES = (window.SangjuApply && SangjuApply.STATUSES) || ["접수", "심사중", "승인", "반려"];
+let AALL = [], A_STATUS = "전체", aPage = 0, A_LOADED = false;
+
+function bindApplicationsUI() {
+  const s = $("#aSearch");
+  if (s) s.addEventListener("input", debounce(() => { aPage = 0; renderApplications(); }, 300));
+  const c = $("#amClose"); if (c) c.onclick = () => closeModal($("#aModal"));
+  const m = $("#aModal");
+  if (m) m.addEventListener("click", (e) => { if (e.target.id === "aModal") closeModal($("#aModal")); });
+  // Esc·포커스 트랩은 공통 _trapKeydown 이 처리(중복 등록 없음)
+}
+
+async function loadApplications() {
+  let data;
+  try {
+    data = await SangjuApply.listApplications();
+  } catch (err) {
+    console.error(err);
+    // 원인(연결/권한/테이블 미생성)별 안내 + 다시 시도 — 테이블 미실행이어도 앱은 안 깨진다
+    showLoadError("#aList", err, "aListRetry", loadApplications);
+    $("#aCount").textContent = "";
+    $("#aPager").innerHTML = "";
+    return;
+  }
+  AALL = data || [];
+  A_LOADED = true;
+  ART_PENDING = 0; syncRtBanners();   // 새로 불러왔으니 «밀린 알림»도 지운다
+  renderAStatusChips();
+  renderApplications();
+}
+
+function subscribeApplicationsRealtime() {
+  // 시민앱에서 신청하면 즉시 여기로 온다 → 화면을 갈아엎지 않고 «N건» 알림 띠만 올린다.
+  if (!window.SangjuApply) return;
+  SangjuApply.subscribeApplications(() => {
+    if (A_LOADED) { ART_PENDING += 1; syncRtBanners(); }
+  });
+}
+
+function renderAStatusChips() {
+  const box = $("#aStatusChips"); if (!box) return;
+  box.innerHTML = "";
+  ["전체", ...A_STATUSES].forEach((st) => {
+    const c = el("button", "chip" + (A_STATUS === st ? " on" : ""));
+    c.type = "button";
+    c.textContent = st;
+    // 색만으로 필터 상태를 알리지 않도록 접근명에 «선택됨»을 함께 넣는다
+    c.setAttribute("aria-pressed", A_STATUS === st ? "true" : "false");
+    c.onclick = () => { A_STATUS = st; aPage = 0; renderAStatusChips(); renderApplications(); };
+    box.appendChild(c);
+  });
+}
+
+// 신청일시: 날짜+시각(KST 표시). created_at 은 UTC 이므로 로컬(KST) 로 변환해 보여준다.
+function fmtDateTime(s) {
+  if (!s) return "";
+  const d = new Date(s); if (isNaN(d)) return String(s).slice(0, 16);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderApplications() {
+  const list = $("#aList"); if (!list) return;
+  const q = ($("#aSearch") ? $("#aSearch").value : "").trim().toLowerCase();
+  let rows = AALL.filter((r) => {
+    if (A_STATUS !== "전체" && (r.status || "접수") !== A_STATUS) return false;
+    if (q) {
+      const blob = `${r.benefit_name || ""} ${r.applicant_name || ""} ${r.phone || ""} ${r.receipt_no || ""} ${r.team || ""}`.toLowerCase();
+      if (!blob.includes(q)) return false;
+    }
+    return true;
+  });
+  // 최신순(신청일시 내림차순) — listApplications 가 이미 정렬하지만 필터 후에도 유지
+  rows.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+
+  $("#aCount").textContent = `총 ${rows.length}건`;
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty">조건에 맞는 신청이 없습니다.</div>';
+    $("#aPager").innerHTML = "";
+    return;
+  }
+
+  const pages = Math.ceil(rows.length / PAGE);
+  if (aPage >= pages) aPage = pages - 1;
+  if (aPage < 0) aPage = 0;
+  const slice = rows.slice(aPage * PAGE, aPage * PAGE + PAGE);
+  list.innerHTML = "";
+  slice.forEach((r) => {
+    const st = r.status || "접수";
+    const card = el("div", "pcard");
+    // 키보드 접근: role=button + Enter/Space. 상태·사업명·신청자를 접근명에 포함(색 의존 금지).
+    const aLabel = [
+      `상태 ${st}`,
+      `사업 ${r.benefit_name || ""}`,
+      `신청자 ${r.applicant_name || ""}`,
+      r.receipt_no ? `접수번호 ${r.receipt_no}` : "",
+    ].filter(Boolean).join(", ") + " — 접수 처리 열기";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", aLabel);
+    card.innerHTML = `<div class="pcard-main">
+        <div class="pcard-top">
+          <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
+          ${r.team ? `<span class="cat-tag">${esc(r.team)}</span>` : ""}
+          ${r.receipt_no ? `<span class="rc-tag"><span aria-hidden="true">🧾</span> ${esc(r.receipt_no)}</span>` : ""}
+        </div>
+        <div class="pcard-title">${esc(r.benefit_name || "(사업명 없음)")}</div>
+        <div class="pcard-meta">
+          <span><span aria-hidden="true">🙍</span> ${esc(r.applicant_name || "")}</span>
+          ${r.phone ? `<span><span aria-hidden="true">📞</span> ${esc(r.phone)}</span>` : ""}
+          <span><span aria-hidden="true">🗓</span> ${esc(fmtDateTime(r.created_at))}</span>
+        </div>
+        ${r.memo ? `<div class="pcard-memo"><span aria-hidden="true">💬</span> ${esc(r.memo)}</div>` : ""}
+      </div>`;
+    const openIt = () => openApplication(r);
+    card.onclick = openIt;
+    card.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openIt(); }
+    });
+    list.appendChild(card);
+  });
+  renderAPager(rows.length, pages);
+}
+
+// 신청 접수 페이지 이동 — 정책제안·사업목록과 동일한 접근성 규약(nav·aria-label·aria-current)
+function renderAPager(total, pages) {
+  const wrap = $("#aPager"); if (!wrap) return;
+  wrap.innerHTML = "";
+  if (pages <= 1) return;
+  const bar = el("nav", "pager");
+  bar.setAttribute("aria-label", "페이지 이동");
+  const mk = (label, p, dis, act, aria) => {
+    const b = el("button", "page-btn" + (act ? " on" : ""));
+    b.type = "button";
+    b.textContent = label;
+    b.setAttribute("aria-label", aria);
+    if (act) b.setAttribute("aria-current", "page");
+    if (dis) b.disabled = true; else b.onclick = () => { aPage = p; renderApplications(); };
+    bar.appendChild(b);
+  };
+  mk("‹", aPage - 1, aPage <= 0, false, "이전 페이지");
+  let s = Math.max(0, aPage - 4), e = Math.min(pages, s + 9); s = Math.max(0, e - 9);
+  for (let p = s; p < e; p++) mk(String(p + 1), p, false, p === aPage, `${p + 1} 페이지`);
+  mk("›", aPage + 1, aPage >= pages - 1, false, "다음 페이지");
+  wrap.appendChild(bar);
+}
+
+async function openApplication(r) {
+  $("#amTitle").textContent = "📥 신청 접수 처리";
+  const st = r.status || "접수";
+  const optHtml = A_STATUSES.map((s) => `<option value="${s}"${s === st ? " selected" : ""}>${s}</option>`).join("");
+
+  $("#amBody").innerHTML = `
+    <div class="pcard-top mb-10">
+      <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
+      ${r.receipt_no ? `<span class="rc-tag"><span aria-hidden="true">🧾</span> ${esc(r.receipt_no)}</span>` : ""}
+    </div>
+    <div class="field"><div class="field-label">사업명</div><div class="field-value">${esc(r.benefit_name || "")}</div></div>
+    <div class="field"><div class="field-label">신청자</div><div class="field-value"><span aria-hidden="true">🙍</span> ${esc(r.applicant_name || "")}${r.phone ? ` · <span aria-hidden="true">📞</span> <a href="tel:${esc((r.phone || "").replace(/[^0-9+]/g, ""))}">${esc(r.phone)}</a>` : ""}</div></div>
+    <div class="field"><div class="field-label">담당팀</div><div class="field-value">${esc(r.team || "-")}${r.manager_email ? ` · ${esc(r.manager_email)}` : ""}</div></div>
+    <div class="field"><div class="field-label">문의사항</div><div class="pm-body-text">${esc(r.memo || "(없음)")}</div></div>
+    <div class="field"><div class="field-label">신청일시</div><div class="field-value"><span aria-hidden="true">🗓</span> ${esc(fmtDateTime(r.created_at))}${r.source ? ` · ${esc(r.source)}` : ""}</div></div>
+    <div class="field">
+      <label class="field-label" for="amStatus">처리 상태 변경</label>
+      <select id="amStatus" class="st-select">${optHtml}</select>
+    </div>
+    <div class="field">
+      <label class="field-label" for="amMemo"><span aria-hidden="true">📝</span> 처리메모(공무원 기록용)</label>
+      <textarea id="amMemo" class="form-textarea" placeholder="처리 경과·안내 내용을 기록하세요.">${esc(r.admin_memo || "")}</textarea>
+    </div>
+    <div class="modal-actions">
+      <button id="amDelete" class="nav-btn danger" type="button">🗑 삭제</button>
+      <button id="amSave" class="nav-btn" type="button">💾 저장</button>
+    </div>`;
+
+  $("#amSave").onclick = async () => {
+    const newStatus = $("#amStatus").value;
+    const memo = ($("#amMemo").value || "").trim();
+    try {
+      await SangjuApply.updateApplication(r.id, { status: newStatus, admin_memo: memo || null });
+    } catch (err) {
+      const m = writeErrMsg(err, "저장");
+      announce(m); alert(m); return;
+    }
+    closeModal($("#aModal"));
+    announce("신청 접수가 저장되었습니다.");
+    await loadApplications();
+  };
+
+  $("#amDelete").onclick = async () => {
+    if (!confirm(`이 신청(접수번호 ${r.receipt_no || "-"})을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+    try {
+      await SangjuApply.deleteApplication(r.id);
+    } catch (err) {
+      const m = writeErrMsg(err, "삭제");
+      announce(m); alert(m); return;
+    }
+    closeModal($("#aModal"));
+    announce("신청이 삭제되었습니다.");
+    await loadApplications();
+  };
+
+  openModal($("#aModal"));
 }
