@@ -415,7 +415,7 @@ function render() {
         <div class="card-desc">${esc(content.slice(0, 90)) || "—"}</div>
         ${note ? `<div class="card-note">${NOTE_LABEL} · ${esc(note)}</div>` : ""}
       </div>
-      <span class="badge ${team ? "" : "warn"}">${team ? esc(team) : "담당팀 확인 필요"}</span>`;
+      <span class="badge ${team ? "" : "warn"}"${team ? ` title="${esc(team)}"` : ""}>${team ? esc(team) : "담당팀 확인 필요"}</span>`;
     // 담당팀 색 구분: 팀명별 결정적 색을 배지에 적용(시민앱과 동일). null이면 중립 유지.
     const tc = teamColor(team);
     if (tc) {

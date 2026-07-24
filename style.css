@@ -116,9 +116,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;display:flex;align-items:center;gap:14px;border-left:5px solid var(--gotgam);cursor:pointer;transition:transform .12s;}
 .card:hover{transform:translateY(-2px);}
 .card-main{flex:1;min-width:0;}
-.card-title{font-size:1rem;font-weight:800;margin-bottom:5px;}
+/* 제목은 목록에서 2줄까지만(넘치면 …). 긴 담당팀 배지에 폭을 빼앗겨도 한 글자씩
+   세로로 쪼개지지 않게 하고, 카드 높이가 폭발하지 않도록 클램프한다. 상세에선 전문 노출. */
+.card-title{font-size:1rem;font-weight:800;margin-bottom:5px;line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
 .card-desc{font-size:0.8125rem;color:#7a6f66;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.badge{font-size:0.75rem;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);white-space:nowrap;}  /* #FBE3D4 위 4.89:1 */
+/* 담당팀 배지: 카드 폭의 40%를 넘지 못하게 하고 넘치면 …(전체 팀명은 title 툴팁).
+   가로 flex 카드에서 배지가 폭을 독차지해 제목을 뭉개던 문제를 막는다. */
+.badge{font-size:0.75rem;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis;}  /* #FBE3D4 위 4.89:1 */
 .badge.warn{background:#FFEBEE;color:#C62828;}   /* #FFEBEE 위 4.92:1 (기존 #E53935 는 3.70) */
 /* 📌 접수 안내(엑셀 «비고» = benefits.note) — 목록 카드용 한 줄 배지.
    색이 아니라 «📌 접수 안내» 라는 글자로 뜻을 전한다(색만으로 정보 전달 금지).
