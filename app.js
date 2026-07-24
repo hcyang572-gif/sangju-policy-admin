@@ -1,5 +1,7 @@
 // 상주시 정책 플랫폼 — 클라우드(Supabase) 사업 관리
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// 📎 서식 스토리지 공용 헬퍼(forms.js)가 같은 클라이언트를 쓰도록 넘겨준다(중복 생성 방지).
+if (window.SangjuForms) SangjuForms.useClient(sb);
 const $ = (s) => document.querySelector(s);
 
 let ALL = [], CATS = [], SELCATS = new Set(), sortKey = "seq", page = 0;
@@ -575,6 +577,21 @@ function openEdit(r) {
   });
   html += `<div class="modal-actions"><button id="mSave" class="top-btn solid">💾 저장</button>` +
     (r ? `<button id="mDel" class="top-btn danger">🗑 삭제</button>` : ``) + `</div>`;
+  // 📎 필요서류 서식 — 저장된 사업(r)에서만. 새 사업은 먼저 저장해야 키가 생긴다.
+  if (r) {
+    html += `<div class="forms-section" id="formsSection">
+      <div class="field-label">📎 필요서류 서식</div>
+      <p class="field-hint">시민이 상세 화면에서 내려받을 서식 파일입니다. 허용: hwp·hwpx·pdf·doc(x)·xls(x)·ppt(x)·jpg·png·zip·txt · 최대 10MB.</p>
+      <ul class="forms-list" id="formsList" aria-live="polite"><li class="forms-empty">불러오는 중…</li></ul>
+      <div class="forms-upload">
+        <input type="file" id="formsFile" class="forms-file"
+          accept=".hwp,.hwpx,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip,.txt"
+          aria-label="등록할 서식 파일 선택">
+        <button type="button" id="formsUpload" class="top-btn solid">⬆ 서식 등록</button>
+      </div>
+      <p class="forms-status" id="formsStatus" role="status" aria-live="polite"></p>
+    </div>`;
+  }
   $("#mBody").innerHTML = html;
   $("#mSave").onclick = async () => {
     const obj = {};
@@ -619,7 +636,88 @@ function openEdit(r) {
     announce("삭제되었습니다.");
     await loadBenefits();
   };
+  if (r) initFormsSection(r);
   openModal($("#modal"));
+}
+
+/* ── 📎 필요서류 서식 등록/삭제 (편집 모달 내부) ─────────────────────
+   저장소 규약: _workspace/서식스토리지_클라이언트_규약.md
+   실제 Storage·테이블 접근은 공용 헬퍼 window.SangjuForms 가 담당.
+   forms_storage.sql 미실행이면 listForms 가 조용히 [] → "등록된 서식 없음". */
+function fSetStatus(msg, isErr) {
+  const el = $("#formsStatus");
+  if (el) { el.textContent = msg || ""; el.classList.toggle("err", !!isErr); }
+  if (msg) announce(msg);
+}
+async function refreshFormsList(r) {
+  const list = $("#formsList");
+  if (!list || !window.SangjuForms) return;
+  let rows = [];
+  try { rows = await SangjuForms.listForms(r); } catch (e) { rows = []; }
+  if (!rows.length) {
+    list.innerHTML = `<li class="forms-empty">등록된 서식이 없습니다.</li>`;
+    return;
+  }
+  list.innerHTML = rows.map((row) => {
+    const nm = String(row.file_name || "서식");
+    const ext = (nm.split(".").pop() || "").toUpperCase();
+    const size = SangjuForms.formatSize(row.size);
+    const meta = (ext ? ext + " 파일" : "파일") + (size ? " · " + size : "");
+    const url = String(row.public_url || "");
+    const nameHtml = url
+      ? `<a class="forms-item-name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">📄 ${esc(nm)}</a>`
+      : `<span class="forms-item-name">📄 ${esc(nm)}</span>`;
+    return `<li class="forms-item" data-id="${esc(String(row.id))}">
+        <span class="forms-item-main">${nameHtml}<span class="forms-item-meta">${esc(meta)}</span></span>
+        <button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제">🗑 삭제</button>
+      </li>`;
+  }).join("");
+  // 삭제 버튼 바인딩(행 데이터는 클로저로 잡아둔다)
+  const byId = {};
+  rows.forEach((row) => { byId[String(row.id)] = row; });
+  list.querySelectorAll(".forms-item").forEach((li) => {
+    const row = byId[li.dataset.id];
+    const btn = li.querySelector(".forms-del");
+    if (btn) btn.onclick = async () => {
+      if (!confirm(`'${row.file_name}' 서식을 삭제하시겠습니까?`)) return;
+      btn.disabled = true;
+      fSetStatus("삭제 중…");
+      try {
+        await SangjuForms.deleteForm(row);
+        fSetStatus("서식을 삭제했습니다.");
+        await refreshFormsList(r);
+      } catch (e) {
+        btn.disabled = false;
+        const m = (e && e.message) || "삭제에 실패했습니다.";
+        fSetStatus(m, true); alert(m);
+      }
+    };
+  });
+}
+function initFormsSection(r) {
+  const fileInput = $("#formsFile");
+  const upBtn = $("#formsUpload");
+  refreshFormsList(r);
+  if (!upBtn || !fileInput) return;
+  upBtn.onclick = async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) { fSetStatus("등록할 파일을 선택해 주세요.", true); return; }
+    const bad = SangjuForms.validateFile(file);
+    if (bad) { fSetStatus(bad, true); alert(bad); return; }
+    upBtn.disabled = true;
+    fSetStatus("업로드 중…");
+    try {
+      await SangjuForms.uploadForm(r, file);
+      fileInput.value = "";
+      fSetStatus("서식을 등록했습니다.");
+      await refreshFormsList(r);
+    } catch (e) {
+      const m = (e && e.message) || "업로드에 실패했습니다.";
+      fSetStatus(m, true); alert(m);
+    } finally {
+      upBtn.disabled = false;
+    }
+  };
 }
 
 /* ============================================================

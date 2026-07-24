@@ -178,6 +178,23 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:10px 12px;font-size:0.875rem;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
 .form-input:focus,.form-textarea:focus{border-color:var(--gotgam);}
 .modal-actions{display:flex;gap:10px;margin-top:8px;}
+/* 📎 필요서류 서식 등록/삭제(편집 모달) — 곶감 팔레트만 사용. 색만으로 정보전달 금지.
+   목록 글자 #4A3B32 on #FFFFFF = 10.6:1, 메타 #7A6152 = 4.7:1 (AA 충족). */
+.forms-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+.forms-list{list-style:none;padding:0;margin:8px 0 10px;display:flex;flex-direction:column;gap:8px;}
+.forms-empty{font-size:0.8125rem;color:var(--sub);padding:8px 2px;}
+.forms-item{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:var(--gotgam-ll);border:1px solid var(--line);border-radius:10px;}
+.forms-item-main{display:flex;flex-direction:column;gap:2px;flex:1 1 auto;min-width:0;}
+.forms-item-name{font-size:0.875rem;font-weight:700;color:var(--gotgam-t);text-decoration:none;word-break:break-all;}
+.forms-item-name:hover{text-decoration:underline;}
+.forms-item-meta{font-size:0.75rem;color:var(--sub);}
+.forms-del{flex:0 0 auto;min-height:36px;border:none;border-radius:8px;padding:6px 10px;font-size:0.78125rem;font-weight:700;cursor:pointer;background:var(--danger);color:#fff;}/* 흰 5.44:1 */
+.forms-del:disabled{opacity:.6;cursor:default;}
+.forms-upload{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.forms-file{flex:1 1 180px;font-size:0.8125rem;}
+.forms-upload .top-btn{min-height:42px;}
+.forms-status{font-size:0.78125rem;color:var(--sub);margin:8px 0 0;min-height:1em;}
+.forms-status.err{color:var(--danger);font-weight:700;}/* 흰 5.44:1 */
 /* height 고정이면 글꼴 확대 시 글자가 버튼 밖으로 잘린다(200% 실측) → 최소 높이로 */
 .modal-actions .top-btn{flex:1;min-height:46px;font-size:0.9375rem;}
 .modal-actions .top-btn.danger{flex:0 0 100px;}
