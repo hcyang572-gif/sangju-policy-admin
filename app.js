@@ -8,7 +8,10 @@ const $ = (s) => document.querySelector(s);
 
 let ALL = [], CATS = [], SELCATS = new Set(), sortKey = "seq", page = 0;
 const PAGE = 12;
-let IS_GUEST = false; // 임시 공개(로그인 없이 입장) 여부
+// ⛔ IS_GUEST(로그인 없이 입장)는 2026-08-04 «영구 제거»했습니다.
+//    이 앱은 시민 신청자의 개인정보(성명·연락처·문의내용)를 다루므로
+//    «세션이 있어야만» 화면에 들어갈 수 있습니다. 우회 플래그를 되살리지 마세요.
+let LOGGING_OUT = false;   // 로그아웃 진행 중(onAuthStateChange 중복 처리 방지)
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m])); }
@@ -125,19 +128,113 @@ function renderChangelog() {
   });
 }
 
-// 기존 세션 있으면 바로 앱
+// ── 진입 관문 ────────────────────────────────────────────────────────────
+// 세션이 «있을 때만» 앱으로 들어간다. 없으면 로그인 화면에 머문다.
+// (showApp() 을 호출하는 곳은 이 블록과 login() 성공 시점 두 곳뿐이어야 한다)
 (async () => {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) showApp();
+  let session = null;
+  try {
+    const res = await sb.auth.getSession();
+    session = res && res.data ? res.data.session : null;
+  } catch (e) {
+    console.warn("[로그인] 세션 확인 실패 — 로그인 화면 유지:", e);
+  }
+  if (session) { showApp(); return; }
+  // 로그인 화면 유지 — 키보드 이용자가 바로 입력할 수 있게 첫 칸에 초점(KWCAG 6.4.3)
+  try { $("#email").focus(); } catch (e) {}
 })();
+
+// 세션이 끊기면(만료·토큰 갱신 실패·다른 곳에서 로그아웃) 로그인 화면으로 되돌린다.
+// reload 하면 #app 이 다시 hidden 인 초기 상태로 돌아가므로 열람하던 자료가 남지 않는다.
+//
+// ⚠ 무한 새로고침 방지 — 반드시 «앱에 들어와 있을 때»만 반응한다.
+//    로그인 화면에서 SIGNED_OUT 이 오면 reload → 또 SIGNED_OUT → reload … 로
+//    앱이 통째로 먹통이 된다. 현재 버전(supabase-js 2.112.0)은 세션이 없을 때
+//    INITIAL_SESSION 을 보내므로 실제로 그럴 일은 없지만(번들에서 확인함),
+//    버전이 올라가도 안전하도록 «화면 상태»로 한 번 더 막는다.
+sb.auth.onAuthStateChange((event) => {
+  // 토큰이 갱신되거나 새로 로그인하면 «만료 예고» 시각을 다시 잡는다.
+  if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") { scheduleExpiryWarning(); return; }
+  if (event !== "SIGNED_OUT") return;
+  if (LOGGING_OUT) return;                                  // 로그아웃 버튼 경로와 중복 방지
+  if ($("#app").classList.contains("hidden")) return;       // 아직 로그인 화면 → 무시
+  showSessionExpired();
+});
+
+/* ── 로그인 만료 대응 (KWCAG 6.2.1 «시간 제한») ──────────────────────────
+   예전에는 만료되는 «순간» alert 를 띄우고 곧바로 location.reload() 를 실행했다.
+   사업을 수정하던 중이면 입력하던 내용이 통째로 사라졌고, 미리 알 수도·연장할 수도 없었다.
+   → ① 만료 2분 전에 미리 알리고 «로그인 연장» 을 제공
+     ② 이미 만료됐으면 화면을 저절로 되돌리지 않고, 사용자가 누를 때 이동
+   ⚠ 위 onAuthStateChange 의 «무한 새로고침 방어»(LOGGING_OUT·#app hidden 확인)는
+      그대로 둔다. 여기서도 자동 reload 를 하지 않으므로 루프가 생기지 않는다. */
+let EXPIRY_TIMER = null;
+
+function showSessionBanner(text, opts) {
+  const box = $("#sessionBanner");
+  if (!box) return;
+  $("#sessionBannerText").textContent = text;
+  $("#sessionExtend").hidden = !(opts && opts.extend);
+  $("#sessionGoLogin").hidden = !(opts && opts.goLogin);
+  box.hidden = false;
+}
+function hideSessionBanner() {
+  const box = $("#sessionBanner");
+  if (box) box.hidden = true;
+}
+
+// 만료 2분 전 예고 — 연장 버튼 제공
+function showSessionExpiring() {
+  showSessionBanner("로그인이 곧 만료됩니다(약 2분 뒤). 계속 작업하시려면 «로그인 연장»을 눌러주세요.",
+    { extend: true });
+}
+
+// 이미 만료됨 — 자동 이동하지 않는다(작성 중인 내용을 복사할 시간을 준다)
+function showSessionExpired() {
+  clearTimeout(EXPIRY_TIMER);
+  showSessionBanner(
+    "로그인이 만료되어 저장·조회가 되지 않습니다. 작성 중인 내용이 있으면 복사해 두신 뒤 «로그인 화면으로»를 눌러주세요.",
+    { goLogin: true });
+}
+
+// 현재 세션의 만료 시각을 읽어 «2분 전» 예고를 예약한다.
+async function scheduleExpiryWarning() {
+  clearTimeout(EXPIRY_TIMER);
+  let s = null;
+  try {
+    const res = await sb.auth.getSession();
+    s = res && res.data ? res.data.session : null;
+  } catch (e) { return; }
+  if (!s || !s.expires_at) return;
+  hideSessionBanner();                       // 갱신됐으면 이전 경고는 지운다
+  const msLeft = s.expires_at * 1000 - Date.now();
+  const warnIn = msLeft - 2 * 60 * 1000;
+  if (warnIn <= 0) { showSessionExpiring(); return; }
+  // setTimeout 은 약 24.8일이 상한이라 그보다 길면 예약하지 않는다(현실적으로 없음)
+  if (warnIn < 2147483647) EXPIRY_TIMER = setTimeout(showSessionExpiring, warnIn);
+}
+
+async function extendSession() {
+  const btn = $("#sessionExtend");
+  if (btn) { btn.disabled = true; btn.textContent = "연장 중..."; }
+  let ok = false;
+  try {
+    const res = await sb.auth.refreshSession();
+    ok = !(res && res.error);
+  } catch (e) { ok = false; }
+  if (btn) { btn.disabled = false; btn.textContent = "로그인 연장"; }
+  if (ok) {
+    hideSessionBanner();
+    scheduleExpiryWarning();
+  } else {
+    // 연장 실패 = 사실상 만료. 그래도 자동 이동은 하지 않는다.
+    showSessionExpired();
+  }
+}
 
 $("#loginBtn").onclick = login;
 $("#pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 $("#email").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#pw").focus(); });
-
-// 임시 공개: 로그인 없이 입장(게스트). 정식 로그인은 그대로 유지.
-$("#guestBtn").onclick = () => { IS_GUEST = true; showApp(); };
-$("#guestBannerClose").onclick = () => $("#guestBanner").classList.add("hidden");
 
 /* ── 인앱 브라우저(카톡·네이버 등) 대응 ──────────────────────────
    카톡/네이버 등 인앱 웹뷰는 PWA 설치·정상 사용이 어렵다.
@@ -219,27 +316,65 @@ $("#inappClose").onclick = () => {
 // 진입 즉시 1회 평가(로그인 화면 상단에서도 노출)
 initInApp();
 
+// 로그인 실패 사유를 공무원이 이해할 수 있는 말로 바꾼다.
+// (Supabase 원문은 영어라 "Invalid login credentials" 만 보이면 원인 파악이 안 된다)
+function loginErrMsg(error) {
+  const msg = String((error && error.message) || "").toLowerCase();
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "인터넷에 연결되어 있지 않습니다. 연결 상태를 확인해 주세요.";
+  }
+  if (/invalid login credentials|invalid credentials/.test(msg)) {
+    return "이메일 또는 비밀번호가 맞지 않습니다. 다시 확인해 주세요.";
+  }
+  if (/email not confirmed/.test(msg)) {
+    return "메일 인증이 끝나지 않은 계정입니다. 시스템 담당자에게 문의해 주세요.";
+  }
+  if (/too many requests|rate limit/.test(msg)) {
+    return "로그인 시도가 너무 잦습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (/failed to fetch|network|load failed/.test(msg)) {
+    return "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  return "로그인하지 못했습니다. (" + ((error && error.message) || "알 수 없는 오류") + ")";
+}
+
 async function login() {
   const email = $("#email").value.trim(), password = $("#pw").value;
-  if (!email || !password) { $("#loginErr").textContent = "이메일과 비밀번호를 입력하세요."; return; }
+  if (!email || !password) {
+    $("#loginErr").textContent = "이메일과 비밀번호를 입력하세요.";
+    (!email ? $("#email") : $("#pw")).focus();   // 초점을 비어 있는 칸으로
+    return;
+  }
+  $("#loginBtn").disabled = true;                 // 중복 제출 방지
   $("#loginErr").textContent = "로그인 중...";
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) { $("#loginErr").textContent = "로그인 실패: " + error.message; return; }
-  // 성공 시 앱 진입은 showApp() 에서 처리
+  let error = null;
+  try {
+    const res = await sb.auth.signInWithPassword({ email, password });
+    error = res && res.error ? res.error : null;
+  } catch (e) {
+    error = e;
+  }
+  $("#loginBtn").disabled = false;
+  if (error) {
+    // role="alert" aria-live="assertive" 라 화면낭독기가 즉시 읽는다.
+    $("#loginErr").textContent = loginErrMsg(error);
+    $("#pw").value = "";
+    $("#pw").focus();                             // 초점 유실 없이 다시 입력 가능
+    return;
+  }
   showApp();
 }
 
 async function showApp() {
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
-  // 게스트(임시 공개)면 안내 배너 표시 + 로그아웃 버튼 문구를 자연스럽게
-  if (IS_GUEST) {
-    $("#guestBanner").classList.remove("hidden");
-    $("#btnLogout").textContent = "로그인 화면으로";
-  }
   bindUI();
   bindProposalsUI();
   bindApplicationsUI();
+  // 로그인 만료 예고 예약 + 띠 버튼 연결
+  scheduleExpiryWarning();
+  $("#sessionExtend").onclick = extendSession;
+  $("#sessionGoLogin").onclick = () => { LOGGING_OUT = true; location.reload(); };
   await loadBenefits();
   subscribeRealtime();
   // 정책제안: 탭 진입 시 1회 로드(초기엔 비활성 섹션이라 미로드 → 첫 탭 전환에서 로드)
@@ -254,9 +389,9 @@ function bindUI() {
   $("#sortSel").addEventListener("change", () => { sortKey = $("#sortSel").value; render(); });
   $("#btnAdd").onclick = () => openEdit(null);
   $("#btnLogout").onclick = async () => {
-    // 게스트면 세션이 없으므로 그냥 로그인 화면으로 복귀
-    if (!IS_GUEST) { try { await sb.auth.signOut(); } catch (e) {} }
-    location.reload();
+    LOGGING_OUT = true;                 // onAuthStateChange 가 중복으로 안내하지 않도록
+    try { await sb.auth.signOut(); } catch (e) { /* 이미 끊겼어도 화면은 되돌린다 */ }
+    location.reload();                  // 초기 상태(로그인 화면)로 — 열람하던 데이터도 사라짐
   };
   // C2: 닫기/바깥클릭은 closeModal로 통일(포커스 복귀). Esc는 _trapKeydown이 일괄 처리.
   $("#mClose").onclick = () => closeModal($("#modal"));
@@ -379,14 +514,30 @@ function subscribeRealtime() {
   sb.channel("benefits-rt")
     .on("postgres_changes", { event: "*", schema: "public", table: "benefits" },
         () => { RT_PENDING += 1; syncRtBanners(); })   // 화면은 그대로, «알림»만
-    .subscribe((status) => { $("#realtimeDot").classList.toggle("off", status !== "SUBSCRIBED"); });
+    .subscribe((status) => setRealtimeDot(status === "SUBSCRIBED"));
+}
+
+// 실시간 연결 표시 갱신 — 색·글자·title 을 «함께» 바꾼다.
+// 예전에는 CSS 클래스만 토글해서, 연결이 끊겨도 aria-label 이 "실시간 연결됨"으로
+// 하드코딩돼 화면낭독기에 «거짓 정보»가 전달됐다(그리고 색만으로 상태를 알렸다).
+function setRealtimeDot(ok) {
+  const box = $("#realtimeDot");
+  if (!box) return;
+  const msg = ok ? "실시간 연결됨" : "실시간 연결 끊김";
+  box.classList.toggle("off", !ok);
+  box.title = msg;
+  const t = box.querySelector(".rt-dot-text");
+  if (t) t.textContent = msg;      // role="status" → 바뀌는 순간 낭독된다
 }
 
 function renderCats() {
   const box = $("#catChips"); box.innerHTML = "";
   CATS.forEach((cat) => {
     const c = el("button", "chip" + (SELCATS.has(cat) ? " on" : ""));
+    c.type = "button";
     c.textContent = cat;
+    // 색(.on)만으로 선택 상태를 알리지 않는다 — renderAStatusChips 와 같은 규약
+    c.setAttribute("aria-pressed", SELCATS.has(cat) ? "true" : "false");
     c.onclick = () => { SELCATS.has(cat) ? SELCATS.delete(cat) : SELCATS.add(cat); page = 0; renderCats(); render(); };
     box.appendChild(c);
   });
@@ -487,7 +638,7 @@ const FIELDS = [
 function editFields() {
   return FIELDS.filter(([, key]) => key !== NOTE_KEY || NOTE_OK);
 }
-// 저장/삭제 실패 메시지: RLS(권한) 거부면 임시공개 안내로 친절하게.
+// 저장/삭제 실패 메시지: RLS(권한) 거부면 «재로그인·계정 권한» 안내로 친절하게.
 // ───────── 오류 원인 분류 ─────────
 // 무료 플랜 일시정지로 클라우드가 통째로 멈췄을 때 화면엔 "불러오기 실패"만 떠서
 // 원인 파악이 불가능했던 사고가 있었다 → 연결/권한/미설정을 문구로 구분한다.
@@ -524,7 +675,8 @@ function errBoxHtml(error, retryId) {
   if (kind === "perm") {
     return `<div class="err-box" role="alert">
       <div class="err-title">🔒 접근 권한이 없어 불러오지 못했습니다.</div>
-      <div class="err-desc">로그인이 필요하거나 RLS 권한이 열려 있지 않습니다.<br>관리자에게 권한 개방을 요청해 주세요.</div>
+      <div class="err-desc">로그인이 만료되었거나 이 계정에 열람 권한이 없습니다.<br>
+        «로그아웃» 후 다시 로그인해 보시고, 그래도 안 되면 시스템 담당자에게 계정 권한을 확인해 주세요.</div>
       ${btn}</div>`;
   }
   if (kind === "setup") {
@@ -567,7 +719,8 @@ function writeErrMsg(error, verb) {
     msg.includes("not authorized") ||
     msg.includes("violates");
   if (isPerm) {
-    return "⚠️ 저장 권한이 없습니다.\n아직 임시공개 권한 적용 전이거나 로그인이 필요합니다.\n(관리자에게 권한 개방을 요청하거나 로그인 후 다시 시도해 주세요.)";
+    return "⚠️ 저장 권한이 없습니다.\n로그인이 만료되었거나 이 계정에 수정 권한이 없습니다.\n" +
+           "«로그아웃» 후 다시 로그인해 보시고, 그래도 안 되면 시스템 담당자에게 계정 권한을 확인해 주세요.";
   }
   return `${verb} 실패: ` + (error && error.message ? error.message : "알 수 없는 오류");
 }
@@ -838,7 +991,9 @@ function renderPStatusChips() {
   const box = $("#pStatusChips"); box.innerHTML = "";
   ["전체", ...P_STATUSES].forEach((st) => {
     const c = el("button", "chip" + (P_STATUS === st ? " on" : ""));
+    c.type = "button";
     c.textContent = st;
+    c.setAttribute("aria-pressed", P_STATUS === st ? "true" : "false");   // 색만으로 알리지 않음
     c.onclick = () => { P_STATUS = st; pPage = 0; renderPStatusChips(); renderProposals(); };
     box.appendChild(c);
   });
@@ -848,7 +1003,9 @@ function renderPCatChips() {
   const box = $("#pCatChips"); box.innerHTML = "";
   PCATS.forEach((cat) => {
     const c = el("button", "chip" + (P_SELCAT.has(cat) ? " on" : ""));
+    c.type = "button";
     c.textContent = cat;
+    c.setAttribute("aria-pressed", P_SELCAT.has(cat) ? "true" : "false"); // 색만으로 알리지 않음
     c.onclick = () => { P_SELCAT.has(cat) ? P_SELCAT.delete(cat) : P_SELCAT.add(cat); pPage = 0; renderPCatChips(); renderProposals(); };
     box.appendChild(c);
   });

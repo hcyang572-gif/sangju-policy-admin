@@ -51,19 +51,12 @@ window.SangjuApply = (function () {
     }
   }
 
-  // ── 매칭 키 — forms.js benefitKey / migrate.py._key_of 와 «값이 같아야» 함 ──
-  //   정책번호 있으면 그 값(정규화 '100049.0'→'100049'), 없으면 공백 제거 사업명.
-  //   cloud benefits 는 {policy_no,name}, 모바일 data.json 은 {정책번호?,사업명} — 둘 다 읽음.
+  // ── 매칭 키 — forms.js benefitKey 와 «값이 같아야» 함 ──
+  //   «공백을 모두 제거한 사업명». ★ 절대 정책번호를 쓰지 말 것 (2026-08-04 확정)
+  //   이미 쌓인 benefit_key 가 전부 사업명 기준이라, 바꾸면 기존 서식·접수 연결이 끊긴다.
+  //   cloud benefits 는 {name}, 모바일 data.json 은 {사업명} — 둘 다 읽음.
   function benefitKey(b) {
     b = b || {};
-    var rawPid = b.policy_no != null ? b.policy_no
-               : (b.정책번호 != null ? b.정책번호 : "");
-    var pid = String(rawPid).trim();
-    if (pid && ["nan", "none"].indexOf(pid.toLowerCase()) === -1) {
-      var n = Number(pid);
-      if (Number.isFinite(n)) return String(Math.trunc(n)); // 100049.0 → 100049
-      return pid;
-    }
     var nm = b.name != null ? b.name : (b.사업명 != null ? b.사업명 : "");
     return String(nm).replace(/\s+/g, "");
   }

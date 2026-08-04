@@ -2,7 +2,10 @@
  * 경로는 모두 상대경로(self.registration.scope 기준 = /sangju-policy-mobile/admin/)로 다뤄
  * 시민앱 서비스워커와 캐시·범위가 완전히 분리되도록 CACHE 이름을 다르게 둔다.
  * 캐시 버전을 올리려면 아래 CACHE 값을 바꾸면 됨(예: sangju-admin-v2). */
-const CACHE = "sangju-admin-v16";
+// ⚠ v17: 로그인 필수화(게스트 우회 제거) + 2026 시정구호.
+//    index.html·app.js 는 cache-first 라 «캐시 버전을 올리지 않으면»
+//    기존 이용자에게 게스트 버튼이 살아 있는 구버전이 계속 제공된다(= 로그인 강제 무력화).
+const CACHE = "sangju-admin-v17";
 
 // scope(예: https://hcyang572-gif.github.io/sangju-policy-mobile/admin/)를 기준으로
 // 절대 URL을 만들어 둔다. (서브경로에서도 안전)
@@ -19,11 +22,13 @@ const PRECACHE = [
   "version.js",
   "forms.js",
   "apply_client.js",
+  "sw-register.js",            // CSP 때문에 인라인에서 분리한 서비스워커 등록 코드
   "manifest.json",
   "assets/icon-admin-192.png",
   "assets/icon-admin-512.png",
   "assets/sangsang1.png",
   "assets/gotgam.png",
+  "assets/slogan-stack.png",   // 2026 시정구호(로그인 화면)
 ];
 
 // 설치: 핵심 자원을 미리 담되, 하나가 실패해도 install 전체가 실패하지 않게 개별 try/catch.

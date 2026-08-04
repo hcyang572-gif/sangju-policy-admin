@@ -70,7 +70,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .login-title{font-size:1.375rem;color:var(--gotgam-t);font-weight:800;margin-top:10px;}  /* 흰 6.03:1 */
 .login-sub{font-size:0.78125rem;color:var(--sub);font-weight:700;margin:4px 0 20px;display:inline-flex;align-items:center;gap:5px;}
 .login-gotgam{width:16px;height:16px;object-fit:contain;}
-.login-input{width:100%;height:46px;border:2px solid var(--gotgam-l);border-radius:12px;text-align:center;font-size:0.9375rem;outline:none;margin-bottom:10px;}
+/* 사용자 입력 요소(글을 넣는 칸)의 경계는 3:1 이상 — --gotgam(#E66B3A) 3.22:1.
+   기존 --gotgam-l(#FBE3D4) 은 1.37:1 이라 저시력 이용자가 칸을 식별할 수 없었다.
+   ⚠ 칩·탭·안내박스 등 «장식» 경계는 --gotgam-l 을 그대로 둔다(webui 와 같은 방침). */
+.login-input{width:100%;height:46px;border:2px solid var(--gotgam);border-radius:12px;text-align:center;font-size:0.9375rem;outline:none;margin-bottom:10px;}
 .login-input:focus{border-color:var(--gotgam);}
 .login-btn{width:100%;height:48px;margin-top:8px;border:none;border-radius:12px;background:var(--gotgam-d);color:#fff;font-size:1rem;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
 .login-btn:hover{background:var(--gotgam-t);}  /* 흰글자 6.03:1 */
@@ -78,6 +81,17 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* 앱 */
 .app{min-height:100vh;display:flex;flex-direction:column;}
+/* 로그인 만료 안내 띠 — 작성 중인 내용을 지키기 위한 장치(KWCAG 6.2.1).
+   경고색(노랑)만으로 알리지 않고 «글»로 무엇을 해야 하는지 알린다.
+   글자 #7A5B00 on #FFF3CD = 5.70:1 (AA 충족). */
+.session-banner{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0;padding:11px 20px;
+  background:#FFF3CD;border-bottom:2px solid #B38600;color:#7A5B00;font-size:0.875rem;font-weight:700;}
+.session-banner .sb-text{flex:1;min-width:200px;line-height:1.5;}
+.session-banner .sb-btn{flex:0 0 auto;border:none;border-radius:9px;padding:9px 14px;
+  background:var(--gotgam-d);color:#fff;font-family:inherit;font-size:0.8125rem;font-weight:800;
+  cursor:pointer;min-height:24px;}  /* 흰글자 4.71:1 */
+.session-banner .sb-btn:hover{background:var(--gotgam-t);}
+.session-banner .sb-btn:disabled{background:var(--dim);cursor:default;}
 .topbar{background:#fff;display:flex;align-items:center;gap:12px;padding:12px 20px;}
 .brand-logo{height:34px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));}
 /* line-height 1.1 은 한글 글자상자(약 1.2em)보다 좁아 글자가 줄상자 밖으로 삐져나왔다(기본 2px·200% 5px).
@@ -86,8 +100,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .brand-title{font-size:1.25rem;font-weight:800;color:var(--gotgam-t);line-height:1.2;}  /* 흰 6.03:1 */
 .brand-sub{font-size:0.75rem;font-weight:700;color:var(--sub);margin-top:0;}
 .top-actions{margin-left:auto;display:flex;align-items:center;gap:8px;}
-.rt-dot{color:#1F7A41;font-size:12px;}      /* 흰 5.36:1 */
+/* 실시간 연결 표시 — 색(●)만이 아니라 «글자»로도 상태를 알린다(KWCAG 5.4.1).
+   좁은 화면에서는 글자를 감추되 낭독기에는 남기고(.sr-only 와 같은 기법),
+   넓은 화면에서는 글자를 함께 보여 색을 구분 못 해도 상태를 알 수 있게 한다. */
+.rt-dot{color:#1F7A41;font-size:12px;display:inline-flex;align-items:center;gap:5px;}  /* 흰 5.36:1 */
 .rt-dot.off{color:var(--dim);}              /* 흰 5.36:1 (기존 #bbb 는 1.92:1) */
+.rt-dot-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+@media (min-width:760px){
+  .rt-dot-text{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:nowrap;font-size:0.75rem;font-weight:700;}
+}
 .top-btn{border:none;border-radius:10px;padding:10px 14px;font-size:0.8125rem;font-weight:700;cursor:pointer;}
 .top-btn.solid{background:var(--gotgam-d);color:#fff;}          /* 흰글자 4.71:1 */
 .top-btn.solid:hover{background:var(--gotgam-t);}               /* 흰글자 6.03:1 */
@@ -101,10 +122,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .content{flex:1;padding:18px 20px 30px;max-width:1100px;width:100%;margin:0 auto;}
 .search-hint{font-size:0.84375rem;font-weight:700;color:var(--sub);margin-bottom:12px;}
 .toolbar{display:flex;align-items:center;gap:10px;margin:12px 0 14px;flex-wrap:wrap;}
-.search-input{height:42px;border:1.5px solid var(--gotgam-l);border-radius:12px;padding:0 14px;font-size:0.875rem;outline:none;background:#fff;}
+.search-input{height:42px;border:1.5px solid var(--gotgam);border-radius:12px;padding:0 14px;font-size:0.875rem;outline:none;background:#fff;}
 .search-input.wide{flex:1;min-width:200px;}
 .search-input:focus{border-color:var(--gotgam);}
-.sort-select{height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 10px;font-size:0.8125rem;font-weight:700;background:#fff;cursor:pointer;}
+.sort-select{height:42px;border:1.5px solid var(--gotgam);border-radius:10px;padding:0 10px;font-size:0.8125rem;font-weight:700;background:#fff;cursor:pointer;}
 .count{font-size:0.875rem;font-weight:800;color:var(--gotgam-t);margin-left:auto;}  /* 흰 6.03:1 */
 
 .chips{display:flex;gap:8px;}
@@ -174,8 +195,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .notice-field .form-textarea{background:#fff;min-height:64px;}
 /* 입력칸 도움말 — 라벨 아래 설명(aria-describedby 로 연결). #FFF1E8 위 5.19:1 / 흰 5.74:1 */
 .field-hint{font-size:0.75rem;font-weight:400;color:var(--sub);line-height:1.6;margin:-1px 0 6px;}
-.form-input{width:100%;height:42px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:0 12px;font-size:0.875rem;font-family:inherit;outline:none;}
-.form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam-l);border-radius:10px;padding:10px 12px;font-size:0.875rem;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
+.form-input{width:100%;height:42px;border:1.5px solid var(--gotgam);border-radius:10px;padding:0 12px;font-size:0.875rem;font-family:inherit;outline:none;}
+.form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam);border-radius:10px;padding:10px 12px;font-size:0.875rem;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
 .form-input:focus,.form-textarea:focus{border-color:var(--gotgam);}
 .modal-actions{display:flex;gap:10px;margin-top:8px;}
 /* 📎 필요서류 서식 등록/삭제(편집 모달) — 곶감 팔레트만 사용. 색만으로 정보전달 금지.
@@ -199,16 +220,16 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .modal-actions .top-btn{flex:1;min-height:46px;font-size:0.9375rem;}
 .modal-actions .top-btn.danger{flex:0 0 100px;}
 
-/* 로그인 없이 입장(임시 공개) 버튼 */
-/* ⚠ font-size 는 px 유지(예외) — 높이 44px 고정 + 2줄(line-height 1.25) 버튼이라
-   글꼴 확대 시 글자가 버튼 밖으로 3px 넘쳤음(20px 기준 검증). 임시 공개용 버튼이라 현행 유지 */
-.guest-btn{width:100%;height:44px;margin-top:10px;border:2px dashed var(--gotgam-l);border-radius:12px;background:#fff;color:var(--gotgam-t);font-size:13.5px;font-weight:800;cursor:pointer;line-height:1.25;}  /* 흰 6.03:1 */
-.guest-btn:hover{background:var(--gotgam-ll);border-color:var(--gotgam);}
+/* ⛔ .guest-btn / .guest-banner (로그인 없이 입장) 는 2026-08-04 «영구 제거».
+   시민 개인정보에 접근하는 앱이라 우회 입장을 두지 않는다. 되살리지 말 것. */
 
-/* 임시 공개 안내 배너 */
-.guest-banner{display:flex;align-items:center;gap:10px;margin:0;padding:10px 16px;background:#FFF3CD;border-bottom:1px solid #F0DDA0;color:#7A5B00;font-size:0.8125rem;font-weight:700;}
-.guest-banner .gb-text{flex:1;}
-.guest-banner .gb-close{flex:0 0 auto;border:none;background:transparent;color:#7A5B00;font-size:16px;font-weight:800;cursor:pointer;padding:2px 6px;}
+/* 2026 시정구호(로그인 화면) — 흰 카드 위라 빨강·청록이 또렷하다.
+   로고(sangsang1)·제목과 싸우지 않게 위아래 여백만 주고 폭에 맡긴다. */
+.login-slogan{display:block;width:100%;max-width:300px;height:auto;margin:16px auto 18px;}
+
+/* 로그인 화면 안내문 — 계정·비밀번호를 못 받았을 때 어디에 문의할지 */
+/* 본문 글자색(--gotgam-t)을 그대로 써서 대비 확보. rem 단위라 글꼴 확대에 따라 커진다. */
+.login-help{margin:14px 0 0;font-size:0.8125rem;line-height:1.5;color:var(--gotgam-t);text-align:center;}
 
 /* 인앱 브라우저(카톡·네이버 등) 안내 배너 — 공무원앱 남색 정체성, 게스트띠보다 강조.
    ⚠ 로그인 화면(.login-screen)이 position:fixed;inset:0 전체화면 오버레이라,
@@ -242,6 +263,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .foot-mail:hover{color:var(--ink);}   /* hover 도 AA 유지(크림 8.4:1) — 기존 --gotgam 은 3.03 */
 
 /* 개인정보 처리방침 본문 */
+/* 처리방침 서두 안내 — 「운영 개시 시 확정」 항목이 누락이 아니라
+   «운영 주체·방식이 정해지면 채울 자리»임을 먼저 밝힌다.
+   ⚠ 문구는 시민앱(모바일웹 .privacy-notice)과 «같아야» 한다. */
+.pp-notice{margin:0 0 14px;padding:12px 14px;background:var(--gotgam-ll);
+  border:1.5px solid var(--gotgam-d);border-radius:12px;}
+.pp-notice p{margin:0;font-size:0.875rem;line-height:1.65;color:var(--ink);}
 .pp-intro{font-size:0.875rem;line-height:1.7;color:var(--ink);margin-bottom:14px;}
 .pp-h{font-size:0.90625rem;font-weight:800;color:var(--gotgam-t);margin:16px 0 6px;}  /* 흰 6.03:1 */
 .pp-p{font-size:0.84375rem;line-height:1.7;color:var(--ink);}
@@ -276,7 +303,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   align-items:center;gap:14px;border-left:5px solid var(--navy);cursor:pointer;transition:transform .12s;}
 .pcard:hover{transform:translateY(-2px);}
 /* 숨김(블라인드) 글: opacity .6 이면 본문이 3.36:1 로 AA 미달 → .75(4.99:1)로 완화 */
-.pcard.hidden-row{opacity:.75;border-left-color:#9AA4B8;background:#FAFBFD;}
+/* 블라인드(숨김) 제안 카드 — «흐리게»가 아니라 «배경·테두리»로 구분한다.
+   ⚠ 예전 주석은 제목 글자 하나만 계산해 «대비 충족»이라 적었으나, opacity:.75 는
+      카드 «전체»에 곱해져 메타 2.95:1 · 상태 배지 3.65:1 로 미달이었다(저시력 이용자).
+      opacity 를 걷어내면 안쪽 글자들이 본래 대비(AA)를 그대로 유지한다.
+   구분은 색만으로 하지 않는다 — 카드 안에 «숨김» 배지 글자가 함께 표시된다. */
+.pcard.hidden-row{border-left-color:#5B6B8C;background:#EEF1F7;border:1.5px dashed #5B6B8C;border-left-width:5px;border-left-style:solid;}
 .pcard-main{flex:1;min-width:0;}
 .pcard-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px;}
 .pcard-title{font-size:1rem;font-weight:800;}
