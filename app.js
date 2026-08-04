@@ -12,6 +12,10 @@ const PAGE = 12;
 //    이 앱은 시민 신청자의 개인정보(성명·연락처·문의내용)를 다루므로
 //    «세션이 있어야만» 화면에 들어갈 수 있습니다. 우회 플래그를 되살리지 마세요.
 let LOGGING_OUT = false;   // 로그아웃 진행 중(onAuthStateChange 중복 처리 방지)
+// 🔑 비밀번호 변경 진행 중. 이 동안에는 «본인 확인용 재로그인»과 «비밀번호 저장» 때문에
+//    세션이 잠깐 갈릴 수 있어, 세션 만료 안내(showSessionExpired)가 끼어들지 않도록 막는다.
+//    (LOGGING_OUT 과 같은 자리에서 선언 — onAuthStateChange 콜백이 먼저 실행돼도 TDZ 오류가 없도록)
+let PW_CHANGING = false;
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m])); }
@@ -76,6 +80,9 @@ function openModal(modal) {
 function closeModal(modal) {
   if (!modal) return;
   modal.classList.add("hidden");
+  // 🔑 닫을 때 비밀번호 칸은 반드시 비운다. (Esc·바깥클릭·✕ 어느 경로로 닫아도 동일하게 동작하도록
+  //    닫기 «한 곳»에서 처리한다. 현재 type="password" 입력칸은 비밀번호 변경 모달에만 있다)
+  try { modal.querySelectorAll('input[type="password"]').forEach((n) => { n.value = ""; }); } catch (e) {}
   if (_activeModal === modal) _activeModal = null;
   if (_lastFocus && typeof _lastFocus.focus === "function") { try { _lastFocus.focus(); } catch (e) {} }
   _lastFocus = null;
@@ -157,6 +164,7 @@ sb.auth.onAuthStateChange((event) => {
   if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") { scheduleExpiryWarning(); return; }
   if (event !== "SIGNED_OUT") return;
   if (LOGGING_OUT) return;                                  // 로그아웃 버튼 경로와 중복 방지
+  if (PW_CHANGING) return;                                  // 🔑 비밀번호 변경 중 — 결과는 그 화면이 직접 안내
   if ($("#app").classList.contains("hidden")) return;       // 아직 로그인 화면 → 무시
   showSessionExpired();
 });
@@ -384,6 +392,189 @@ async function showApp() {
   loadApplications();
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   🔑 비밀번호 변경 (담당자 본인이 직접)
+   ────────────────────────────────────────────────────────────────────
+   계정은 시스템 담당자가 Supabase 대시보드에서 만들고 «임시 비밀번호»를 알려 준다.
+   그 값을 계속 쓰면 만든 사람도 아는 비밀번호가 되어 «본인만 아는 비밀번호» 원칙
+   (개인정보의 안전성 확보조치 기준)에 어긋난다 → 여기서 스스로 바꾼다.
+
+   절차: ① 현재 비밀번호로 본인 확인  ② 복잡도 검사  ③ Supabase 에 새 비밀번호 저장
+   ★ ①을 두는 이유: Supabase 는 «세션만 있으면» 현재 비밀번호 없이 바꿀 수 있다.
+     자리를 비운 사이 지나가던 사람이 비밀번호를 바꿔 계정을 통째로 가져갈 수 있으므로,
+     PC앱(webui/app_web.py change_password)과 같게 현재 비밀번호를 한 번 더 묻는다.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 비밀번호 복잡도 — PC앱 auth.py password_strength_error() 의 «그대로» 옮긴 판정.
+   기준(개인정보의 안전성 확보조치 기준 해설서): 문자 종류 3종 이상이면 8자,
+   2종 이상이면 10자. 두 앱이 다른 기준을 쓰면 담당자가 혼란스러우므로
+   ⚠ 한쪽만 고치지 말 것(auth.py ↔ 이 함수는 한 쌍이다).
+   문자 종류 판정은 파이썬 islower/isupper/isdigit/isalnum 과 맞춘다
+   (한글은 대·소문자가 없고 isalnum 이 참 → «특수문자»로 세지 않는다). */
+function passwordStrengthError(pw) {
+  const s = String(pw == null ? "" : pw);
+  if (!s.trim()) return "새 비밀번호를 입력해 주세요.";
+  if (/\s/.test(s)) return "비밀번호에 공백은 쓸 수 없습니다.";
+  let kinds = 0;
+  if (/\p{Ll}/u.test(s)) kinds++;                 // 소문자
+  if (/\p{Lu}/u.test(s)) kinds++;                 // 대문자
+  if (/\p{Nd}/u.test(s)) kinds++;                 // 숫자
+  if (/[^\p{L}\p{N}]/u.test(s)) kinds++;          // 특수문자(글자·숫자가 아닌 것)
+  const len = [...s].length;                      // 이모지 등도 1자로 세도록 코드포인트 기준
+  if (kinds >= 3 && len >= 8) return "";
+  if (kinds >= 2 && len >= 10) return "";
+  return "비밀번호가 너무 단순합니다.\n" +
+    "· 영문 대문자·소문자·숫자·특수문자 중 3종류 이상을 섞으면 8자 이상\n" +
+    "· 2종류만 섞으면 10자 이상\n" +
+    "  예) sangju!2026 · Gotgam2026!\n" +
+    "(지금 입력: " + len + "자, " + kinds + "종류)";
+}
+
+// 비밀번호 변경 실패 사유를 공무원이 이해할 수 있는 말로 바꾼다(loginErrMsg 와 같은 방식).
+function pwErrMsg(error) {
+  const msg = String((error && error.message) || "").toLowerCase();
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "인터넷에 연결되어 있지 않습니다. 연결 상태를 확인해 주세요.";
+  }
+  if (/invalid login credentials|invalid credentials/.test(msg)) {
+    return "현재 비밀번호가 맞지 않습니다. 다시 확인해 주세요.";
+  }
+  if (/should be different|same_password|same as the old/.test(msg)) {
+    return "지금 쓰는 비밀번호와 같습니다. 다른 값으로 정해 주세요.";
+  }
+  if (/weak password|password should be at least|password is too short/.test(msg)) {
+    return "서버가 요구하는 조건에 못 미치는 비밀번호입니다. 더 길고 복잡하게 정해 주세요.";
+  }
+  if (/too many requests|rate limit|for security purposes/.test(msg)) {
+    return "시도가 너무 잦습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (/session|jwt|token|not authenticated/.test(msg)) {
+    return "로그인이 만료되었습니다. 다시 로그인하신 뒤 바꿔 주세요.";
+  }
+  if (/failed to fetch|network|load failed/.test(msg)) {
+    return "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  return "비밀번호를 바꾸지 못했습니다. (" + ((error && error.message) || "알 수 없는 오류") + ")";
+}
+
+function pwSetMsg(text, kind) {
+  const box = $("#pwErr");
+  if (!box) return;
+  box.className = "pw-msg" + (kind ? " " + kind : "");
+  box.textContent = text || "";
+}
+
+// 화면을 처음 상태로 되돌리고 연다(직전 입력·안내가 남지 않게).
+function openChangePw() {
+  ["#pwCur", "#pwNew", "#pwChk"].forEach((s) => { const n = $(s); if (n) n.value = ""; });
+  const rule = $("#pwNewRule");
+  if (rule) { rule.textContent = ""; rule.className = "pw-rule"; }
+  pwSetMsg("");
+  const btn = $("#pwSave");
+  if (btn) { btn.disabled = false; btn.textContent = "🔑 변경하기"; btn.onclick = submitChangePw; }
+  openModal($("#pwModal"));   // 첫 초점은 «현재 비밀번호» 칸(모달 공통 규약)
+}
+
+async function submitChangePw() {
+  const cur = $("#pwCur").value, nw = $("#pwNew").value, chk = $("#pwChk").value;
+  // 실패 안내 + 고쳐야 할 칸으로 초점 이동(KWCAG)
+  const fail = (msg, sel) => {
+    pwSetMsg(msg, "ng");
+    announce(msg);
+    if (sel) { const n = $(sel); if (n) n.focus(); }
+  };
+  if (!cur) { fail("현재 비밀번호를 입력해 주세요.", "#pwCur"); return; }
+  const ruleErr = passwordStrengthError(nw);
+  if (ruleErr) {
+    // 여러 줄짜리 «규칙 안내»는 해당 칸 바로 아래에 두고, 맨 아래 결과줄에는 한 줄 요약만 —
+    // 같은 긴 안내가 화면에 두 번 뜨면 무엇을 고쳐야 할지 오히려 찾기 어렵다.
+    const box = $("#pwNewRule");
+    const oneLine = ruleErr.indexOf("\n") < 0;
+    if (box) {
+      box.textContent = oneLine ? "" : ruleErr;
+      box.className = "pw-rule" + (oneLine ? "" : " ng");
+    }
+    fail(oneLine ? ruleErr : "새 비밀번호가 규칙에 맞지 않습니다. 「새 비밀번호」 칸 아래 안내를 확인해 주세요.", "#pwNew");
+    return;
+  }
+  if (!chk) { fail("새 비밀번호 확인을 입력해 주세요.", "#pwChk"); return; }
+  if (nw !== chk) { fail("새 비밀번호 확인이 일치하지 않습니다. 같은 값을 다시 입력해 주세요.", "#pwChk"); return; }
+  if (nw === cur) { fail("지금 쓰는 비밀번호와 같습니다. 다른 값으로 정해 주세요.", "#pwNew"); return; }
+
+  const btn = $("#pwSave");
+  const label = btn.textContent;
+  let needRelogin = false;
+  btn.disabled = true; btn.textContent = "변경 중...";
+  pwSetMsg("비밀번호를 바꾸는 중입니다...");
+  PW_CHANGING = true;
+  try {
+    // ① 본인 확인 — 지금 로그인한 이메일 + 입력한 현재 비밀번호로 다시 로그인해 본다.
+    //    (Supabase 에는 «비밀번호만 확인» 하는 기능이 없다. 성공하면 같은 계정의 새 세션으로 이어진다)
+    let email = "";
+    try {
+      const r = await sb.auth.getSession();
+      const ses = r && r.data ? r.data.session : null;
+      email = (ses && ses.user && ses.user.email) || "";
+    } catch (e) { email = ""; }
+    if (!email) {
+      needRelogin = true;
+      fail("로그인이 만료되었습니다. 다시 로그인하신 뒤 바꿔 주세요.");
+      return;
+    }
+    let vErr = null;
+    try {
+      const r = await sb.auth.signInWithPassword({ email, password: cur });
+      vErr = r && r.error ? r.error : null;
+    } catch (e) { vErr = e; }
+    if (vErr) {
+      $("#pwCur").value = "";
+      fail(pwErrMsg(vErr), "#pwCur");
+      return;
+    }
+
+    // ② 새 비밀번호 저장
+    let uErr = null;
+    try {
+      const r = await sb.auth.updateUser({ password: nw });
+      uErr = r && r.error ? r.error : null;
+    } catch (e) { uErr = e; }
+    if (uErr) { fail(pwErrMsg(uErr), "#pwNew"); return; }
+
+    // ③ 세션이 살아 있는지 확인 — Supabase 설정에 따라 비밀번호를 바꾸면
+    //    다른 기기의 로그인을 끊는데, 그때 이 기기까지 끊기는 경우가 있어 결과를 보고 안내를 나눈다.
+    let alive = false;
+    try {
+      const r = await sb.auth.getSession();
+      alive = !!(r && r.data && r.data.session);
+    } catch (e) { alive = false; }
+
+    ["#pwCur", "#pwNew", "#pwChk"].forEach((s) => { const n = $(s); if (n) n.value = ""; });
+    const rule = $("#pwNewRule");
+    if (rule) { rule.textContent = ""; rule.className = "pw-rule"; }
+
+    if (alive) {
+      scheduleExpiryWarning();     // 새 세션 기준으로 «만료 2분 전» 예고를 다시 잡는다
+      pwSetMsg("✅ 비밀번호를 바꿨습니다. 지금 로그인은 그대로 유지되며, 다음 로그인부터 새 비밀번호를 쓰시면 됩니다.", "ok");
+      announce("비밀번호를 바꿨습니다. 다음 로그인부터 새 비밀번호를 쓰세요.");
+    } else {
+      needRelogin = true;
+      pwSetMsg("✅ 비밀번호를 바꿨습니다. 보안을 위해 로그인이 끊겼으니 새 비밀번호로 다시 로그인해 주세요.", "ok");
+      announce("비밀번호를 바꿨습니다. 새 비밀번호로 다시 로그인해 주세요.");
+    }
+  } finally {
+    PW_CHANGING = false;
+    btn.disabled = false;
+    if (needRelogin) {
+      // 저절로 화면을 되돌리지 않는다(KWCAG 6.2.1 «시간 제한») — 누를 때 이동한다.
+      btn.textContent = "로그인 화면으로";
+      btn.onclick = () => { LOGGING_OUT = true; location.reload(); };
+      try { btn.focus(); } catch (e) {}
+    } else {
+      btn.textContent = label;
+    }
+  }
+}
+
 function bindUI() {
   $("#search").addEventListener("input", debounce(() => { page = 0; render(); }, 300));
   $("#sortSel").addEventListener("change", () => { sortKey = $("#sortSel").value; render(); });
@@ -396,6 +587,25 @@ function bindUI() {
   // C2: 닫기/바깥클릭은 closeModal로 통일(포커스 복귀). Esc는 _trapKeydown이 일괄 처리.
   $("#mClose").onclick = () => closeModal($("#modal"));
   $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal($("#modal")); });
+
+  // 🔑 비밀번호 변경 모달 (열기/닫기/바깥클릭) — Esc는 공통 트랩에서 처리
+  const pwm = $("#pwModal");
+  if (pwm) {
+    $("#btnChangePw").onclick = openChangePw;
+    $("#pwClose").onclick = () => closeModal(pwm);
+    pwm.addEventListener("click", (e) => { if (e.target.id === "pwModal") closeModal(pwm); });
+    $("#pwSave").onclick = submitChangePw;
+    // 입력 중 규칙 미리 확인 — 「변경하기」를 눌러야 알 수 있던 것을 미리 알려 준다(300ms 디바운스).
+    // 안내는 role="status"(polite) 라 타이핑을 방해하지 않는다.
+    $("#pwNew").addEventListener("input", debounce(() => {
+      const v = $("#pwNew").value, box = $("#pwNewRule");
+      if (!box) return;
+      if (!v) { box.textContent = ""; box.className = "pw-rule"; return; }
+      const err = passwordStrengthError(v);
+      box.textContent = err ? err : "✅ 쓸 수 있는 비밀번호입니다.";
+      box.className = "pw-rule " + (err ? "ng" : "ok");
+    }, 300));
+  }
 
   // 개인정보 처리방침 모달 (열기/닫기/바깥클릭) — Esc는 공통 트랩에서 처리
   const pp = $("#ppModal");

@@ -29,6 +29,8 @@
   --cream:#FFF7F0; --line:#F0E0D5; --card:#FFFFFF;
   /* 흰 글자를 얹는 위험(삭제) 배경 — 흰 대비 5.44:1 */
   --danger:#C0392B;
+  /* 성공·통과 표시 글자색 — 흰 대비 5.42:1 (PC앱 webui --ok 와 같은 값) */
+  --ok:#1F7A41;
   --shadow:0 6px 18px rgba(170,90,45,.13);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -66,7 +68,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* 로그인 */
 .login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#FFF3EA,#FFE2CE);padding:20px;}
 .login-card{background:#fff;width:100%;max-width:380px;padding:38px 32px;border-radius:24px;box-shadow:0 18px 50px rgba(170,90,45,.22);text-align:center;}
-.login-logo{height:62px;width:auto;max-width:78%;object-fit:contain;display:block;margin:0 auto;}
+/* 상상주도 CI 로고(로그인 카드) — 아래 시정구호(.login-slogan)와 균형을 맞춰 62px → 40px.
+   순수 이미지(링크 아님)라 44×44 터치 대상 규정 대상이 아니다. */
+.login-logo{height:40px;width:auto;max-width:78%;object-fit:contain;display:block;margin:0 auto;}
 .login-title{font-size:1.375rem;color:var(--gotgam-t);font-weight:800;margin-top:10px;}  /* 흰 6.03:1 */
 .login-sub{font-size:0.78125rem;color:var(--sub);font-weight:700;margin:4px 0 20px;display:inline-flex;align-items:center;gap:5px;}
 .login-gotgam{width:16px;height:16px;object-fit:contain;}
@@ -93,7 +97,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .session-banner .sb-btn:hover{background:var(--gotgam-t);}
 .session-banner .sb-btn:disabled{background:var(--dim);cursor:default;}
 .topbar{background:#fff;display:flex;align-items:center;gap:12px;padding:12px 20px;}
-.brand-logo{height:34px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));}
+/* 상상주도 CI 로고(헤더) — 시정구호가 커진 만큼 «보조 표식» 크기로 34px → 22px.
+   시민앱(모바일웹) .topbar-logo 와 같은 22px. 헤더 높이(64px)는 제목 블록이 정하므로 그대로다. */
+.brand-logo{height:22px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));}
 /* line-height 1.1 은 한글 글자상자(약 1.2em)보다 좁아 글자가 줄상자 밖으로 삐져나왔다(기본 2px·200% 5px).
    1.2 로 올려 글자를 줄상자 안에 담고, 늘어난 2px 만큼 아래 .brand-sub 의 margin-top(2px)을 없애
    헤더 전체 높이(64px)와 부제 위치는 그대로 유지한다. */
@@ -365,12 +371,33 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   background:var(--gotgam-d);color:#fff;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
 .rt-banner-btn:hover{background:var(--gotgam-t);}  /* 흰글자 6.03:1 */
 
+/* ════════════════════════════════════════════════════════════
+   🔑 비밀번호 변경 모달
+   ════════════════════════════════════════════════════════════ */
+.pw-intro{font-size:0.8125rem;line-height:1.7;color:var(--sub);margin:0 0 14px;}
+.pw-intro strong{color:var(--gotgam-t);}          /* 흰 6.03:1 */
+/* 입력 중 규칙 판정(여러 줄 안내를 줄바꿈 그대로 보여 준다) */
+.pw-rule{margin-top:6px;font-size:0.75rem;font-weight:700;line-height:1.6;
+  color:var(--sub);white-space:pre-wrap;}
+.pw-rule.ok{color:var(--ok);}                     /* 흰 5.42:1 */
+.pw-rule.ng{color:var(--danger);}                 /* 흰 5.44:1 */
+/* 변경 결과·실패 사유 */
+.pw-msg{margin:2px 0 12px;font-size:0.8125rem;font-weight:700;line-height:1.7;
+  color:var(--sub);white-space:pre-wrap;}
+.pw-msg:empty{margin:0;}
+.pw-msg.ok{color:var(--ok);}
+.pw-msg.ng{color:var(--danger);}
+
 /* 반응형(핸드폰) */
 @media (max-width:600px){
   .topbar{flex-wrap:wrap;padding:10px 14px;}
   .brand-title{font-size:1.125rem;}
-  .top-actions{width:100%;margin-left:0;}
-  .top-btn{flex:1;text-align:center;}
+  /* 버튼이 3개(새 사업·비밀번호 변경·로그아웃)로 늘어 좁은 화면에서는 줄바꿈을 허용한다.
+     flex:1 0 auto = 남는 자리는 나눠 갖되(1) «글자 너비 아래로는 줄어들지 않는다»(0)
+     → 폭이 모자라면 글자가 뭉개지는 대신 다음 줄로 내려간다.
+     (.modal-actions .top-btn 은 선택자가 더 구체적이라 여기 영향을 받지 않는다 — 모달 버튼은 그대로 균등폭) */
+  .top-actions{width:100%;margin-left:0;flex-wrap:wrap;}
+  .top-btn{flex:1 0 auto;text-align:center;}
   .content{padding:14px;}
   .card{padding:14px;}
   .card-title{font-size:0.9375rem;}
