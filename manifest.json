@@ -4,12 +4,14 @@
   "short_name": "상주정책(공무원용)",
   "description": "상주시 지원사업을 공무원이 관리(추가·수정·삭제)하는 관리자용 앱",
   "lang": "ko",
+  "dir": "ltr",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "orientation": "portrait",
-  "theme_color": "#1B2A4A",
-  "background_color": "#E1E9F2",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#0E7C86",
+  "background_color": "#FDF4EC",
   "icons": [
     {
       "src": "assets/icon-admin-192.png",
@@ -24,7 +26,7 @@
       "purpose": "any"
     },
     {
-      "src": "assets/icon-admin-512.png",
+      "src": "assets/icon-admin-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

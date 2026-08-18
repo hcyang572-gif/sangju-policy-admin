@@ -13,8 +13,11 @@
        · nalpuhtdruovzulcagtj.supabase.co — 사업·제안·접수 조회/수정 + 로그인(Auth) + 실시간(wss)
          (Auth 도 같은 도메인이라 따로 추가할 것이 없다) -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; connect-src 'self' https://nalpuhtdruovzulcagtj.supabase.co wss://nalpuhtdruovzulcagtj.supabase.co">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1B2A4A">
+<!-- viewport-fit=cover : 노치·둥근 모서리 기기에서 화면 «끝까지» 그린다(안전영역은 CSS env() 로 피함).
+     ⛔ user-scalable=no · maximum-scale 은 «절대» 넣지 않는다 — 확대를 막으면 KWCAG 위반이다. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 시안 A「감빛 온기」 — 공무원용 정체성 색은 청록(#0E7C86). 상태표시줄·작업 전환 화면 색 -->
+<meta name="theme-color" content="#0E7C86">
 <title>상주정책(공무원용)</title>
 <meta name="description" content="상주시 정책 플랫폼 공무원 관리 도구 — 지원사업 정보와 시민 정책제안을 실시간으로 조회·검토·답변·관리합니다.">
 
@@ -55,11 +58,23 @@
   <button id="inappClose" class="inapp-close" type="button" aria-label="안내 닫기">✕</button>
 </div>
 
+<!-- 「홈 화면에 추가」 안내 — 설치가 실제로 가능할 때만(a2hs.js 가 beforeinstallprompt 를 받았을 때) 뜬다.
+     설치하면 주소창 없이 «일반 앱처럼» 전체화면으로 열린다. 한 번 닫으면 다시 나오지 않는다. -->
+<div id="a2hsBanner" class="a2hs" role="region" aria-label="앱 설치 안내" hidden>
+  <span class="a2hs-emoji" aria-hidden="true">📲</span>
+  <p class="a2hs-text">홈 화면에 추가하면 주소창 없이 <b>일반 앱처럼</b> 쓸 수 있습니다.</p>
+  <button id="a2hsInstall" class="a2hs-btn" type="button">홈 화면에 추가</button>
+  <button id="a2hsClose" class="a2hs-close" type="button" aria-label="설치 안내 닫기 — 다시 표시하지 않음">✕</button>
+</div>
+
 <!-- 로그인 -->
 <div id="login" class="login-screen">
   <div class="login-card">
     <img src="assets/sangsang1.png" class="login-logo" alt="상상주도 로고">
-    <h1 class="login-title">상주시 정책 플랫폼</h1>
+    <!-- 브랜드 제목 표기(3개 앱 공통 규약) — 「시민 참여형」(작게) + 「상주시 정책플랫폼」(크게) + 배지 「공무원용」.
+         배지는 제목 «뒤»에 두며, h1 안에 두어 낭독기에도 «어느 앱인지»가 제목과 함께 읽히게 한다. -->
+    <span class="login-eyebrow">시민 참여형</span>
+    <h1 class="login-title">상주시 정책플랫폼<span class="brand-tag">공무원용</span></h1>
     <p class="login-sub"><img src="assets/gotgam.png" class="login-gotgam" alt="상주 곶감">공무원 관리자 로그인 (클라우드)</p>
     <!-- 2026 시정구호 — 이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수).
          로그인 카드는 폭이 좁으므로 2줄형만 쓴다(1줄형은 글자가 너무 작아진다). -->
@@ -96,10 +111,16 @@
     <img src="assets/sangsang1.png" class="brand-logo" alt="상상주도 로고">
     <div class="brand-text">
       <!-- 앱 화면의 «유일한 h1». 로그인 카드의 h1 은 로그인 후 사라지므로,
-           로그인 뒤 문서에 제목 단계가 하나도 없던 문제를 여기서 해소한다. -->
-      <h1 class="brand-title">상주시 정책 플랫폼</h1>
+           로그인 뒤 문서에 제목 단계가 하나도 없던 문제를 여기서 해소한다.
+           브랜드 표기 규약: 「시민 참여형」(작게) + 「상주시 정책플랫폼」(크게) + 배지 「공무원용」(뒤). -->
+      <span class="brand-eyebrow">시민 참여형</span>
+      <h1 class="brand-title">상주시 정책플랫폼<span class="brand-tag">공무원용</span></h1>
       <div class="brand-sub" id="dbInfo">사업 관리 (실시간)</div>
     </div>
+    <!-- 2026 시정구호 — 대표 제목 바로 옆에 «크게»(넓은 화면 320px 이상). 좁은 화면에서는 CSS 가 감춘다.
+         이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수). -->
+    <img src="assets/slogan-wide.png" class="top-slogan" width="1201" height="122"
+         alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
     <div class="top-actions">
       <!-- 실시간 연결 표시 — 상태가 바뀌면 app.js setRealtimeDot() 이 «글자»(rt-dot-text)와
            title 을 함께 갱신한다. 색(●)만으로 상태를 전하지 않기 위함(KWCAG 5.4.1)이며,
@@ -133,6 +154,37 @@
   <section id="secApplications" class="content" role="tabpanel" aria-labelledby="tabApplications">
     <h2 class="sr-only">신청 접수</h2>
     <div class="search-hint">📥 시민 신청을 실시간으로 접수·처리하세요. 상태 변경·처리메모는 모든 접속자에게 즉시 반영됩니다.</div>
+
+    <!-- 📊 이달의 접수 현황(도넛) — 확정 시안 A 의 도넛을 그대로 옮긴 «현황» 자리.
+         수치·조각 길이는 stats.js 가 실제 접수 목록에서 «이번 달»만 골라 채운다(app.js 는 손대지 않는다).
+         접수가 한 건도 없는 달에는 통째로 숨긴다(hidden).
+         ⚠ 색만으로 알리지 않는다 — 범례에 건수·비율과 «모양»(원/둥근사각/각사각/마름모)을 함께 두고,
+            <title>/<desc> 에 같은 수치를 글로 적어 낭독기에도 동일한 정보를 준다. -->
+    <figure id="aStats" class="stats-card" hidden>
+      <figcaption class="stats-cap">이달의 접수 <b id="aStatsTotal">0</b>건 · 상태별</figcaption>
+      <div class="donut-wrap">
+        <svg class="donut" viewBox="0 0 140 140" role="img" aria-labelledby="aStatsT aStatsD">
+          <title id="aStatsT">이달의 접수 상태별 비중</title>
+          <desc id="aStatsD">아직 자료를 불러오지 않았습니다.</desc>
+          <circle class="dn-track" cx="70" cy="70" r="54"></circle>
+          <g class="dn-seg">
+            <circle class="d1" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+            <circle class="d2" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+            <circle class="d3" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+            <circle class="d4" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+          </g>
+          <text class="dn-num" id="aStatsNum" x="70" y="72" text-anchor="middle">0</text>
+          <text class="dn-lab" x="70" y="89" text-anchor="middle">이달의 접수(건)</text>
+        </svg>
+        <ul class="donut-legend">
+          <li><span class="dn-mk m1" aria-hidden="true"></span>승인<b id="aLgN1">0</b><em id="aLgP1">0%</em></li>
+          <li><span class="dn-mk m2" aria-hidden="true"></span>심사중<b id="aLgN2">0</b><em id="aLgP2">0%</em></li>
+          <li><span class="dn-mk m3" aria-hidden="true"></span>접수<b id="aLgN3">0</b><em id="aLgP3">0%</em></li>
+          <li><span class="dn-mk m4" aria-hidden="true"></span>반려<b id="aLgN4">0</b><em id="aLgP4">0%</em></li>
+        </ul>
+      </div>
+    </figure>
+
     <div id="aStatusChips" class="chips wrap" role="group" aria-label="상태 필터"></div>
     <div class="toolbar">
       <label for="aSearch" class="sr-only">사업명 · 신청자 · 연락처 · 접수번호 검색</label>
@@ -363,6 +415,14 @@
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
 <script src="apply_client.js"></script>
 <script src="app.js"></script>
+<!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
+     CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.
+       · tap.js   — 버튼 눌림 파동 + 햅틱(진동). 화면에 무엇을 그리지는 않는다.
+       · stats.js — 「이달의 접수」 도넛 채우기. app.js 가 만든 목록을 «읽기만» 한다.
+       · a2hs.js  — 「홈 화면에 추가」 안내. 닫으면 다시 뜨지 않는다. -->
+<script src="tap.js"></script>
+<script src="stats.js"></script>
+<script src="a2hs.js"></script>
 
 <!-- PWA 서비스워커 등록 (상대경로 → /admin/ 하위에서만 동작, 시민앱과 분리) -->
 <!-- 서비스워커 등록 — CSP 적용을 위해 인라인 대신 별도 파일(sw-register.js)로 둔다 -->

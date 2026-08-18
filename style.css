@@ -1,48 +1,68 @@
-/* 상주시 정책 플랫폼 — 클라우드(곶감 테마, 반응형) */
+/* 상주시 정책 플랫폼 — 공무원앱(cloudui) · 시안 A「감빛 온기」 Warm Persimmon */
 /* ═══════════════════════════════════════════════════════════════
-   공통 접근성 팔레트 (시민앱(모바일웹) · 공무원앱(cloudui) · PC앱(webui) 3종 동일 값)
+   확정 디자인 팔레트 — 시안 A「감빛 온기」 (2026-08-19 확정)
+   시민앱(모바일웹) · 공무원앱(cloudui) · PC앱(webui) 3종 동일 값
    ─────────────────────────────────────────────────────────────
-   토큰 대응표 (이름은 각 앱 기존 체계 유지, 값만 일치)
+   토큰 대응표 (변수 «이름»은 기존 체계를 그대로 두고 «값»만 시안 A 로 교체)
      ※ 아래 «대비» 는 WCAG 2.x 상대휘도식 (L+0.05)/(l+0.05) 로 계산한 값이며,
-        «흰» = #FFFFFF(카드 배경), «크림» = #FFF7F0(body 배경) 을 각각 기준으로 한다.
-        (2026-08-18 재계산 확인 — 배경을 밝히지 않은 채 «대비 몇 대 몇» 만 적으면
+        «흰» = #FFFFFF(카드 배경), «바탕» = #FDF4EC(body 배경) 을 각각 기준으로 한다.
+        (2026-08-19 재계산 — 배경을 밝히지 않은 채 «대비 몇 대 몇» 만 적으면
          읽는 사람마다 다른 배경을 가정해 수치가 어긋난다.)
-     역할                     값        cloudui      시민앱             흰 기준   크림 기준
-     장식·테두리 전용         #E66B3A   --gotgam     --primary          3.22      3.03   (흰글자 배경 금지)
-     흰 글자 얹는 배경 전용   #C2501F   --gotgam-d   --primary-hover    4.71      4.44   (흰 글자를 «얹는» 배경으로만)
-     밝은 배경 위 주황 글자   #A8431A   --gotgam-t   --accent-text      6.03      5.69
-     보조 텍스트              #7A6152   --sub        --muted            5.74      5.41
-     비활성·빈상태 텍스트     #6F6A63   --dim        --disabled         5.36      5.06
-     경계선                   #F0E0D5   --line       --border           (비텍스트 — 3:1 기준 대상 아님)
-   ⚠ #E66B3A 위에 흰 글자를 얹으면 3.22:1 로 AA(4.5) 미달 → 반드시 --gotgam-d 사용
-   ⚠ --gotgam-d 를 «밝은 배경 위 글자색»으로 쓰면 4.3~4.5 경계 → 글자는 --gotgam-t 사용
+     역할                        값        cloudui      시민앱          흰 기준   바탕 기준
+     바탕(페이지)                #FDF4EC   --cream      --bg            —         —
+     카드                        #FFFFFF   --card       --card          —         —
+     주조(테두리 + 흰글자 배경)  #B84A1C   --gotgam     --primary       5.21      4.79
+     진한 주조(hover·밝은바탕글자) #96370F --gotgam-t   --accent-text   7.37      6.78
+     보조(금빛) ⚠글자색 금지     #E8A33D   --gold       --gold          2.16      1.99   (면·테두리 전용)
+     청록 포인트                 #0E7C86   --navy(청록) --civic         4.95      4.55
+     진한 청록(hover)            #0A5C64   --navy-d     —               7.70      7.08
+     글자                        #33241C   --ink        --text          14.90     13.71
+     보조 텍스트                 #6E594A   --sub        --muted         6.58      6.06
+     비활성·빈상태 텍스트        #6B5F55   --dim        --disabled      6.19      5.70
+     경계선                      #EADCCE   --line       --border        (비텍스트 — 3:1 기준 대상 아님)
+   ⚠ #E8A33D(보조·금빛) 위에 흰 글자를 얹으면 2.16:1 → «글자색으로 절대 쓰지 않는다».
+      면(도넛 조각·강조 띠)·테두리로만 쓰고, 그 위 표식은 어두운 색(#33241C)으로 얹는다.
+   ⚠ --gotgam(#B84A1C)은 흰 글자를 «얹는» 배경으로 쓸 수 있다(5.21:1). 밝은 배경 위
+      «글자»로 쓸 때는 여백이 좁으므로 되도록 --gotgam-t(#96370F, 7.37:1)를 쓴다.
+   ※ --navy* 는 이름만 남은 «정책제안·시민공개» 계열 토큰이다. 값은 시안 A 의 청록
+      포인트(#0E7C86)로 바뀌었다 — 이름을 고치면 app.js 가 참조하는 클래스까지 흔들려
+      «값만» 교체했다.
    ═══════════════════════════════════════════════════════════════ */
 :root{
-  /* 장식·테두리 전용(흰 글자 배경 금지) */
-  --gotgam:#E66B3A;
-  /* 흰 글자를 얹는 배경 전용 — 흰 대비 4.71:1 */
-  --gotgam-d:#C2501F;
-  /* 밝은 배경 위 주황 «글자» 전용 — 흰 6.03 · #FBE3D4 4.89 · #FFF1E8 5.46 · #F0E0D5 4.69 */
-  --gotgam-t:#A8431A;
-  --gotgam-l:#FBE3D4; --gotgam-ll:#FFF1E8;
-  --ink:#4A3B32;
-  /* 보조 텍스트 — 흰 5.74 · 크림 5.41 */
-  --sub:#7A6152;
-  /* 비활성·빈상태 텍스트 — 흰 5.36 */
-  --dim:#6F6A63;
-  --cream:#FFF7F0; --line:#F0E0D5; --card:#FFFFFF;
-  /* 흰 글자를 얹는 위험(삭제) 배경 — 흰 대비 5.44:1 */
+  /* 주조 — 테두리·강조선 + «흰 글자를 얹는» 배경 겸용(흰 5.21:1 · 바탕 4.79:1) */
+  --gotgam:#B84A1C;
+  /* 흰 글자를 얹는 배경(= 주조와 같은 값. 이름은 기존 체계 유지) */
+  --gotgam-d:#B84A1C;
+  /* 밝은 배경 위 주황 «글자» + 버튼 hover — 흰 7.37 · #F8E3D2 5.93 · #FDF0E4 6.58 · #EADCCE 5.48 */
+  --gotgam-t:#96370F;
+  --gotgam-l:#F8E3D2; --gotgam-ll:#FDF0E4;
+  /* 보조(금빛) — ⚠ 글자색 금지. 면·테두리 전용(도넛 조각·강조 띠) */
+  --gold:#E8A33D;
+  --ink:#33241C;
+  /* 보조 텍스트 — 흰 6.58 · 바탕 6.06 */
+  --sub:#6E594A;
+  /* 비활성·빈상태 텍스트 — 흰 6.19 · 바탕 5.70 */
+  --dim:#6B5F55;
+  --cream:#FDF4EC; --line:#EADCCE; --card:#FFFFFF;
+  /* 흰 글자를 얹는 위험(삭제) 배경 — 흰 대비 5.44:1 · 바탕 5.01:1 */
   --danger:#C0392B;
   /* 성공·통과 표시 글자색 — 흰 대비 5.42:1 (PC앱 webui --ok 와 같은 값) */
   --ok:#1F7A41;
-  --shadow:0 6px 18px rgba(170,90,45,.13);
+  /* 시안 A 의 «부드러운 이중 그림자» */
+  --shadow:0 2px 0 rgba(184,74,28,.06), 0 10px 22px rgba(51,36,28,.08);
+  /* 라운드 — 시안 A 는 20px 를 기준으로 넉넉하게 */
+  --r-card:20px; --r-ctl:12px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
 /* 글꼴 크기 기준(rem) — 사용자가 브라우저·OS에서 지정한 기본 글꼴 크기를 그대로 존중한다.
    ⚠ 루트(html)에는 rem 을 쓰지 말 것(루트의 rem 은 사용자 설정이 아닌 초기값 16px 를 가리킴). */
 html{font-size:100%;}
-body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;background:var(--cream);color:var(--ink);}
+/* 「일반 앱처럼」 — 주소창에 방해받지 않게 전체화면 높이(100dvh)를 쓰고,
+   화면 끝에서 당겼을 때 브라우저가 페이지를 통째로 늘였다 놓는(고무줄) 동작을 끈다.
+   ⚠ 확대는 반드시 허용한다(index.html viewport 에 user-scalable=no·maximum-scale 금지 — KWCAG). */
+body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;background:var(--cream);color:var(--ink);
+  overscroll-behavior:none;}
 .hidden{display:none !important;}
 /* hidden 속성은 display 를 지정한 요소(.rt-banner 등)에서도 항상 우선 */
 [hidden]{display:none !important;}
@@ -50,7 +70,7 @@ body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;background
 /* 건너뛰기 링크(KWCAG 2.2 «반복 영역 건너뛰기»): 평소엔 화면 밖, 키보드 포커스 시에만 노출 */
 .skip-link{position:absolute;left:8px;top:-60px;z-index:999;padding:10px 16px;
   background:var(--gotgam-d);color:#fff;font-size:0.9375rem;font-weight:800;
-  border-radius:0 0 10px 10px;text-decoration:none;transition:top .12s ease;}  /* 흰글자 4.71:1 */
+  border-radius:0 0 10px 10px;text-decoration:none;transition:top .12s ease;}  /* 흰글자 5.21:1 */
 .skip-link:focus{top:0;}
 
 /* 스크린리더 전용(화면엔 숨김, 보조기기엔 노출) */
@@ -58,7 +78,7 @@ body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;background
 /* 키보드 포커스 가시성(KWCAG) */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,
 [role="button"]:focus-visible{outline:3px solid var(--gotgam-t);outline-offset:2px;}
-/* 카드(role=button)의 키보드 포커스 — 곶감/남색 톤 구분 */
+/* 카드(role=button)의 키보드 포커스 — 감빛/청록 톤 구분 */
 .card[role="button"]:focus-visible{outline:3px solid var(--gotgam-t);outline-offset:2px;}
 .pcard[role="button"]:focus-visible{outline:3px solid var(--navy);outline-offset:2px;}
 
@@ -66,29 +86,36 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .mb-10{margin-bottom:10px;}
 .mt-8{margin-top:8px;}
 .req-note{color:var(--danger);font-weight:700;}  /* 흰 5.44:1 */
-/* opacity .6 은 #FFF5F5 위에서 2.33:1 로 AA 미달 → 불투명 회색(5.36:1)으로 대체 */
+/* opacity .6 은 #FFF5F5 위에서 2.33:1 로 AA 미달 → 불투명 회색(6.19:1)으로 대체 */
 .muted-date{color:var(--dim);}
 
 /* 로그인 */
-.login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#FFF3EA,#FFE2CE);padding:20px;}
+.login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow-y:auto;
+  background:linear-gradient(160deg,#FDF4EC,#F6E3CE);
+  padding:calc(20px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));}
 .login-card{background:#fff;width:100%;max-width:380px;padding:38px 32px;border-radius:24px;box-shadow:0 18px 50px rgba(170,90,45,.22);text-align:center;}
 /* 상상주도 CI 로고(로그인 카드) — 아래 시정구호(.login-slogan)와 균형을 맞춰 62px → 40px.
    순수 이미지(링크 아님)라 44×44 터치 대상 규정 대상이 아니다. */
-.login-logo{height:40px;width:auto;max-width:78%;object-fit:contain;display:block;margin:0 auto;}
-.login-title{font-size:1.375rem;color:var(--gotgam-t);font-weight:800;margin-top:10px;}  /* 흰 6.03:1 */
-.login-sub{font-size:0.78125rem;color:var(--sub);font-weight:700;margin:4px 0 20px;display:inline-flex;align-items:center;gap:5px;}
+.login-logo{height:42px;width:auto;max-width:78%;object-fit:contain;display:block;margin:0 auto;}
+/* 브랜드 제목 표기 — 헤더와 «같은 규약»(눈높이 작게 + 제목 크게 + 용도 배지 오른쪽) */
+.login-eyebrow{display:block;font-size:0.8125rem;font-weight:700;color:var(--gotgam-t);
+  letter-spacing:.02em;margin-top:12px;}  /* 흰 7.37:1 */
+.login-title{font-size:1.375rem;color:var(--ink);font-weight:800;margin-top:2px;line-height:1.25;
+  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;}  /* 흰 14.9:1 */
+.login-title .brand-tag{font-size:0.8125rem;padding:5px 12px;}
+.login-sub{font-size:0.78125rem;color:var(--sub);font-weight:700;margin:6px 0 4px;display:inline-flex;align-items:center;gap:5px;}
 .login-gotgam{width:16px;height:16px;object-fit:contain;}
-/* 사용자 입력 요소(글을 넣는 칸)의 경계는 3:1 이상 — --gotgam(#E66B3A) 3.22:1.
-   기존 --gotgam-l(#FBE3D4) 은 1.37:1 이라 저시력 이용자가 칸을 식별할 수 없었다.
+/* 사용자 입력 요소(글을 넣는 칸)의 경계는 3:1 이상 — --gotgam(#B84A1C) 5.21:1.
+   연한 틴트(--gotgam-l #F8E3D2)는 1.29:1 이라 저시력 이용자가 칸을 식별할 수 없다.
    ⚠ 칩·탭·안내박스 등 «장식» 경계는 --gotgam-l 을 그대로 둔다(webui 와 같은 방침). */
 .login-input{width:100%;height:46px;border:2px solid var(--gotgam);border-radius:12px;text-align:center;font-size:0.9375rem;outline:none;margin-bottom:10px;}
 .login-input:focus{border-color:var(--gotgam);}
-.login-btn{width:100%;height:48px;margin-top:8px;border:none;border-radius:12px;background:var(--gotgam-d);color:#fff;font-size:1rem;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
-.login-btn:hover{background:var(--gotgam-t);}  /* 흰글자 6.03:1 */
+.login-btn{width:100%;height:48px;margin-top:8px;border:none;border-radius:12px;background:var(--gotgam-d);color:#fff;font-size:1rem;font-weight:800;cursor:pointer;}  /* 흰글자 5.21:1 */
+.login-btn:hover{background:var(--gotgam-t);}  /* 흰글자 7.37:1 */
 .login-err{color:#C62828;font-size:0.8125rem;font-weight:700;margin-top:10px;min-height:18px;}
 
-/* 앱 */
-.app{min-height:100vh;display:flex;flex-direction:column;}
+/* 앱 — 100dvh 는 주소창이 접혔다 펴져도 «지금 보이는 높이»를 그대로 쓴다(구형 대비 100vh 폴백) */
+.app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;}
 /* 로그인 만료 안내 띠 — 작성 중인 내용을 지키기 위한 장치(KWCAG 6.2.1).
    경고색(노랑)만으로 알리지 않고 «글»로 무엇을 해야 하는지 알린다.
    글자 #7A5B00 on #FFF3CD = 5.70:1 (AA 충족). */
@@ -97,106 +124,127 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .session-banner .sb-text{flex:1;min-width:200px;line-height:1.5;}
 .session-banner .sb-btn{flex:0 0 auto;border:none;border-radius:9px;padding:9px 14px;
   background:var(--gotgam-d);color:#fff;font-family:inherit;font-size:0.8125rem;font-weight:800;
-  cursor:pointer;min-height:24px;}  /* 흰글자 4.71:1 */
+  cursor:pointer;min-height:24px;}  /* 흰글자 5.21:1 */
 .session-banner .sb-btn:hover{background:var(--gotgam-t);}
 .session-banner .sb-btn:disabled{background:var(--dim);cursor:default;}
-.topbar{background:#fff;display:flex;align-items:center;gap:12px;padding:12px 20px;}
+/* 헤더 — 안전영역(노치·홈 인디케이터)을 피해 좌우·위 여백을 더한다(PWA 전체화면 대응) */
+.topbar{background:#fff;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:12px calc(20px + env(safe-area-inset-right)) 12px calc(20px + env(safe-area-inset-left));
+  padding-top:calc(12px + env(safe-area-inset-top));}
 /* 상상주도 CI 로고(헤더) — 시정구호가 커진 만큼 «보조 표식» 크기로 34px → 22px.
    시민앱(모바일웹) .topbar-logo 와 같은 22px. 헤더 높이(64px)는 제목 블록이 정하므로 그대로다. */
-.brand-logo{height:22px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));}
+.brand-logo{height:26px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.12));}
+.brand-text{min-width:0;}
+/* ── 브랜드 제목 표기(3개 앱 공통 규약) ──────────────────────────
+   「시민 참여형」(작게) + 「상주시 정책플랫폼」(크게) + 배지 「공무원용」(제목 오른쪽).
+   눈높이(eyebrow)는 제목의 약 0.6배. 배지는 청록 바탕에 흰 글자(4.95:1). */
+.brand-eyebrow{display:block;font-size:0.75rem;font-weight:700;color:var(--gotgam-t);
+  letter-spacing:.02em;line-height:1.25;}  /* 흰 7.37:1 */
 /* line-height 1.1 은 한글 글자상자(약 1.2em)보다 좁아 글자가 줄상자 밖으로 삐져나왔다(기본 2px·200% 5px).
-   1.2 로 올려 글자를 줄상자 안에 담고, 늘어난 2px 만큼 아래 .brand-sub 의 margin-top(2px)을 없애
-   헤더 전체 높이(64px)와 부제 위치는 그대로 유지한다. */
-.brand-title{font-size:1.25rem;font-weight:800;color:var(--gotgam-t);line-height:1.2;}  /* 흰 6.03:1 */
-.brand-sub{font-size:0.75rem;font-weight:700;color:var(--sub);margin-top:0;}
+   1.2 로 올려 글자를 줄상자 안에 담는다. */
+.brand-title{font-size:1.3125rem;font-weight:800;color:var(--ink);line-height:1.2;
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;}  /* 흰 14.9:1 */
+/* 용도 구분 배지 — 색만으로 알리지 않도록 «공무원용» 이라는 글자가 곧 정보다 */
+.brand-tag{flex:none;background:var(--navy);color:#fff;border-radius:999px;
+  padding:4px 11px;font-size:0.75rem;font-weight:700;white-space:nowrap;line-height:1.4;}  /* 흰글자 4.95:1 */
+.brand-sub{font-size:0.75rem;font-weight:700;color:var(--sub);margin-top:2px;}
+/* 2026 시정구호(헤더) — 대표 제목 옆에 «크게». 가로 320px 이상이 되도록 넓은 화면에서 폭을 키운다.
+   좁은 화면에서는 제목·버튼과 자리를 다투므로 감춘다(로그인 카드에는 항상 보인다). */
+.top-slogan{display:none;height:auto;flex:none;}
+/* 1180px 아래에서는 제목·버튼과 자리를 다투어 헤더가 두 줄로 접힌다 → 그 위에서만 편다 */
+@media (min-width:1180px){
+  .top-slogan{display:block;width:clamp(320px,26vw,380px);margin-left:18px;}
+}
 .top-actions{margin-left:auto;display:flex;align-items:center;gap:8px;}
 /* 실시간 연결 표시 — 색(●)만이 아니라 «글자»로도 상태를 알린다(KWCAG 5.4.1).
    좁은 화면에서는 글자를 감추되 낭독기에는 남기고(.sr-only 와 같은 기법),
    넓은 화면에서는 글자를 함께 보여 색을 구분 못 해도 상태를 알 수 있게 한다. */
-.rt-dot{color:#1F7A41;font-size:12px;display:inline-flex;align-items:center;gap:5px;}  /* 흰 5.36:1 */
-.rt-dot.off{color:var(--dim);}              /* 흰 5.36:1 (기존 #bbb 는 1.92:1) */
+.rt-dot{color:#1F7A41;font-size:12px;display:inline-flex;align-items:center;gap:5px;}  /* 흰 6.19:1 */
+.rt-dot.off{color:var(--dim);}              /* 흰 6.19:1 (기존 #bbb 는 1.92:1) */
 .rt-dot-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
 @media (min-width:760px){
   .rt-dot-text{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:nowrap;font-size:0.75rem;font-weight:700;}
 }
-.top-btn{border:none;border-radius:10px;padding:10px 14px;font-size:0.8125rem;font-weight:700;cursor:pointer;}
-.top-btn.solid{background:var(--gotgam-d);color:#fff;}          /* 흰글자 4.71:1 */
-.top-btn.solid:hover{background:var(--gotgam-t);}               /* 흰글자 6.03:1 */
-.top-btn.ghost{background:var(--gotgam-ll);color:var(--gotgam-t);}  /* #FFF1E8 위 5.46:1 */
+.top-btn{border:none;border-radius:var(--r-ctl);padding:10px 14px;font-size:0.8125rem;font-weight:700;cursor:pointer;}
+.top-btn.solid{background:var(--gotgam-d);color:#fff;}          /* 흰글자 5.21:1 */
+.top-btn.solid:hover{background:var(--gotgam-t);}               /* 흰글자 7.37:1 */
+.top-btn.ghost{background:var(--gotgam-ll);color:var(--gotgam-t);}  /* #FDF0E4 위 6.58:1 */
 .top-btn.danger{background:var(--danger);color:#fff;}           /* 흰글자 5.44:1 */
-.topline{height:3px;background:var(--gotgam);}
+/* 헤더 아래 강조 띠 — 주조에서 보조(금빛)로 흐른다. 글자를 얹지 않는 «면»이라 금빛을 써도 된다 */
+.topline{height:3px;background:linear-gradient(90deg,var(--gotgam),var(--gold));}
 
 /* 탭 패널 2개를 감싸는 유일한 <main> — 예전에 .content 가 직접 하던 «남은 높이 채우기»를
    그대로 이어받아(세로 flex + flex:1) 푸터 위치가 달라지지 않게 한다(레이아웃 무변화). */
 #main{flex:1;display:flex;flex-direction:column;}
-.content{flex:1;padding:18px 20px 30px;max-width:1100px;width:100%;margin:0 auto;}
+.content{flex:1;width:100%;max-width:1100px;margin:0 auto;
+  padding:18px calc(20px + env(safe-area-inset-right)) 30px calc(20px + env(safe-area-inset-left));}
 .search-hint{font-size:0.84375rem;font-weight:700;color:var(--sub);margin-bottom:12px;}
 .toolbar{display:flex;align-items:center;gap:10px;margin:12px 0 14px;flex-wrap:wrap;}
-.search-input{height:42px;border:1.5px solid var(--gotgam);border-radius:12px;padding:0 14px;font-size:0.875rem;outline:none;background:#fff;}
+.search-input{height:42px;border:1.5px solid var(--gotgam);border-radius:var(--r-ctl);padding:0 14px;font-size:0.875rem;outline:none;background:#fff;}
 .search-input.wide{flex:1;min-width:200px;}
 .search-input:focus{border-color:var(--gotgam);}
 .sort-select{height:42px;border:1.5px solid var(--gotgam);border-radius:10px;padding:0 10px;font-size:0.8125rem;font-weight:700;background:#fff;cursor:pointer;}
-.count{font-size:0.875rem;font-weight:800;color:var(--gotgam-t);margin-left:auto;}  /* 흰 6.03:1 */
+.count{font-size:0.875rem;font-weight:800;color:var(--gotgam-t);margin-left:auto;}  /* 흰 7.37:1 */
 
 .chips{display:flex;gap:8px;}
 .chips.wrap{flex-wrap:wrap;}
-.chip{border:1.5px solid var(--gotgam-l);background:#fff;color:var(--gotgam-t);border-radius:18px;padding:7px 14px;font-size:0.8125rem;font-weight:700;cursor:pointer;}  /* 흰 6.03:1 */
-.chip.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 4.71:1 */
+.chip{border:1.5px solid var(--gotgam-l);background:#fff;color:var(--gotgam-t);border-radius:18px;padding:7px 14px;font-size:0.8125rem;font-weight:700;cursor:pointer;}  /* 흰 7.37:1 */
+.chip.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 5.21:1 */
 
 .cardlist{display:flex;flex-direction:column;gap:12px;}
-.card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;display:flex;align-items:center;gap:14px;border-left:5px solid var(--gotgam);cursor:pointer;transition:transform .12s;}
+.card{background:var(--card);border-radius:var(--r-card);box-shadow:var(--shadow);padding:16px 18px;display:flex;align-items:center;gap:14px;border-left:5px solid var(--gotgam);cursor:pointer;transition:transform .12s;}
 .card:hover{transform:translateY(-2px);}
 .card-main{flex:1;min-width:0;}
 /* 제목은 목록에서 2줄까지만(넘치면 …). 긴 담당팀 배지에 폭을 빼앗겨도 한 글자씩
    세로로 쪼개지지 않게 하고, 카드 높이가 폭발하지 않도록 클램프한다. 상세에선 전문 노출. */
 .card-title{font-size:1rem;font-weight:800;margin-bottom:5px;line-height:1.35;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
-.card-desc{font-size:0.8125rem;color:#7a6f66;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-desc{font-size:0.8125rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* 담당팀 배지: 카드 폭의 40%를 넘지 못하게 하고 넘치면 …(전체 팀명은 title 툴팁).
    가로 flex 카드에서 배지가 폭을 독차지해 제목을 뭉개던 문제를 막는다. */
-.badge{font-size:0.75rem;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis;}  /* #FBE3D4 위 4.89:1 */
+.badge{font-size:0.75rem;font-weight:800;padding:5px 11px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis;}  /* #F8E3D2 위 5.93:1 */
 .badge.warn{background:#FFEBEE;color:#C62828;}   /* #FFEBEE 위 4.92:1 (기존 #E53935 는 3.70) */
 /* 📌 접수 안내(엑셀 «비고» = benefits.note) — 목록 카드용 한 줄 배지.
    색이 아니라 «📌 접수 안내» 라는 글자로 뜻을 전한다(색만으로 정보 전달 금지).
-   글자 #A8431A · 배경 #FFF1E8 = 5.46:1 (KWCAG 2.2 «명도 대비» 4.5:1 충족)
-   테두리 #FBE3D4 는 장식 전용(글자를 얹지 않는다). PC앱 webui/style.css .card-note 와 동일 규약. */
+   글자 #96370F · 배경 #FDF0E4 = 6.58:1 (KWCAG 2.2 «명도 대비» 4.5:1 충족)
+   테두리 #F8E3D2 는 장식 전용(글자를 얹지 않는다). PC앱 webui/style.css .card-note 와 동일 규약. */
 .card-note{
   display:inline-block;max-width:100%;margin-top:6px;
   background:var(--gotgam-ll);border:1px solid var(--gotgam-l);border-radius:8px;
   padding:3px 10px;font-size:0.75rem;font-weight:800;color:var(--gotgam-t);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.empty{text-align:center;color:var(--dim);font-size:0.9375rem;padding:46px 0;line-height:1.7;}  /* 흰 5.36:1 */
+.empty{text-align:center;color:var(--dim);font-size:0.9375rem;padding:46px 0;line-height:1.7;}  /* 흰 6.19:1 */
 
 /* 오류 안내 — 원인(연결/권한/미설정)에 따라 문구가 달라지고 «다시 시도»를 제공 */
 .err-box{padding:40px 16px;text-align:center;}
 .err-title{font-size:1rem;font-weight:800;color:var(--ink);margin-bottom:8px;line-height:1.5;}
-.err-desc{font-size:0.875rem;color:var(--sub);line-height:1.7;}   /* 흰 5.74:1 */
+.err-desc{font-size:0.875rem;color:var(--sub);line-height:1.7;}   /* 흰 6.58:1 */
 .err-retry{margin-top:16px;font-family:inherit;font-size:0.875rem;font-weight:800;padding:11px 20px;
-  border:none;border-radius:10px;background:var(--gotgam-d);color:#fff;cursor:pointer;}  /* 흰글자 4.71:1 */
+  border:none;border-radius:10px;background:var(--gotgam-d);color:#fff;cursor:pointer;}  /* 흰글자 5.21:1 */
 .err-retry:hover{background:var(--gotgam-t);}
 
 .pager-wrap{display:flex;justify-content:center;margin-top:18px;}
 .pager{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
-.page-btn{min-width:38px;height:38px;padding:0 6px;border:none;border-radius:9px;background:#F0E0D5;color:var(--gotgam-t);font-size:0.875rem;font-weight:800;cursor:pointer;}  /* #F0E0D5 위 4.69:1 */
-.page-btn.on{background:var(--gotgam-d);color:#fff;}  /* 흰글자 4.71:1 */
+.page-btn{min-width:38px;height:38px;padding:0 6px;border:none;border-radius:9px;background:var(--line);color:var(--gotgam-t);font-size:0.875rem;font-weight:800;cursor:pointer;}  /* #EADCCE 위 5.48:1 */
+.page-btn.on{background:var(--gotgam-d);color:#fff;}  /* 흰글자 5.21:1 */
 .page-btn:disabled{opacity:.4;}
 
 /* 모달 */
 /* 모달 — .modal 이 max-height:88vh + .modal-body 내부 스크롤 구조라 글꼴을 키워도 화면 안에 들어온다
    (200% 확대 실측에서도 넘침 없음). 스크롤이 뒤 본문으로 번지지 않게만 보강(.modal-body). */
-.modal-backdrop{position:fixed;inset:0;background:rgba(60,40,30,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(51,36,28,.48);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;}
 .modal{background:#fff;width:100%;max-width:600px;max-height:88vh;border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.32);display:flex;flex-direction:column;overflow:hidden;}
-.modal-head{background:var(--gotgam-d);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}  /* 흰글자 4.71:1 */
+.modal-head{background:var(--gotgam-d);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}  /* 흰글자 5.21:1 */
 .modal-title{font-size:1.0625rem;font-weight:800;}
 /* 헤더 위 «흰 반투명»은 배경을 밝혀 흰 ✕ 글자가 3.12:1 로 떨어짐 → 검정 반투명으로 어둡게(6.96:1) */
 .modal-close{background:rgba(0,0,0,.22);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;}
 .modal-body{padding:22px;overflow-y:auto;overscroll-behavior:contain;}
 .field{margin-bottom:15px;}
-.field-label{font-size:0.8125rem;font-weight:800;color:var(--gotgam-t);margin-bottom:5px;}  /* 흰 6.03:1 */
+.field-label{font-size:0.8125rem;font-weight:800;color:var(--gotgam-t);margin-bottom:5px;}  /* 흰 7.37:1 */
 .field-value{font-size:0.875rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
 /* 📌 접수 안내(비고) 입력칸 — «지금 신청 가능한지»에 직결되므로 상세(수정) 화면에서 눈에 띄게 둔다.
-   라벨 #A8431A · 배경 #FFF1E8 = 5.46:1 / 왼쪽 굵은 선은 장식(뜻은 «📌 접수 안내» 글자가 전한다)
+   라벨 #96370F · 배경 #FDF0E4 = 6.58:1 / 왼쪽 굵은 선은 장식(뜻은 «📌 접수 안내» 글자가 전한다)
    PC앱 webui/style.css .notice-field 와 동일 규약. */
 .notice-field{
   background:var(--gotgam-ll);border:1.5px solid var(--gotgam-l);
@@ -215,14 +263,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .citizen-field .field-label.citizen-label{color:#00595A;}
 .citizen-field .form-textarea{background:#fff;border-color:#00747F;}
 .citizen-warn{font-size:0.75rem;font-weight:700;color:#00474D;line-height:1.6;margin:-1px 0 8px;}
-/* 입력칸 도움말 — 라벨 아래 설명(aria-describedby 로 연결). #FFF1E8 위 5.19:1 / 흰 5.74:1 */
+/* 입력칸 도움말 — 라벨 아래 설명(aria-describedby 로 연결). #FDF0E4 위 6.03:1 / 흰 6.58:1 */
 .field-hint{font-size:0.75rem;font-weight:400;color:var(--sub);line-height:1.6;margin:-1px 0 6px;}
-.form-input{width:100%;height:42px;border:1.5px solid var(--gotgam);border-radius:10px;padding:0 12px;font-size:0.875rem;font-family:inherit;outline:none;}
-.form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam);border-radius:10px;padding:10px 12px;font-size:0.875rem;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
+.form-input{width:100%;height:42px;border:1.5px solid var(--gotgam);border-radius:var(--r-ctl);padding:0 12px;font-size:0.875rem;font-family:inherit;outline:none;}
+.form-textarea{width:100%;min-height:84px;border:1.5px solid var(--gotgam);border-radius:var(--r-ctl);padding:10px 12px;font-size:0.875rem;font-family:inherit;line-height:1.6;outline:none;resize:vertical;}
 .form-input:focus,.form-textarea:focus{border-color:var(--gotgam);}
 .modal-actions{display:flex;gap:10px;margin-top:8px;}
 /* 📎 필요서류 서식 등록/삭제(편집 모달) — 곶감 팔레트만 사용. 색만으로 정보전달 금지.
-   목록 글자 #4A3B32 on #FFFFFF = 10.6:1, 메타 #7A6152 = 4.7:1 (AA 충족). */
+   목록 글자 #33241C on #FFFFFF = 14.9:1, 메타 #6E594A = 6.6:1 (AA 충족). */
 .forms-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
 .forms-list{list-style:none;padding:0;margin:8px 0 10px;display:flex;flex-direction:column;gap:8px;}
 .forms-empty{font-size:0.8125rem;color:var(--sub);padding:8px 2px;}
@@ -246,28 +294,29 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
    시민 개인정보에 접근하는 앱이라 우회 입장을 두지 않는다. 되살리지 말 것. */
 
 /* 2026 시정구호(로그인 화면) — 흰 카드 위라 빨강·청록이 또렷하다.
-   로고(sangsang1)·제목과 싸우지 않게 위아래 여백만 주고 폭에 맡긴다. */
-.login-slogan{display:block;width:100%;max-width:300px;height:auto;margin:16px auto 18px;}
+   양호창님 요청으로 «잘 보이게» 카드 폭을 꽉 채운다(카드 안쪽 폭 316px).
+   1줄형(slogan-wide)은 이 폭에서 글자가 너무 작아지므로 2줄형(slogan-stack)만 쓴다. */
+.login-slogan{display:block;width:100%;max-width:100%;height:auto;margin:14px auto 18px;}
 
 /* 로그인 화면 안내문 — 계정·비밀번호를 못 받았을 때 어디에 문의할지 */
 /* 본문 글자색(--gotgam-t)을 그대로 써서 대비 확보. rem 단위라 글꼴 확대에 따라 커진다. */
 .login-help{margin:14px 0 0;font-size:0.8125rem;line-height:1.5;color:var(--gotgam-t);text-align:center;}
 
-/* 인앱 브라우저(카톡·네이버 등) 안내 배너 — 공무원앱 남색 정체성, 게스트띠보다 강조.
+/* 인앱 브라우저(카톡·네이버 등) 안내 배너 — 공무원앱 청록 정체성, 안내띠보다 강조.
    ⚠ 로그인 화면(.login-screen)이 position:fixed;inset:0 전체화면 오버레이라,
       문서 흐름(static) 배너는 그 아래 깔려 안 보였다 → fixed+z-index로 최상단 고정.
       (모달 backdrop z-index:100 보다 낮춰 모달이 배너를 덮도록 90 사용) */
 .inapp-banner{position:fixed;top:0;left:0;right:0;z-index:90;
   display:flex;align-items:flex-start;gap:9px;width:100%;padding:11px 16px;
-  background:linear-gradient(135deg,#1B2A4A,#10192E);color:#fff;
-  box-shadow:0 3px 10px rgba(16,25,46,.30);}
+  background:linear-gradient(135deg,#0E7C86,#0A4A52);color:#fff;
+  box-shadow:0 3px 10px rgba(10,74,82,.30);}
 .inapp-emoji{font-size:20px;flex-shrink:0;line-height:1.4;}
 .inapp-body{flex:1;min-width:0;}
 .inapp-text{font-size:0.875rem;font-weight:700;line-height:1.5;}
 .inapp-text b{text-decoration:underline;}
 .inapp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;}
 .inapp-btn{font-family:inherit;font-size:0.8125rem;font-weight:800;padding:8px 14px;border-radius:9px;
-  cursor:pointer;background:#fff;color:#10192E;border:none;}
+  cursor:pointer;background:#fff;color:#0A4A52;border:none;}
 .inapp-btn:active{transform:scale(.98);}
 .inapp-btn.ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.75);}
 /* 손가락 조작 최소 크기 24x24 CSS px 확보(실측 19.4x23.6 로 미달) */
@@ -276,13 +325,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center;}
 
 /* 푸터(상주 곶감 은은한 포인트) */
-.appfoot{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:16px;color:var(--sub);font-size:0.75rem;font-weight:700;border-top:1px solid var(--line);}
+.appfoot{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+  padding:16px calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));color:var(--sub);font-size:0.75rem;font-weight:700;border-top:1px solid var(--line);}
 .foot-gotgam{width:20px;height:20px;object-fit:contain;opacity:.85;}
-.foot-link{border:none;background:transparent;color:var(--gotgam-t);font-size:0.75rem;font-weight:800;cursor:pointer;text-decoration:underline;padding:4px 6px;border-radius:6px;}  /* 크림 5.69:1 */
+.foot-link{border:none;background:transparent;color:var(--gotgam-t);font-size:0.75rem;font-weight:800;cursor:pointer;text-decoration:underline;padding:4px 6px;border-radius:6px;}  /* 바탕 6.78:1 */
 .foot-link:hover{color:var(--ink);}
 /* 푸터 문의 창구(시민앱과 동일 문구·위치) */
-.foot-mail{color:var(--gotgam-t);font-weight:800;text-decoration:underline;}  /* 크림 5.69:1 */
-.foot-mail:hover{color:var(--ink);}   /* hover 도 AA 유지(크림 8.4:1) — 기존 --gotgam 은 3.03 */
+.foot-mail{color:var(--gotgam-t);font-weight:800;text-decoration:underline;}  /* 바탕 6.78:1 */
+.foot-mail:hover{color:var(--ink);}   /* hover 도 AA 유지(바탕 13.71:1) — --gotgam(#B84A1C)은 바탕 4.79 */
 
 /* 개인정보 처리방침 본문 */
 /* 처리방침 서두 안내 — 「운영 개시 시 확정」 항목이 누락이 아니라
@@ -292,7 +342,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   border:1.5px solid var(--gotgam-d);border-radius:12px;}
 .pp-notice p{margin:0;font-size:0.875rem;line-height:1.65;color:var(--ink);}
 .pp-intro{font-size:0.875rem;line-height:1.7;color:var(--ink);margin-bottom:14px;}
-.pp-h{font-size:0.90625rem;font-weight:800;color:var(--gotgam-t);margin:16px 0 6px;}  /* 흰 6.03:1 */
+.pp-h{font-size:0.90625rem;font-weight:800;color:var(--gotgam-t);margin:16px 0 6px;}  /* 흰 7.37:1 */
 /* 처리방침 항목의 부연 설명 — 본문색 그대로 두고 크기만 줄인다(대비 유지, 시민앱 .privacy-sub 와 같은 규약) */
 .pp-sub{display:inline-block;margin-top:3px;font-size:0.9375em;color:var(--ink);line-height:1.6;}
 .pp-p{font-size:0.84375rem;line-height:1.7;color:var(--ink);}
@@ -304,26 +354,29 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .cl-entry{padding:14px 2px;border-bottom:1px solid var(--line);}
 .cl-entry:last-child{border-bottom:none;}
 .cl-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
-.cl-ver{font-size:0.8125rem;font-weight:800;color:#fff;background:var(--gotgam-d);border-radius:7px;padding:3px 9px;}  /* 흰글자 4.71:1 */
+.cl-ver{font-size:0.8125rem;font-weight:800;color:#fff;background:var(--gotgam-d);border-radius:7px;padding:3px 9px;}  /* 흰글자 5.21:1 */
 .cl-date{font-size:0.75rem;color:var(--sub);font-weight:700;}
 .cl-title{font-size:0.9375rem;font-weight:800;color:var(--ink);margin-bottom:8px;}
 .cl-items{list-style:disc;margin:0;padding-left:20px;}
 .cl-items li{font-size:0.84375rem;line-height:1.7;color:var(--ink);margin-bottom:5px;}
 
-/* ── 정책제안 관리(관리자 남색 톤) ── */
-:root{ --navy:#1B2A4A; --navy-d:#10192E; --navy-l:#E3E8F2; --navy-ll:#F1F4FA; }
+/* ── 정책제안 관리(시안 A «청록 포인트» 톤) ──
+   변수 이름(--navy*)은 app.js·기존 규칙과의 계약을 지키려 그대로 두고 «값»만 청록으로 바꿨다.
+   흰 글자 대비: #0E7C86 4.95:1 · #0A5C64 7.70:1 (둘 다 AA 충족) */
+:root{ --navy:#0E7C86; --navy-d:#0A5C64; --navy-l:#CDE6E8; --navy-ll:#EAF5F6; }
 
 /* 상단 탭바 */
 /* 좁은 화면 + 큰 글꼴에서 탭이 한 줄에 안 들어가면 가로 스크롤이 생기므로 줄바꿈을 허용한다.
    줄바꿈됐을 때 위아래 탭이 붙어 한 덩어리로 보이도록 세로 간격은 0(가로만 8px). */
-.tabbar{display:flex;flex-wrap:wrap;column-gap:8px;row-gap:0;max-width:1100px;width:100%;margin:0 auto;padding:12px 20px 0;}
+.tabbar{display:flex;flex-wrap:wrap;column-gap:8px;row-gap:0;max-width:1100px;width:100%;margin:0 auto;
+  padding:12px calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left));}
 .tab-btn{flex:0 0 auto;border:1.5px solid var(--line);border-bottom:none;background:#fff;color:var(--sub);
   border-radius:12px 12px 0 0;padding:11px 20px;font-size:0.875rem;font-weight:800;cursor:pointer;}
-.tab-btn.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 4.71:1 */
+.tab-btn.on{background:var(--gotgam-d);color:#fff;border-color:var(--gotgam-d);}  /* 흰글자 5.21:1 */
 #tabProposals.on{background:var(--navy);border-color:var(--navy);}
 
 /* 정책제안 카드 */
-.pcard{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:14px 18px;display:flex;
+.pcard{background:var(--card);border-radius:var(--r-card);box-shadow:var(--shadow);padding:14px 18px;display:flex;
   align-items:center;gap:14px;border-left:5px solid var(--navy);cursor:pointer;transition:transform .12s;}
 .pcard:hover{transform:translateY(-2px);}
 /* 숨김(블라인드) 글: opacity .6 이면 본문이 3.36:1 로 AA 미달 → .75(4.99:1)로 완화 */
@@ -332,20 +385,20 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
       카드 «전체»에 곱해져 메타 2.95:1 · 상태 배지 3.65:1 로 미달이었다(저시력 이용자).
       opacity 를 걷어내면 안쪽 글자들이 본래 대비(AA)를 그대로 유지한다.
    구분은 색만으로 하지 않는다 — 카드 안에 «숨김» 배지 글자가 함께 표시된다. */
-.pcard.hidden-row{border-left-color:#5B6B8C;background:#EEF1F7;border:1.5px dashed #5B6B8C;border-left-width:5px;border-left-style:solid;}
+.pcard.hidden-row{border-left-color:#6B6A66;background:#F1EEEA;border:1.5px dashed #6B6A66;border-left-width:5px;border-left-style:solid;}
 .pcard-main{flex:1;min-width:0;}
 .pcard-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px;}
 .pcard-title{font-size:1rem;font-weight:800;}
-.pcard-meta{font-size:0.78125rem;color:#7a6f66;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.pcard-meta{font-size:0.78125rem;color:var(--sub);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 
 /* 상태 뱃지 */
 .st-badge{font-size:0.71875rem;font-weight:800;padding:4px 10px;border-radius:8px;white-space:nowrap;}
-.st-접수{background:#E3E8F2;color:#1B2A4A;}
-.st-검토중{background:#FFF3CD;color:#7A5B00;}
+.st-접수{background:#DDEFF1;color:#0A5C64;}   /* #DDEFF1 위 6.49:1 */
+.st-검토중{background:#FBECD2;color:#7A5B00;}   /* #FBECD2 위 5.42:1 */
 .st-반영{background:#E3F6EA;color:#1F7A41;}
 .st-불채택{background:#FDE7E7;color:#B03024;}   /* #FDE7E7 위 5.39:1 (기존 #C0392B 는 4.60) · .ast-반려 와 같은 값 */
 .st-보류{background:#ECEFF3;color:#5A6678;}
-.cat-tag{font-size:0.71875rem;font-weight:700;padding:4px 9px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);}  /* #FBE3D4 위 4.89:1 */
+.cat-tag{font-size:0.71875rem;font-weight:700;padding:4px 9px;border-radius:8px;background:var(--gotgam-l);color:var(--gotgam-t);}  /* #F8E3D2 위 5.93:1 */
 .hide-tag{font-size:0.71875rem;font-weight:800;padding:4px 9px;border-radius:8px;background:#37404F;color:#fff;}
 .like-tag{font-weight:800;color:var(--navy);}
 .report-tag{font-weight:800;color:var(--danger);}  /* 흰 5.44:1 */
@@ -353,24 +406,24 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* 신청 접수 상태 배지 — 정책제안과 «같은 검증된 팔레트»(새 색 없음, 대비 4.5:1↑).
    접수/심사중/승인/반려 4값(PC config.APPLICATION_STATUSES 와 동일). 색만으로 알리지
    않도록 배지 텍스트(상태명)를 항상 함께 쓴다(카드·모달·접근명 모두). */
-.ast-접수{background:#E3E8F2;color:#1B2A4A;}    /* 접수 — 파랑-회색 (st-접수와 동일) */
-.ast-심사중{background:#FFF3CD;color:#7A5B00;}  /* 심사중 — 노랑 (st-검토중과 동일) */
+.ast-접수{background:#DDEFF1;color:#0A5C64;}    /* 접수 — 청록 연한 면 (st-접수와 동일 · 6.49:1) */
+.ast-심사중{background:#FBECD2;color:#7A5B00;}  /* 심사중 — 금빛 연한 면 (st-검토중과 동일 · 5.42:1) */
 .ast-승인{background:#E3F6EA;color:#1F7A41;}    /* 승인 — 초록 (st-반영과 동일) */
 .ast-반려{background:#FDE7E7;color:#B03024;}    /* 반려 — 빨강. #FDE7E7 위 5.39:1 (기존 #C0392B 는 4.60) · 시민앱 .ast-반려 와 같은 값 */
 /* 접수번호 태그 + 신청 문의 미리보기(카드) */
-.rc-tag{font-size:0.71875rem;font-weight:700;padding:4px 9px;border-radius:8px;background:#EEF1F6;color:#374151;}  /* #EEF1F6 위 7.4:1 */
+.rc-tag{font-size:0.71875rem;font-weight:700;padding:4px 9px;border-radius:8px;background:#F1EDE8;color:#3B322C;}  /* #F1EDE8 위 10.2:1 */
 /* 💬 시민 안내문이 «공개되어 있음»을 목록에서 바로 알린다(색만이 아니라 글자로도 알림) */
 .cr-tag{font-size:0.71875rem;font-weight:700;padding:4px 9px;border-radius:8px;background:#E0F2F1;color:#00595A;}  /* #E0F2F1 위 6.4:1 */
-.pcard-memo{margin-top:6px;font-size:0.8125rem;color:#5a5148;line-height:1.5;
+.pcard-memo{margin-top:6px;font-size:0.8125rem;color:var(--sub);line-height:1.5;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 /* 신청 삭제 버튼(모달) — 정책제안 저장 버튼과 같은 규격, 위험 색만 다르게 */
 .modal-actions .nav-btn.danger{flex:0 0 100px;background:var(--danger);}
 .modal-actions .nav-btn.danger:hover{filter:brightness(0.92);}
 
-/* 정책제안 모달 헤더 = 남색 */
+/* 정책제안·신청접수 모달 헤더 = 청록 포인트(흰 글자 4.95:1) */
 .modal-head.admin{background:var(--navy);}
 .tab-btn:focus-visible,.st-select:focus{outline:2px solid var(--navy);}
-.st-select{width:100%;height:42px;border:1.5px solid var(--navy-l);border-radius:10px;padding:0 12px;
+.st-select{width:100%;height:42px;border:1.5px solid var(--navy-l);border-radius:var(--r-ctl);padding:0 12px;
   font-size:0.875rem;font-weight:700;font-family:inherit;background:#fff;cursor:pointer;outline:none;}
 .modal-actions .nav-btn{flex:1;min-height:46px;font-size:0.9375rem;border:none;border-radius:10px;font-weight:800;cursor:pointer;
   background:var(--navy);color:#fff;}
@@ -388,14 +441,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   color:var(--ink);font-size:0.875rem;font-weight:700;}
 .rt-banner-text{flex:1;min-width:0;}
 .rt-banner-btn{flex-shrink:0;border:none;border-radius:9px;padding:8px 14px;min-height:24px;
-  background:var(--gotgam-d);color:#fff;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;}  /* 흰글자 4.71:1 */
-.rt-banner-btn:hover{background:var(--gotgam-t);}  /* 흰글자 6.03:1 */
+  background:var(--gotgam-d);color:#fff;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;}  /* 흰글자 5.21:1 */
+.rt-banner-btn:hover{background:var(--gotgam-t);}  /* 흰글자 7.37:1 */
 
 /* ════════════════════════════════════════════════════════════
    🔑 비밀번호 변경 모달
    ════════════════════════════════════════════════════════════ */
 .pw-intro{font-size:0.8125rem;line-height:1.7;color:var(--sub);margin:0 0 14px;}
-.pw-intro strong{color:var(--gotgam-t);}          /* 흰 6.03:1 */
+.pw-intro strong{color:var(--gotgam-t);}          /* 흰 7.37:1 */
 /* 입력 중 규칙 판정(여러 줄 안내를 줄바꿈 그대로 보여 준다) */
 .pw-rule{margin-top:6px;font-size:0.75rem;font-weight:700;line-height:1.6;
   color:var(--sub);white-space:pre-wrap;}
@@ -407,6 +460,76 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .pw-msg:empty{margin:0;}
 .pw-msg.ok{color:var(--ok);}
 .pw-msg.ng{color:var(--danger);}
+
+/* ════════════════════════════════════════════════════════════
+   📊 이달의 접수 — 도넛 그래프 (확정 시안 A 의 도넛을 그대로 이식)
+   · 수치는 stats.js 가 실제 접수 목록(AALL)에서 «이번 달» 만 골라 채운다.
+   · 색만으로 알리지 않는다 — 범례에 건수·비율·«모양»(원/둥근사각/각사각/마름모)을 병기하고,
+     svg 에 <title>/<desc> 로 전체 수치를 글로 적어 낭독기에도 같은 정보를 준다.
+   · ⚠ 밝은 조각(#E8A33D) 위에 흰 표식을 얹으면 2.16:1 로 비텍스트 대비 미달 →
+     범례 표식은 네 개 모두 «어두운 외곽선»(#33241C)으로 통일한다.
+   ════════════════════════════════════════════════════════════ */
+.stats-card{margin:0 0 14px;background:var(--card);border:1.5px solid var(--line);
+  border-radius:var(--r-card);padding:14px 18px 16px;box-shadow:var(--shadow);}
+.stats-cap{font-size:0.90625rem;font-weight:800;color:var(--ink);margin-bottom:10px;}
+.stats-cap b{color:var(--gotgam-t);}   /* 흰 7.37:1 */
+.donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.donut{width:132px;height:132px;flex:0 0 132px;
+  filter:drop-shadow(0 6px 12px rgba(120,70,35,.16));}
+.donut .dn-track{fill:none;stroke:var(--line);stroke-width:19;}
+.donut .dn-seg{transform:rotate(-90deg);transform-origin:70px 70px;}
+.donut .dn-seg circle{fill:none;stroke-width:19;}
+.donut .d1{stroke:#0E7C86;}   /* 승인   — 청록 */
+.donut .d2{stroke:var(--gold);}   /* 심사중 — 금빛(#E8A33D · 면 전용) */
+.donut .d3{stroke:#B84A1C;}   /* 접수   — 감빛 주홍 */
+.donut .d4{stroke:#6E594A;}   /* 반려   — 진한 갈색 */
+.donut .dn-num{font-family:inherit;font-size:28px;font-weight:800;fill:var(--ink);}
+.donut .dn-lab{font-family:inherit;font-size:11px;font-weight:700;fill:var(--sub);}
+/* 범례 — 좁으면 1열, 넓어지면 2·4열로 늘어나 카드 폭을 자연스럽게 채운다.
+   한 줄 안에서 «이름 … 건수 비율» 이 오른쪽으로 정렬되도록 li 는 그대로 flex 를 쓴다. */
+.donut-legend{flex:1 1 260px;min-width:0;list-style:none;margin:0;padding:0;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,230px));gap:8px 28px;
+  justify-content:start;}
+.donut-legend li{display:flex;align-items:center;gap:9px;font-size:0.84375rem;font-weight:700;color:var(--ink);}
+.dn-mk{width:15px;height:15px;flex:0 0 15px;display:block;border:1.5px solid var(--ink);}
+.dn-mk.m1{background:#0E7C86;border-radius:50%;}                          /* 승인 · 원 */
+.dn-mk.m2{background:var(--gold);border-radius:5px;}                      /* 심사중 · 둥근 사각 */
+.dn-mk.m3{background:#B84A1C;border-radius:2px;}                          /* 접수 · 각진 사각 */
+.dn-mk.m4{background:#6E594A;border-radius:2px;transform:rotate(45deg);}  /* 반려 · 마름모 */
+.donut-legend b{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums;}
+.donut-legend em{font-style:normal;width:44px;text-align:right;color:var(--sub);font-size:0.78125rem;}  /* 흰 6.58:1 */
+
+/* 좁은 화면에서 표·넓은 내용이 넘칠 때의 가로 스크롤 상자(본문 자체는 절대 가로로 밀리지 않게) */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.table-scroll>table{min-width:560px;}
+
+/* ════════════════════════════════════════════════════════════
+   👆 눌림 반응(파동) — 동작은 tap.js 가 클래스만 붙였다 뗀다.
+   CSP 가 인라인 style 을 막으므로 좌표 없는 «가운데서 퍼지는» 파동으로 만든다.
+   ════════════════════════════════════════════════════════════ */
+button:active,[role="button"]:active,.foot-link:active{transform:scale(.97);}
+.tap-ripple{position:relative;overflow:hidden;}
+.tap-ripple::after{content:"";position:absolute;left:50%;top:50%;width:12px;height:12px;
+  margin:-6px 0 0 -6px;border-radius:50%;background:currentColor;opacity:.28;pointer-events:none;
+  animation:tapWave .42s ease-out forwards;}
+@keyframes tapWave{from{transform:scale(1);opacity:.28;} to{transform:scale(22);opacity:0;}}
+
+/* ════════════════════════════════════════════════════════════
+   📱 「홈 화면에 추가」 안내 — a2hs.js 가 설치 가능할 때만 띄운다.
+   닫으면 localStorage 에 남겨 «다시 나오지 않는다».
+   ════════════════════════════════════════════════════════════ */
+.a2hs{position:fixed;left:12px;right:12px;z-index:95;
+  bottom:calc(12px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:10px;max-width:560px;margin:0 auto;
+  padding:12px 14px;border-radius:16px;background:var(--card);
+  border:1.5px solid var(--navy);box-shadow:0 12px 30px rgba(51,36,28,.22);}
+.a2hs-emoji{font-size:22px;line-height:1.2;flex:none;}
+.a2hs-text{flex:1;min-width:0;font-size:0.8125rem;font-weight:700;line-height:1.5;color:var(--ink);}
+.a2hs-btn{flex:none;min-height:38px;border:none;border-radius:10px;padding:9px 14px;
+  background:var(--navy);color:#fff;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;}  /* 흰글자 4.95:1 */
+.a2hs-btn:hover{background:var(--navy-d);}
+.a2hs-close{flex:none;min-width:32px;min-height:32px;border:none;background:transparent;
+  color:var(--sub);font-family:inherit;font-size:15px;cursor:pointer;border-radius:8px;}
 
 /* 반응형(핸드폰) */
 @media (max-width:600px){
@@ -435,6 +558,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   .tabbar{max-width:1320px;}
   .cardlist{grid-template-columns:repeat(3,minmax(0,1fr));}
 }
+/* 초광폭(4K·듀얼 모니터) — 카드 4단으로 화면을 꽉 채운다 */
+@media (min-width:1700px){
+  .content{max-width:1660px;}
+  .tabbar{max-width:1660px;}
+  .cardlist{grid-template-columns:repeat(4,minmax(0,1fr));}
+}
 
 /* ── 움직임 최소화(KWCAG 2.2 «깜빡임과 번쩍임 사용 제한»·OS 접근성 설정 존중) ──
  * 운영체제에서 "동작 줄이기"를 켠 사용자에게는 전환·호버 이동을 사실상 제거한다.
@@ -449,4 +578,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   }
   .card:hover,.pcard:hover{transform:none;}
   .inapp-btn:active{transform:none;}
+  /* 눌림 축소·파동(tap.js)도 끈다 — tap.js 는 vibrate 만 남긴다 */
+  button:active,[role="button"]:active,.foot-link:active{transform:none;}
+  .tap-ripple::after{display:none;}
 }

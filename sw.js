@@ -9,7 +9,11 @@
 //    캐시 버전을 올리지 않으면 기존 이용자에게는 «비밀번호 변경» 버튼이 없는 구버전이 계속 뜬다.
 // ⚠ v20: 💬 시민 안내문(citizen_reply) 입력칸 추가(app.js·style.css·apply_client.js).
 //    캐시 버전을 올리지 않으면 기존 담당자에게는 «시민 안내문» 칸이 없는 구버전이 계속 뜬다.
-const CACHE = "sangju-admin-v21";   // v21: 시민 안내문 공개 전 확인창·개인정보 패턴 경고·300자 제한·공개 감사기록(admin_audit)
+// ⚠ v22: 확정 디자인 시안 A「감빛 온기」 전면 적용(style.css 팔레트·index.html 브랜드 표기·
+//    「이달의 접수」 도넛·tap.js/stats.js/a2hs.js 신설·PWA 아이콘 교체).
+//    index.html·style.css 는 cache-first 라 «캐시 버전을 올리지 않으면» 기존 담당자에게
+//    옛 디자인이 계속 제공된다(= 개편이 반영되지 않는다).
+const CACHE = "sangju-admin-v22";   // v22: 확정 디자인 시안 A「감빛 온기」 적용
 
 // scope(예: https://hcyang572-gif.github.io/sangju-policy-mobile/admin/)를 기준으로
 // 절대 URL을 만들어 둔다. (서브경로에서도 안전)
@@ -27,12 +31,17 @@ const PRECACHE = [
   "forms.js",
   "apply_client.js",
   "sw-register.js",            // CSP 때문에 인라인에서 분리한 서비스워커 등록 코드
+  "tap.js",                    // 눌림 파동 + 햅틱(시각 레이어)
+  "stats.js",                  // 「이달의 접수」 도넛 채우기(시각 레이어)
+  "a2hs.js",                   // 「홈 화면에 추가」 안내(시각 레이어)
   "manifest.json",
   "assets/icon-admin-192.png",
   "assets/icon-admin-512.png",
+  "assets/icon-admin-maskable-512.png",  // 안드로이드 «잘리는» 아이콘용(안전영역 안쪽에만 그림)
   "assets/sangsang1.png",
   "assets/gotgam.png",
-  "assets/slogan-stack.png",   // 2026 시정구호(로그인 화면)
+  "assets/slogan-stack.png",   // 2026 시정구호(로그인 화면 · 2줄형)
+  "assets/slogan-wide.png",    // 2026 시정구호(앱 헤더 · 1줄형)
 ];
 
 // 설치: 핵심 자원을 미리 담되, 하나가 실패해도 install 전체가 실패하지 않게 개별 try/catch.
