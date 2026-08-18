@@ -694,6 +694,22 @@ async function loadBenefits() {
 // 자동 변경이었다. → 이제는 누적 건수만 띠로 알리고, 갱신은 사용자가 누를 때만 한다.
 let RT_PENDING = 0, PRT_PENDING = 0, ART_PENDING = 0;
 
+// 자동 반영(2026-08-18) — 예전에는 «알림 띠»만 올리고 사람이 눌러야 목록이 바뀌었다.
+//  요구: 시민앱에서 신청·제안이 들어오거나 사업이 바뀌면 «아무 동작 없이» 화면에 나타나야 한다.
+//  · rtBusy()(편집·상세 모달이 열려 있음)면 화면을 갈아엎지 않고 띠만 남긴다 — 작업 중 유실 방지.
+//    모달을 닫으면 그때 띠를 눌러 반영하거나, 다음 이벤트에 자동으로 따라온다.
+//  · 한 번 동기화에 수십 행이 바뀌면 이벤트도 그만큼 온다 → 1.2초로 «묶어» 한 번만 부른다.
+const RT_APPLY_MS = 1200;
+const _rtJobs = {};
+function rtAutoApply(kind, fn) {
+  clearTimeout(_rtJobs[kind]);
+  _rtJobs[kind] = setTimeout(() => {
+    if (rtBusy()) { syncRtBanners(); return; }
+    try { Promise.resolve(fn()).catch(() => {}); } catch (e) { /* 실패해도 띠가 남는다 */ }
+  }, RT_APPLY_MS);
+}
+
+
 // 모달이 열려 있으면(=편집 중) 알림 띠도 띄우지 않는다 — 작업 방해 금지
 function rtBusy() {
   return ["#modal", "#pModal", "#aModal", "#ppModal", "#versionModal"]
@@ -723,7 +739,7 @@ function syncRtBanners() {
 function subscribeRealtime() {
   sb.channel("benefits-rt")
     .on("postgres_changes", { event: "*", schema: "public", table: "benefits" },
-        () => { RT_PENDING += 1; syncRtBanners(); })   // 화면은 그대로, «알림»만
+        () => { RT_PENDING += 1; syncRtBanners(); rtAutoApply("benefits", loadBenefits); })
     .subscribe((status) => setRealtimeDot(status === "SUBSCRIBED"));
 }
 
@@ -1193,7 +1209,7 @@ async function loadReportCounts() {
 function subscribeProposalsRealtime() {
   sb.channel("proposals-rt")
     .on("postgres_changes", { event: "*", schema: "public", table: "proposals" },
-        () => { if (P_LOADED) { PRT_PENDING += 1; syncRtBanners(); } })   // 화면은 그대로, «알림»만
+        () => { if (P_LOADED) { PRT_PENDING += 1; syncRtBanners(); rtAutoApply("proposals", loadProposals); } })
     .subscribe();
 }
 
@@ -1425,7 +1441,7 @@ function subscribeApplicationsRealtime() {
   // 시민앱에서 신청하면 즉시 여기로 온다 → 화면을 갈아엎지 않고 «N건» 알림 띠만 올린다.
   if (!window.SangjuApply) return;
   SangjuApply.subscribeApplications(() => {
-    if (A_LOADED) { ART_PENDING += 1; syncRtBanners(); }
+    if (A_LOADED) { ART_PENDING += 1; syncRtBanners(); rtAutoApply("applications", loadApplications); }
   });
 }
 
@@ -1486,6 +1502,7 @@ function renderApplications() {
       `사업 ${r.benefit_name || ""}`,
       `신청자 ${r.applicant_name || ""}`,
       r.receipt_no ? `접수번호 ${r.receipt_no}` : "",
+      r.citizen_reply ? "시민 안내문 공개중" : "",
     ].filter(Boolean).join(", ") + " — 접수 처리 열기";
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
@@ -1495,6 +1512,7 @@ function renderApplications() {
           <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
           ${r.team ? `<span class="cat-tag">${esc(r.team)}</span>` : ""}
           ${r.receipt_no ? `<span class="rc-tag"><span aria-hidden="true">🧾</span> ${esc(r.receipt_no)}</span>` : ""}
+          ${r.citizen_reply ? `<span class="cr-tag"><span aria-hidden="true">💬</span> 시민 안내문 공개중</span>` : ""}
         </div>
         <div class="pcard-title">${esc(r.benefit_name || "(사업명 없음)")}</div>
         <div class="pcard-meta">
@@ -1557,8 +1575,21 @@ async function openApplication(r) {
       <select id="amStatus" class="st-select">${optHtml}</select>
     </div>
     <div class="field">
-      <label class="field-label" for="amMemo"><span aria-hidden="true">📝</span> 처리메모(공무원 기록용)</label>
-      <textarea id="amMemo" class="form-textarea" placeholder="처리 경과·안내 내용을 기록하세요.">${esc(r.admin_memo || "")}</textarea>
+      <label class="field-label" for="amMemo"><span aria-hidden="true">📝</span> 처리메모(공무원 기록용 · 시민에게 보이지 않음)</label>
+      <p id="amMemoHint" class="field-hint">부서 내부 기록입니다. 신청자 화면에는 나타나지 않습니다.</p>
+      <textarea id="amMemo" class="form-textarea" aria-describedby="amMemoHint"
+                placeholder="처리 경과·내부 판단을 기록하세요.">${esc(r.admin_memo || "")}</textarea>
+    </div>
+    <!-- 💬 시민 안내문 — 신청자가 「내 신청 현황」에서 «그대로» 읽는 글.
+         내부 메모(admin_memo)와 «다른 칸·다른 색»으로 둔다. 절대 섞지 말 것. -->
+    <div class="field citizen-field">
+      <label class="field-label citizen-label" for="amReply"><span aria-hidden="true">💬</span> 시민 안내문 (신청자에게 공개)</label>
+      <p id="amReplyWarn" class="citizen-warn"><span aria-hidden="true">⚠</span>
+        이 내용은 <b>신청자에게 그대로 보입니다.</b> 내부 판단·개인정보는 위의 «처리메모»에 적어 주세요.
+        한 번 공개한 글은 되돌릴 수 없습니다.</p>
+      <textarea id="amReply" class="form-textarea" maxlength="300" aria-describedby="amReplyWarn amReplyLimit"
+                placeholder="예) 서류 확인이 끝났습니다. 8월 25일까지 심사 결과를 문자로 안내드리겠습니다.">${esc(r.citizen_reply || "")}</textarea>
+      <p id="amReplyLimit" class="field-hint">300자까지 쓸 수 있습니다. 안내에 필요한 내용만 간단히 적어 주세요.</p>
     </div>
     <div class="modal-actions">
       <button id="amDelete" class="nav-btn danger" type="button">🗑 삭제</button>
@@ -1568,14 +1599,57 @@ async function openApplication(r) {
   $("#amSave").onclick = async () => {
     const newStatus = $("#amStatus").value;
     const memo = ($("#amMemo").value || "").trim();
+    // 💬 시민 안내문 — 내부 메모와 «별도 필드»로 보낸다(절대 합치지 않는다).
+    const reply = ($("#amReply").value || "").trim();
+    const prevReply = (r.citizen_reply || "").trim();
+
+    // ── 공개 전 확인 (2026-08-18, 🩷 security-privacy 지적) ───────────────
+    //   왜: 삭제에는 확인창이 있는데 «공개»에는 없었다 — 확인 강도가 거꾸로다.
+    //   삭제는 되돌릴 수 있지만, 공개는 신청자가 이미 읽었으면 회수할 수 없다.
+    //   처리메모를 복사해 안내문 칸에 붙여넣는 실수가 클릭 한 번으로 시민 화면에 걸린다.
+    //   → 안내문이 «새로 생기거나 달라졌을 때만» 확인한다(상태·메모만 고칠 때는 묻지 않는다).
+    if (reply && reply !== prevReply) {
+      if (reply.length > 300) {
+        alert(`시민 안내문은 300자까지 쓸 수 있습니다.\n지금은 ${reply.length}자입니다. 줄여 주세요.`);
+        $("#amReply").focus();
+        return;
+      }
+      // 개인정보로 «보이는» 숫자 패턴이 있으면 한 번 더 묻는다(주민번호·휴대전화·계좌 형식).
+      const RE_JUMIN = /\d{6}[- ]?\d{7}/;
+      const RE_PHONE = /01\d[- ]?\d{3,4}[- ]?\d{4}/;
+      const RE_ACCT  = /(?:^|[^0-9])\d{2,6}-\d{2,6}-\d{2,6}(?!\d)/;
+      if (RE_JUMIN.test(reply) || RE_PHONE.test(reply) || RE_ACCT.test(reply)) {
+        if (!confirm("시민 안내문에 연락처 또는 주민등록번호로 보이는 숫자가 들어 있습니다.\n"
+                   + "이 글은 신청자에게 그대로 공개됩니다. 그래도 저장할까요?")) {
+          $("#amReply").focus();
+          return;
+        }
+      }
+      if (!confirm("아래 글이 신청자 화면에 「그대로」 보입니다.\n\n"
+                 + "────────────────\n" + reply + "\n────────────────\n\n"
+                 + "신청자 본인 외 다른 사람의 이름·연락처가 들어 있지는 않은지, 내부 판단이 섞이지는 않았는지 확인해 주세요.\n"
+                 + "한 번 공개하면 신청자가 이미 읽었을 수 있어 되돌릴 수 없습니다.\n\n"
+                 + "이대로 공개할까요?")) {
+        $("#amReply").focus();
+        return;
+      }
+    }
+    // 💬 시민 안내문은 «달라졌을 때만» 보낸다.
+    //    같은 값을 다시 보내면 서버 쪽 감사기록(admin_audit)이 «직전 값»을 읽느라
+    //    왕복이 한 번 더 늘고, 남길 일도 없는 저장에서 헛일을 한다.
+    //    (상태·처리메모만 고치는 저장은 예전과 똑같이 왕복 1회다)
+    const patch = { status: newStatus, admin_memo: memo || null };
+    if (reply !== prevReply) patch.citizen_reply = reply || null;
     try {
-      await SangjuApply.updateApplication(r.id, { status: newStatus, admin_memo: memo || null });
+      await SangjuApply.updateApplication(r.id, patch);
     } catch (err) {
       const m = writeErrMsg(err, "저장");
       announce(m); alert(m); return;
     }
     closeModal($("#aModal"));
-    announce("신청 접수가 저장되었습니다.");
+    announce(reply
+      ? "신청 접수가 저장되었습니다. 시민 안내문은 신청자 화면에 그대로 공개됩니다."
+      : "신청 접수가 저장되었습니다.");
     await loadApplications();
   };
 

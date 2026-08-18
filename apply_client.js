@@ -111,8 +111,31 @@ window.SangjuApply = (function () {
     return res.data || [];
   }
 
-  // ── 공무원 상태변경 · 처리메모 — patch = {status?, admin_memo?} ──
+  // ── 공무원 상태변경 · 처리메모 · 시민 안내문 — patch = {status?, admin_memo?, citizen_reply?} ──
   //   허용 필드만 추린다. updated_at 은 서버 트리거가 갱신(클라가 넣지 않음).
+  //   ⚠ admin_memo(내부 기록)와 citizen_reply(신청자에게 그대로 보임)는 «다른 칸»이다.
+  //      절대 한쪽 값을 다른 쪽에 복사하거나 합치지 말 것 — 내부 메모가 시민에게 새어 나간다.
+  //      citizen_reply 는 시민앱이 check_application_status(조회코드) 로 읽어 화면에 띄운다.
+  // 🔒 「시민 안내문 공개」 감사기록 — supabase/application_status_2.sql 의 admin_audit
+  //    ⛔ 본문은 절대 보내지 않는다. 누가·언제는 서버가 채운다(actor_uid=auth.uid()).
+  //    ⛔ 기록 실패로 업무(저장)를 멈추지 않는다 — PC앱 access_log.py 와 같은 원칙.
+  async function _auditReply(sb, receiptNo, prevReply, newReply) {
+    var was = String(prevReply || "").trim(), now = String(newReply || "").trim();
+    if (was === now) return;                       // 같은 값 재저장은 남기지 않는다
+    var detail = !now ? "안내문 공개 취소(내용 지움)"
+               : was  ? ("공개중인 안내문 수정(" + now.length + "자)")
+                      : ("안내문 신규 공개(" + now.length + "자)");
+    try {
+      await sb.from("admin_audit").insert({
+        action: "PUBLISH_CITIZEN_REPLY",
+        target: receiptNo || "",                   // ★ 접수번호만. 이름·연락처 금지
+        target_type: "접수(공무원앱)",
+        detail: detail,                            // ★ 길이만. 본문 금지
+        result: "성공"
+      });
+    } catch (e) { /* 기록 실패는 조용히 넘어간다 */ }
+  }
+
   async function updateApplication(id, patch) {
     var sb = client();
     if (!sb) throw new Error("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
@@ -120,8 +143,23 @@ window.SangjuApply = (function () {
     var upd = {};
     if (patch.status !== undefined) upd.status = patch.status;
     if (patch.admin_memo !== undefined) upd.admin_memo = patch.admin_memo;
+    if (patch.citizen_reply !== undefined) upd.citizen_reply = patch.citizen_reply;
+    // ① 바꾸기 «직전» 값을 먼저 읽는다 (신규공개/수정/취소 구분에 필요)
+    //    ⚠ 안내문을 «건드리는 저장»일 때만 읽는다 — 상태·처리메모만 고치는 저장에서는
+    //      왕복이 늘지 않는다(호출부도 안내문이 달라졌을 때만 citizen_reply 를 담아 보낸다).
+    var prevReply = null, receiptNo = "";
+    if (patch.citizen_reply !== undefined) {
+      var pre = await sb.from(TABLE).select("citizen_reply,receipt_no").eq("id", id).single();
+      if (!pre.error && pre.data) { prevReply = pre.data.citizen_reply; receiptNo = pre.data.receipt_no || ""; }
+    }
     var res = await sb.from(TABLE).update(upd).eq("id", id).select().single();
     if (res.error) throw res.error;
+    // ② 저장이 «성공한 뒤에» 남긴다
+    //    admin_audit 테이블은 아직 Supabase 에 없을 수 있다(양호창님 대시보드 실행 전).
+    //    없어도 위 저장은 이미 끝났고, _auditReply 가 실패를 삼키므로 업무는 멈추지 않는다.
+    if (patch.citizen_reply !== undefined) {
+      await _auditReply(sb, receiptNo, prevReply, res.data && res.data.citizen_reply);
+    }
     return res.data;
   }
 

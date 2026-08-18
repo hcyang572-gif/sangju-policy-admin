@@ -7,7 +7,9 @@
 //    기존 이용자에게 게스트 버튼이 살아 있는 구버전이 계속 제공된다(= 로그인 강제 무력화).
 // ⚠ v18: 🔑 비밀번호 변경 화면 추가(index.html·app.js·style.css).
 //    캐시 버전을 올리지 않으면 기존 이용자에게는 «비밀번호 변경» 버튼이 없는 구버전이 계속 뜬다.
-const CACHE = "sangju-admin-v18";
+// ⚠ v20: 💬 시민 안내문(citizen_reply) 입력칸 추가(app.js·style.css·apply_client.js).
+//    캐시 버전을 올리지 않으면 기존 담당자에게는 «시민 안내문» 칸이 없는 구버전이 계속 뜬다.
+const CACHE = "sangju-admin-v21";   // v21: 시민 안내문 공개 전 확인창·개인정보 패턴 경고·300자 제한·공개 감사기록(admin_audit)
 
 // scope(예: https://hcyang572-gif.github.io/sangju-policy-mobile/admin/)를 기준으로
 // 절대 URL을 만들어 둔다. (서브경로에서도 안전)
