@@ -42,6 +42,17 @@
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   }
 
+  /* 지난달(전월) 인지 — 1월이면 «작년 12월»로 넘어간다 */
+  function isPrevMonth(v) {
+    if (!v) return false;
+    var d = new Date(v);
+    if (isNaN(d)) return false;
+    var now = new Date();
+    var y = now.getFullYear(), m = now.getMonth() - 1;
+    if (m < 0) { m = 11; y -= 1; }
+    return d.getFullYear() === y && d.getMonth() === m;
+  }
+
   function isToday(v) {
     if (!v) return false;
     var d = new Date(v);
@@ -61,6 +72,100 @@
     if (!e) return;
     if (typeof window.sjCountUp === "function" && e.querySelector(".kpi-vis")) { window.sjCountUp(e, n); return; }
     e.textContent = String(n);
+  }
+
+  /* ── 📈 도넛 옆 요약 카드 — 「접수 많은 사업」·「담당팀별 접수」 ─────────────────
+     ⚠ 없는 수치를 지어내지 않는다. 이미 들어와 있는 접수 목록(AALL)에서 «세기»만 한다.
+     ⚠ 개인정보는 만지지 않는다 — 사업명(benefit_name)·담당팀(team) 두 칸만 본다.
+     기간은 «전체»다(도넛은 이달 기준). 그래서 카드마다 «전체 접수 N건»을 글로 밝혀 둔다. */
+
+  // 한 칸을 기준으로 묶어 센 뒤 «많은 순 → 이름 순»으로 늘어놓는다
+  function tally(all, key, blank) {
+    var map = Object.create(null), names = [];
+    for (var i = 0; i < all.length; i++) {
+      var r = all[i];
+      var k = (r && r[key] != null) ? String(r[key]).trim() : "";
+      if (!k) k = blank;
+      if (!(k in map)) { map[k] = 0; names.push(k); }
+      map[k] += 1;
+    }
+    var arr = [];
+    for (var j = 0; j < names.length; j++) arr.push({ name: names[j], n: map[names[j]] });
+    arr.sort(function (a, b) {
+      if (b.n !== a.n) return b.n - a.n;
+      return a.name.localeCompare(b.name, "ko");
+    });
+    return arr;
+  }
+
+  // 좁은 화면에서는 3줄만(요약이 목록보다 길어지지 않게), 넓으면 5줄
+  function topCount() {
+    try { return window.matchMedia("(min-width:900px)").matches ? 5 : 3; } catch (e) { return 5; }
+  }
+
+  // unit = 무엇을 묶었는지(사업/담당팀), cw = 그 셈숱말(개/곳)
+  function renderRank(listId, subId, items, total, unit, cw) {
+    var ul = $(listId), sub = $(subId);
+    if (!ul) return;
+    while (ul.firstChild) ul.removeChild(ul.firstChild);
+
+    if (sub) {
+      sub.textContent = items.length
+        ? ("전체 접수 " + total + "건 · " + unit + " " + items.length + cw)
+        : "";
+    }
+    if (!items.length) {
+      var e0 = document.createElement("li");
+      e0.className = "rank-empty";
+      e0.textContent = "아직 접수가 없습니다.";
+      ul.appendChild(e0);
+      return;
+    }
+
+    var show = Math.min(topCount(), items.length);
+    if (sub && items.length > show) sub.textContent += " 중 상위 " + show;
+    var max = items[0].n || 1;
+
+    for (var i = 0; i < show; i++) {
+      var it = items[i];
+      var pct = total ? Math.round((it.n / total) * 100) : 0;
+
+      var li = document.createElement("li");
+      var nm = document.createElement("span");
+      nm.className = "rank-nm";
+      nm.textContent = it.name;
+      var b = document.createElement("b");
+      b.className = "rank-n";
+      b.textContent = it.n + "건";
+      var em = document.createElement("em");
+      em.className = "rank-p";
+      em.textContent = pct + "%";
+      // 막대는 «곁들이는 그림»일 뿐 — 위 세 칸이 같은 정보를 글자로 이미 담고 있다
+      var bar = document.createElement("span");
+      bar.className = "rank-bar";
+      bar.setAttribute("aria-hidden", "true");
+      var fill = document.createElement("i");
+      // ⚠ CSP(style-src 'self')가 style 속성을 막는다 → 반드시 CSSOM 으로 넣는다
+      fill.style.width = Math.max(4, Math.round((it.n / max) * 100)) + "%";
+      bar.appendChild(fill);
+
+      li.appendChild(nm); li.appendChild(b); li.appendChild(em); li.appendChild(bar);
+      ul.appendChild(li);
+    }
+  }
+
+  // 이달 ↔ 지난달 견주기 한 줄(도넛 아래). 늘고 줆을 «글자»로 적는다.
+  function renderNote(thisM, prevM) {
+    var el = $("aStatsNote");
+    if (!el) return;
+    while (el.firstChild) el.removeChild(el.firstChild);
+    var d = thisM - prevM;
+    var tail = d > 0 ? (d + "건 늘었습니다") : (d < 0 ? (-d + "건 줄었습니다") : "지난달과 같습니다");
+    el.appendChild(document.createTextNode("지난달 " + prevM + "건 · 이달 "));
+    var b = document.createElement("b");
+    b.textContent = thisM + "건";
+    el.appendChild(b);
+    el.appendChild(document.createTextNode(" — " + tail));
   }
 
   function draw() {
@@ -100,6 +205,17 @@
     // 접수가 한 건도 없으면 요약 전체를 숨긴다(0건짜리 도넛은 오히려 헷갈린다)
     if (!all.length) { wrap.hidden = true; return; }
     wrap.hidden = false;
+
+    /* 도넛 옆 요약 카드 두 장 — «전체 접수» 기준. 이달 접수가 0건이어도 그려 둔다
+       (도넛만 감추고 옆자리가 비면 예전 결함으로 되돌아간다). */
+    renderRank("aTopBizList", "aTopBizSub", tally(all, "benefit_name", "(사업명 없음)"), all.length, "사업", "개");
+    renderRank("aTopTeamList", "aTopTeamSub", tally(all, "team", "담당팀 미지정"), all.length, "담당팀", "곳");
+
+    // 이달 ↔ 지난달 견주기
+    var prevM = 0;
+    for (var p = 0; p < all.length; p++) if (isPrevMonth(all[p] && all[p].created_at)) prevM += 1;
+    renderNote(total, prevM);
+
     // 이번 달 접수만 없을 때는 지표는 두고 도넛만 감춘다
     fig.hidden = !total;
     if (!total) return;
@@ -187,7 +303,17 @@
     } catch (e) { /* 아주 오래된 브라우저 — 초기 1회 표시만 하고 넘어간다 */ }
   }
 
-  function start() { watch(); draw(); }
+  /* 900px 경계를 넘나들면 순위 카드 줄 수(3 ↔ 5)가 달라진다 → 그때만 다시 그린다.
+     (resize 마다 그리면 창을 끌 때 헛일이 잦다) */
+  function watchWidth() {
+    try {
+      var mq = window.matchMedia("(min-width:900px)");
+      if (mq.addEventListener) mq.addEventListener("change", schedule);
+      else if (mq.addListener) mq.addListener(schedule);
+    } catch (e) { /* 아주 오래된 브라우저 — 첫 그림 그대로 둔다 */ }
+  }
+
+  function start() { watch(); watchWidth(); draw(); }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);

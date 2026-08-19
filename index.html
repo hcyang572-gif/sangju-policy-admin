@@ -163,12 +163,16 @@
       <span class="brand-eyebrow">시민 참여형</span>
       <h1 class="brand-title">상주시 정책플랫폼<span class="brand-tag">공무원용</span></h1>
       <div class="brand-sub" id="dbInfo">사업 관리 (실시간)</div>
-      <!-- 2026 시정구호 — 공통 규격서 §6: 로고 → 아이브로 → 제목(+배지) → 구호 순서.
-           «잘 보이되 제목보다 작게»(제목 블록보다 확실히 작은 폭). 좁은 화면에서는 CSS 가 감춘다.
-           이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수). -->
-      <img src="assets/slogan-wide.png" class="top-slogan" width="1201" height="122"
-           alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
     </div>
+    <!-- 2026 시정구호 — ★ 2026-08-19: 제목 블록(.brand-text) «안»에서 «밖»으로 꺼냈다.
+         안에 두면 블록 요소라 제목·부제 아래로 줄바꿈되어 «제목에 매달린» 모양이 됐다(양호창님 지적).
+         이제 헤더의 «오른쪽 영역»에 계정 버튼과 나란히 세로 가운데로 앉는다 —
+         시민앱 홈의 구호처럼 «따로 놓인 공식 상징물»로 읽힌다.
+         ⚠ 상주시 공식 상징물이라 원색 그대로 쓴다(규격서 §18: 단색화·판·테두리·그림자·투명도 금지).
+         «잘 보이되 제목보다 작게». 좁은 화면(<1180px)에서는 CSS 가 감춘다.
+         이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수). -->
+    <img src="assets/slogan-wide.png" class="top-slogan" width="1201" height="122"
+         alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
     <div class="top-actions">
       <!-- ⛔ 「실시간 연결됨」 알약(#realtimeDot)은 2026-08-19 양호창님 지시로 «화면에서 제거»했습니다.
            되살리지 마세요 — 좁은 폰에서 이 알약 때문에 계정 버튼이 제목 아래 줄로 밀려
@@ -222,7 +226,10 @@
          ⚠ 색만으로 알리지 않는다 — 범례에 건수·비율과 «모양»(원/둥근사각/각사각/마름모)을 함께 두고,
             <title>/<desc> 에 같은 수치를 글로 적어 낭독기에도 동일한 정보를 준다. -->
     <!-- ── 요약 지표 + 이달의 접수 도넛 (확정 시안 A 목업의 «상단 요약» 그대로) ──────────
-         왼쪽 지표 4개는 2×2, 오른쪽은 도넛. 수치는 stats.js 가 실제 접수 목록에서 계산한다.
+         ★ 2026-08-19 배치 교정 — 예전엔 «왼쪽 2×2 + 오른쪽 도넛»이라 지표 카드가 도넛 높이에
+           끌려 과하게 커 보였다. 지금은 지표 4장이 «윗줄 전체»(넓은 화면 한 줄 / 좁은 화면 2×2),
+           아랫줄은 «도넛 + 접수 많은 사업 + 담당팀별 접수» 세 장이 나란히 선다(1440px 에서 도넛
+           오른쪽이 통째로 비던 결함을 2026-08-19 에 이렇게 메웠다). 수치는 stats.js 가 실제 접수 목록에서 계산한다.
          자료를 아직 못 불러왔거나 이번 달 접수가 0건이면 통째로 숨긴다(hidden). -->
     <div id="aSummary" class="sum-row" hidden>
       <!-- 요약 지표 4개 — 규격서 §14 «숫자 카운트업».
@@ -258,7 +265,24 @@
           <li><span class="dn-mk m4" aria-hidden="true"></span>반려<b id="aLgN4">0</b><em id="aLgP4">0%</em></li>
           </ul>
         </div>
+        <!-- 이달 ↔ 지난달 견주기 — stats.js 가 created_at 만 세어 채운다(글자만, 색 의존 없음) -->
+        <p class="stats-note" id="aStatsNote"></p>
       </figure>
+
+      <!-- 📈 도넛 옆 «요약 카드» 두 장 (2026-08-19 추가)
+           예전엔 도넛 카드가 왼쪽 392px 만 쓰고 넓은 화면(1440px)에서 오른쪽 60% 가 통째로 비었다.
+           그 자리를 «이미 있는 접수 자료로 계산되는 것»만 골라 채운다 — 사업별·담당팀별 접수 건수.
+           ⚠ 없는 수치를 지어내지 않는다. ⚠ 개인정보(이름·연락처)는 세지도, 보여주지도 않는다.
+           ⚠ 막대는 «곁들이는 그림»일 뿐이라 aria-hidden — 건수·비율은 언제나 «글자»로 함께 있다. -->
+      <section class="rank-card" aria-labelledby="aTopBizCap">
+        <h3 class="stats-cap" id="aTopBizCap">접수 많은 사업 <span class="rank-sub" id="aTopBizSub">집계 중</span></h3>
+        <ol class="rank-list" id="aTopBizList"></ol>
+      </section>
+
+      <section class="rank-card" aria-labelledby="aTopTeamCap">
+        <h3 class="stats-cap" id="aTopTeamCap">담당팀별 접수 <span class="rank-sub" id="aTopTeamSub">집계 중</span></h3>
+        <ol class="rank-list" id="aTopTeamList"></ol>
+      </section>
     </div>
 
     <!-- 상태 필터 — «한 개만» 고르는 줄(전체/접수/심사중/승인/반려). 줄바꿈 알약(.chips.wrap).

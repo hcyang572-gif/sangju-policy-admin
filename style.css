@@ -190,14 +190,21 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* 실시간 건수(app.js 가 «사업 N건 · 실시간» 으로 갱신) — 표어가 아니라 «지금 상태»를 알리는 글이라 남긴다.
    다만 제목과 겨루지 않게 가장 작게 둔다. */
 .brand-sub{font-size:0.71875rem;font-weight:700;color:var(--sub);margin-top:2px;}
-/* 2026 시정구호(헤더) — 대표 제목 옆에 «크게». 가로 320px 이상이 되도록 넓은 화면에서 폭을 키운다.
+/* 2026 시정구호(헤더) — ★ 2026-08-19 위치 교정.
+   예전엔 제목 블록(.brand-text) «안»에 있었다. 블록 요소라 제목·부제 «아래»로 줄바꿈되어
+   「상주시 정책플랫폼」에 매달린 모양이 됐다(넓은 화면에서 어색하다는 지적).
+   지금은 .topbar 의 «직계 자식»이라 로고·제목과 같은 줄에서 세로 가운데로 앉고,
+   .brand-text 가 flex:1 로 늘어나므로 구호는 헤더 «오른쪽»(계정 버튼 왼편)에 놓인다.
+   ⚠ 상주시 공식 상징물 — 원색 그대로 둔다(규격서 §18). 투명도(opacity)도 얹지 않는다.
    좁은 화면에서는 제목·버튼과 자리를 다투므로 감춘다(로그인 카드에는 항상 보인다). */
-.top-slogan{display:none;height:auto;flex:none;}
-/* 1180px 아래에서는 제목·버튼과 자리를 다투어 헤더가 두 줄로 접힌다 → 그 위에서만 편다.
-   ★ «잘 보이되 제목보다 작게» — 제목 블록(약 210px 폭·22px 글자)보다 확실히 낮은 존재감이 되도록
-     폭을 240px 안쪽으로 묶는다(1차 적용의 320~380px 는 과했다). */
+.top-slogan{display:none;height:auto;flex:none;align-self:center;}
+/* 1180px 아래에서는 제목·버튼과 자리를 다투어 헤더가 눌린다 → 그 위에서만 편다.
+   ★ «잘 보이되 제목보다 작게» — 제목 블록보다 확실히 낮은 존재감이 되도록 260px 안쪽으로 묶는다.
+   구호와 계정 버튼 사이의 «가름선»은 계정 영역(.top-actions)에 건다.
+   ⚠ 구호 이미지 자체에는 테두리·그림자·투명도를 절대 얹지 않는다(규격서 §18). */
 @media (min-width:1180px){
-  .top-slogan{display:block;width:clamp(200px,16vw,240px);margin-left:20px;opacity:.92;}
+  .top-slogan{display:block;width:clamp(210px,17vw,260px);margin-left:28px;}
+  .top-actions{padding-left:18px;border-left:1px solid var(--line);}
 }
 /* 헤더 오른쪽 — 계정 버튼 «하나»뿐이다. 어떤 폭에서도 제목과 같은 줄에 오른쪽 정렬로 남는다.
    ⛔ 여기에 새 버튼·표시를 늘리지 마세요. 늘리는 순간 좁은 폰에서 헤더가 다시 두 줄이 됩니다
@@ -680,8 +687,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .donut .dn-num{font-family:inherit;font-size:28px;font-weight:800;fill:var(--ink);}
 .donut .dn-lab{font-family:inherit;font-size:11px;font-weight:700;fill:var(--sub);}
 /* 범례 — 좁으면 1열, 넓어지면 2·4열로 늘어나 카드 폭을 자연스럽게 채운다.
-   한 줄 안에서 «이름 … 건수 비율» 이 오른쪽으로 정렬되도록 li 는 그대로 flex 를 쓴다. */
-.donut-legend{flex:1 1 260px;min-width:0;list-style:none;margin:0;padding:0;
+   한 줄 안에서 «이름 … 건수 비율» 이 오른쪽으로 정렬되도록 li 는 그대로 flex 를 쓴다.
+   ★ 2026-08-19 — 기준폭을 260px → 190px 로 낮췄다. 예전에는 카드 안폭(356px)에서
+     도넛(132)+틈(20)+범례(260) 이 넘쳐 범례가 «도넛 아래»로 접혔고, 그 바람에 도넛
+     오른쪽이 통째로 비면서 카드만 300px 넘게 길어졌다. 이제는 도넛 옆에 나란히 선다. */
+.donut-legend{flex:1 1 190px;min-width:0;list-style:none;margin:0;padding:0;
   display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,230px));gap:8px 28px;
   justify-content:start;}
 .donut-legend li{display:flex;align-items:center;gap:9px;font-size:0.84375rem;font-weight:700;color:var(--ink);}
@@ -692,6 +702,39 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .dn-mk.m4{background:#6E594A;border-radius:2px;transform:rotate(45deg);}  /* 반려 · 마름모 */
 .donut-legend b{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums;}
 .donut-legend em{font-style:normal;width:44px;text-align:right;color:var(--sub);font-size:0.78125rem;}  /* 흰 6.58:1 */
+/* 이달 ↔ 지난달 견주기 한 줄 — 도넛 아래. 글자만 쓴다(색·화살표에 기대지 않는다). */
+.stats-note{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+  font-size:0.8125rem;font-weight:700;color:var(--sub);}   /* 흰 6.55:1 */
+.stats-note b{color:var(--gotgam-t);font-variant-numeric:tabular-nums;}  /* 흰 7.37:1 */
+.stats-note:empty{display:none;}
+
+/* ── 📈 도넛 옆 요약 카드 — 「접수 많은 사업」·「담당팀별 접수」 ─────────────────
+   ★ 2026-08-19 신설. 넓은 화면에서 도넛 카드 오른쪽 60% 가 비던 결함을 메운다.
+   수치는 stats.js 가 «이미 들어와 있는 접수 목록»에서 세는 것만 쓴다(지어낸 값 없음).
+   ⚠ 막대는 장식(aria-hidden) — 건수·비율은 반드시 «글자»로 함께 둔다(색·길이 의존 금지).
+   ⚠ 막대 채움(--gotgam #B84A1C) 위에 글자를 얹지 않는다. 바탕(--gotgam-l)과의 대비는
+      비텍스트 3:1 기준을 넘고(4.3:1), 어차피 같은 정보를 글자로 중복해 둔다. */
+/* 기준폭 260px — 노트북(1024px, 안폭 968px)에서도 392+16+260+16+260=944 로 «세 장이 한 줄»에 선다.
+   더 크게 잡으면(예: 300px) 1024px 에서 담당팀 카드만 아래로 밀려 혼자 가로로 늘어난다. */
+.rank-card{flex:1 1 260px;min-width:0;margin:0 0 14px;background:var(--card);
+  border:1.5px solid var(--line);border-radius:var(--r-card);padding:14px 18px 16px;
+  box-shadow:var(--shadow);}
+.rank-sub{display:inline-block;font-size:0.78125rem;font-weight:700;color:var(--sub);}  /* 흰 6.55:1 */
+.rank-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;}
+/* 한 줄 = «사업명(또는 팀) · 건수 · 비율» 윗줄 + 막대 아랫줄 */
+.rank-list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:baseline;column-gap:10px;row-gap:5px;
+  font-size:0.84375rem;font-weight:700;color:var(--ink);}
+.rank-nm{min-width:0;word-break:keep-all;overflow-wrap:anywhere;line-height:1.4;}
+.rank-n{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.rank-p{font-style:normal;width:44px;text-align:right;color:var(--sub);font-size:0.78125rem;white-space:nowrap;}
+/* max-width — 900~1000px 처럼 카드 한 장이 아래로 밀려 «혼자 가로로 늘어나는» 폭에서
+   막대만 900px 넘게 뻗어 보이지 않게 한다. 보통 폭(≈420px)에서는 아무 영향이 없다. */
+.rank-bar{grid-column:1 / -1;height:8px;max-width:520px;border-radius:var(--r-pill);
+  background:var(--gotgam-l);overflow:hidden;}
+.rank-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--gotgam);}
+/* ⚠ .rank-list li 보다 «약하면» 격자 규칙에 눌린다 — 반드시 li 를 붙여 쓸 것 */
+.rank-list li.rank-empty{display:block;color:var(--dim);font-size:0.84375rem;font-weight:700;}  /* 흰 6.19:1 */
 
 /* 좁은 화면에서 표·넓은 내용이 넘칠 때의 가로 스크롤 상자(본문 자체는 절대 가로로 밀리지 않게) */
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -741,17 +784,32 @@ button:active,[role="button"]:active,.foot-link:active{transform:scale(.97);}
    📊 상단 요약 — 지표 카드 4개 + 이달의 접수 도넛 (시안 A 목업)
    ════════════════════════════════════════════════════════════ */
 .sum-row{display:flex;flex-wrap:wrap;gap:16px;align-items:stretch;margin:0 0 24px;}
-.kpis{flex:1 1 320px;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+/* ★ 2026-08-19 크기 교정 — 지표 카드가 «본문(목록)»보다 커 보인다는 지적.
+   요약 지표는 «곁들이는 수»이지 주인공이 아니다 → 높이·여백·숫자 크기를 한 단계 낮췄다.
+   ★ 자리 배치도 바꿨다 — 예전엔 «왼쪽 2×2 + 오른쪽 도넛»이라 넓은 화면에서 지표 줄이
+     도넛 높이(약 230px)에 끌려 늘어났다. 지금은 지표 4장이 «윗줄 전체»를 쓰고 도넛은 아랫줄이다.
+     덕분에 사업·시민 제안 탭의 요약 띠(.sum-mini)와 «같은 모양·같은 높이»로 맞는다.
+   좁은 화면 2열(2×2) → 900px 이상에서 4개가 «한 줄».
+   ⚠ 900px 은 도넛 카드가 한 줄을 통째로 쓰게 되는 경계(아래 .stats-card)와 같은 값이다.
+      더 높이 잡으면(예: 1180px) 노트북 폭(1024px)에서 카드가 두 장씩 과하게 늘어난다. */
+.kpis{flex:1 1 100%;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+@media (min-width:900px){ .kpis{grid-template-columns:repeat(4,minmax(0,1fr));} }
 /* 지표 카드 — «숫자»와 «무엇을 센 수인지»를 한 줄에 나란히(넓은 화면에서도 빈 칸이 생기지 않는다).
-   규격서 표 규칙에 맞춰 숫자는 오른쪽 자리에 두고 tabular-nums 로 자릿수를 고정한다. */
+   규격서 표 규칙에 맞춰 숫자는 오른쪽 자리에 두고 tabular-nums 로 자릿수를 고정한다.
+   ⚠ 세 탭(접수 처리·사업·시민 제안)이 «같은 높이·같은 글자 크기»여야 한다 —
+      이 한 곳(.kpi)만 고치면 세 곳이 함께 바뀐다. 탭별로 따로 크기를 주지 말 것. */
 .kpi{background:var(--card);border:1.5px solid var(--line);border-radius:var(--r-card);
-  box-shadow:var(--shadow);padding:16px 20px;min-height:76px;
-  display:flex;align-items:center;justify-content:space-between;gap:16px;}
-.kpi b{font-size:2rem;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;order:2;}
-.kpi span{font-size:0.875rem;font-weight:700;color:var(--sub);order:1;}  /* 흰 6.55:1 */
-/* 도넛 카드는 목업과 같은 고정 폭(392px)으로 두어 지표 카드와 균형을 맞춘다 */
+  box-shadow:var(--shadow);padding:9px 14px;min-height:52px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;}
+/* 숫자 1.5rem(24px) — 본문 0.9375rem 의 1.6배로 «지표»답게 읽히되 카드가 부풀지 않는다 */
+.kpi b{font-size:1.5rem;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums;order:2;}
+.kpi span{font-size:0.8125rem;font-weight:700;color:var(--sub);order:1;}  /* 13px 굵은 글자 · 흰 6.55:1 */
+/* 도넛 카드는 목업과 같은 고정 폭(392px)으로 두어 지표 카드와 균형을 맞춘다.
+   ★ 2026-08-19 — 그 옆(.rank-card 두 장)이 남는 폭을 나눠 갖는다. 예전에는 도넛 한 장만
+     놓여 1440px 화면에서 오른쪽 60% 가 통째로 비었다.
+     1180px 안폭 기준 392 + 16 + 350 + 16 + 350, 1320px 안폭 기준 392 + 16 + 420 + 16 + 420. */
 .stats-card{flex:0 0 392px;}
-@media (max-width:900px){ .stats-card{flex:1 1 100%;} }
+@media (max-width:900px){ .stats-card,.rank-card{flex:1 1 100%;} }
 .kpi.k-now b{color:var(--gotgam-t);}   /* 오늘 접수 — 흰 7.47:1 */
 .kpi.k-rev b{color:#7A5B00;}           /* 심사중  — 흰 6.9:1 (보조 금빛은 «글자색 금지»라 어두운 갈금색) */
 .kpi.k-ok  b{color:var(--navy-d);}     /* 승인    — 흰 7.70:1 */
@@ -955,9 +1013,19 @@ main#main{ overflow-x:hidden; }
 .acct-pop .top-btn{ width:100%; justify-content:flex-start; }
 .acct-pop[hidden]{ display:none; }
 
-/* 요약 띠 — 탭마다 위쪽에 늘 보이는 지표(통계를 따로 열지 않아도 되게) */
-.sum-mini{ display:flex; flex-wrap:wrap; gap:10px; margin:0 0 12px; }
-.sum-mini .kpi{ flex:1 1 130px; }
+/* 요약 띠 — 탭마다 위쪽에 늘 보이는 지표(통계를 따로 열지 않아도 되게).
+   ★ 2026-08-19: flex → grid. 넓은 화면에서는 «한 줄»(3열), 좁은 화면에서는 2열로 접힌다.
+     예전 flex(1 1 130px)는 폭에 따라 3개가 2:1 로 어긋나 접수 처리 탭과 줄이 맞지 않았다.
+   ⚠ 카드 크기(높이·글자)는 .kpi 한 곳에서 정한다 — 여기서 따로 키우거나 줄이지 말 것.
+     세 탭의 요약 카드는 «같은 높이·같은 글자 크기»여야 한다(양호창님 지시). */
+.sum-mini{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0 0 12px; }
+/* 3개 중 마지막 한 장이 반 칸만 차지해 어긋나 보이지 않게 «한 줄 전체»로 편다(2열일 때만) */
+.sum-mini .kpi:nth-child(3):last-child{ grid-column:1 / -1; }
+/* ★ 경계값 900px 은 접수 처리 탭(.kpis)과 «같은 값». 세 탭이 같은 폭에서 함께 접혀야 한다. */
+@media (min-width:900px){
+  .sum-mini{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .sum-mini .kpi:nth-child(3):last-child{ grid-column:auto; }
+}
 
 /* ⚠ 저감 모션에서 «전부» 끈다 — 위 블록보다 아래에 두어 확실히 이긴다.
       파일 위쪽의 공통 저감 블록(!important)과 겹쳐서 두 겹으로 막는다. */
@@ -1014,8 +1082,10 @@ a[href^="mailto:"],a[href^="http"],.login-help strong,.forms-item-name,
   .cardlist.rows .pcard-top .rc-tag{ max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 }
 
-/* 요약 지표 — 네 카드의 높이를 같게 하고 숫자 기준선을 맞춘다(tabular-nums 는 위에서 이미 적용) */
-.kpis{ align-items:stretch; }
+/* 요약 지표 — 같은 줄 카드끼리 높이를 맞추되(align-items), «줄 자체»는 늘리지 않는다(align-content).
+   ⚠ align-content 를 stretch(기본)로 두면 옆의 도넛 카드(약 230px) 높이에 맞춰 지표 카드가
+      통째로 늘어난다 — 「카드가 너무 크다」던 원인이 바로 이것이었다(2026-08-19). */
+.kpis{ align-items:stretch; align-content:start; }
 .kpi{ align-items:center; }
 .kpi span{ min-width:0; }
 
