@@ -103,9 +103,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .field-opt{color:var(--sub);font-weight:400;}    /* 흰 6.55:1 */
 /* 입력 오류 안내(모달 안) — 브라우저 alert() 대신 쓰는 «화면 안» 경고.
    ⚠ 색만으로 알리지 않는다: ⚠ 표식 + 무엇을 해야 하는지 적은 «글»이 함께 간다.
-   #A52714 on #FDECEA = 6.75:1 (AA 충족) */
+   #A52714 on #FDECEA = 6.75:1 (AA 충족)
    ⚠ 표식은 «마크업»에 둔다(icons.js 가 선 아이콘 SVG 로 바꿔 준다).
-      ⛔ CSS content:"⚠" 로 넣지 말 것 — icons.js 가 닿지 못해 이모지가 그대로 남는다(규격서 §5 위반). */
+      ⛔ CSS content 로 넣지 말 것 — icons.js 가 닿지 못해 이모지가 그대로 남는다(규격서 §5 위반).
+   ⛔ 이 주석을 여기서 «두 토막»으로 끊지 말 것 — 2026-08-19 까지 위 줄에서 주석이 먼저 닫혀
+      아래 두 줄이 «CSS 본문»으로 흘러들었고, 그 때문에 CSS 파서가 .field-err 규칙을 통째로
+      버렸다(분야 미선택 경고가 빨간 상자 없이 맨 글자로만 떴다). */
 .field-err{display:flex;align-items:flex-start;gap:8px;margin:10px 0 0;padding:10px 12px;
   border-radius:var(--r-ctl);background:#FDECEA;border-left:4px solid var(--danger);color:var(--danger);
   font-size:0.8125rem;font-weight:700;line-height:1.6;}
@@ -356,6 +359,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* 모달 — .modal 이 max-height:88vh + .modal-body 내부 스크롤 구조라 글꼴을 키워도 화면 안에 들어온다
    (200% 확대 실측에서도 넘침 없음). 스크롤이 뒤 본문으로 번지지 않게만 보강(.modal-body). */
 .modal-backdrop{position:fixed;inset:0;background:rgba(51,36,28,.48);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;}
+/* 모달이 열려 있는 동안에는 «뒤 본문»이 스크롤되지 않게 잠근다 (2026-08-19).
+   왜: 덮개(.modal-backdrop)는 position:fixed 라 스스로 스크롤하지 않아, 덮개 위에서 굴린
+   휠·손가락이 그대로 문서로 흘러 뒤 목록이 밀렸다. 모달을 닫으면 엉뚱한 자리에 서 있게 된다.
+   ⚠ 클래스는 app.js lockBodyScroll() 이 켜고 끈다. 스크롤막대가 사라지며 화면이 옆으로 튀지
+      않도록 그 폭만큼을 같은 함수가 body 오른쪽 여백으로 채운다(CSSOM — CSP 안전). */
+body.modal-open{overflow:hidden;}
 /* ★ 모달(패널) 규격 «단일 기준» — 24px 라운드 · 헤더 18/22 · 본문 24 여백 */
 .modal{background:#fff;width:100%;max-width:720px;max-height:88vh;border-radius:var(--r-card);
   box-shadow:0 28px 70px rgba(51,36,28,.36);display:flex;flex-direction:column;overflow:hidden;}

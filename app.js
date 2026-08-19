@@ -18,7 +18,21 @@ let LOGGING_OUT = false;   // 로그아웃 진행 중(onAuthStateChange 중복 �
 let PW_CHANGING = false;
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
-function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m])); }
+// HTML 로 꽂기 전에 반드시 거치는 이스케이프.
+// ⚠ 홑따옴표(')도 함께 막는다 — 지금은 모든 속성을 쌍따옴표로 감싸지만, 나중에 누가
+//    한 곳이라도 title='…' 처럼 쓰면 시민이 적은 이름·문의로 속성을 빠져나갈 수 있다.
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+/* 링크로 쓸 수 있는 주소인지 — http(s) 와 같은 출처 상대경로만 통과시킨다.
+   왜: 서식 목록의 href 는 DB(benefit_forms.public_url)에서 온 값이다. 그 값이
+   "javascript:…" 로 바뀌면 «로그인 세션을 가진 공무원 화면»에서 그대로 실행된다.
+   통과하지 못하면 링크 대신 «글자»로만 보여 준다(파일명은 그대로 읽힌다). */
+function safeHref(u) {
+  const s = String(u == null ? "" : u).trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^[./]/.test(s) && !/^\/\//.test(s)) return s;   // 같은 출처 상대경로
+  return "";
+}
 function el(t, c) { const e = document.createElement(t); if (c) e.className = c; return e; }
 
 /* ── 담당팀 색 구분 (시민앱과 동일 팔레트·해시 → 같은 팀 = 양앱 같은 색) ──
@@ -59,6 +73,10 @@ let ASK_RESOLVE = null;
 let ASK_LASTFOCUS = null;       // 확인 창 열기 전 초점(닫으면 여기로 되돌린다)
 
 function _trapKeydown(e) {
+  // ⓪-0 한글 입력 중(IME 조합)에는 키를 가로채지 않는다.
+  //   조합 중의 Esc 는 «조합 취소», Tab 은 «후보 선택»이다. 여기서 가로채면 처리메모·안내문을
+  //   쓰다 말고 모달이 닫히거나 초점이 튄다(브라우저는 조합 중 keydown 을 229 로 보낸다).
+  if (e.isComposing || e.keyCode === 229) return;
   // ⓪ 확인 창(#askModal)이 떠 있으면 «그것이» 키보드의 주인이다 — 뒤 모달은 건드리지 않는다.
   //    Esc = «취소»(안전한 쪽). 창만 닫히고 뒤 모달은 그대로 남는다.
   //    ⚠ 여기서 requestCloseModal 로 흘려보내면 창은 닫히는데 기다리던 약속이 안 풀려 «먹통»이 된다.
@@ -86,6 +104,26 @@ function _trapKeydown(e) {
 // 트랩 keydown은 문서에 단 한 번만 등록(모달 전환돼도 _activeModal만 갱신)
 document.addEventListener("keydown", _trapKeydown);
 
+/* 🔒 모달이 열려 있는 동안 «뒤 본문»의 스크롤을 잠근다 (2026-08-19).
+   왜: 덮개(.modal-backdrop)는 position:fixed 라 스스로 스크롤하지 않는다. 그래서 덮개 위에서
+   굴린 휠·손가락이 문서로 흘러 뒤 목록이 밀렸고, 모달을 닫으면 보던 자리를 잃었다.
+   ⚠ 스크롤막대가 사라지며 화면이 옆으로 튀지 않도록 그 폭만큼 body 오른쪽 여백으로 메운다.
+      CSP(style-src 'self')는 «마크업의 style= 속성»을 막을 뿐 CSSOM 지정은 막지 않는다
+      (stats.js 의 막대 폭 지정과 같은 방식). */
+function lockBodyScroll(on) {
+  const b = document.body;
+  if (!b) return;
+  if (on) {
+    if (b.classList.contains("modal-open")) return;      // 이미 잠겨 있으면 여백을 두 번 주지 않는다
+    const gap = window.innerWidth - document.documentElement.clientWidth;
+    if (gap > 0) b.style.paddingRight = gap + "px";
+    b.classList.add("modal-open");
+  } else {
+    b.classList.remove("modal-open");
+    b.style.paddingRight = "";
+  }
+}
+
 function openModal(modal) {
   if (!modal) return;
   _lastFocus = document.activeElement;
@@ -96,7 +134,10 @@ function openModal(modal) {
   modal._sjSnap = formSnapshot(modal);
   // ⬅ 브라우저·안드로이드 뒤로가기 = 모달만 닫기. 모달 열기를 히스토리 «한 칸»으로 만든다.
   navPush({ type: "modal", id: modal.id, tab: pCurrentTab });
-  modal._sjNav = true;
+  // ⚠ 히스토리를 «실제로 쌓았을 때만» 표시를 남긴다. NAV_READY 가 거짓이면 navPush 가
+  //    아무 일도 하지 않으므로, 그때 true 로 두면 닫을 때 남의 히스토리를 한 칸 되돌리게 된다.
+  modal._sjNav = NAV_READY;
+  lockBodyScroll(true);
   // 첫 포커스: 닫기 버튼이 아닌 첫 입력요소 우선, 없으면 첫 포커스 대상
   const focusables = [...modal.querySelectorAll(FOCUS_SEL)].filter((n) => n.offsetParent !== null);
   const target = focusables.find((n) => !n.classList.contains("modal-close")) || focusables[0];
@@ -114,6 +155,7 @@ function closeModal(modal, opts) {
   //    닫기 «한 곳»에서 처리한다. 현재 type="password" 입력칸은 비밀번호 변경 모달에만 있다)
   try { modal.querySelectorAll('input[type="password"]').forEach((n) => { n.value = ""; }); } catch (e) {}
   if (_activeModal === modal) _activeModal = null;
+  if (!_activeModal) lockBodyScroll(false);      // 남은 모달이 없을 때만 뒤 본문 스크롤을 푼다
   if (_lastFocus && typeof _lastFocus.focus === "function") { try { _lastFocus.focus(); } catch (e) {} }
   _lastFocus = null;
   // ★ 모달이 열려 있는 동안 도착한 알림은 rtBusy() 때문에 띠가 «숨겨진 채» 카운트만 쌓인다.
@@ -181,6 +223,7 @@ function askConfirm(opts) {
   $("#askGo").textContent = opts.okText || "확인";
   ASK_LASTFOCUS = document.activeElement;
   m.classList.remove("hidden");
+  lockBodyScroll(true);            // 모달 위에 겹쳐 떠도 뒤 본문은 잠긴 채로 둔다(이미 잠겼으면 무동작)
   return new Promise((resolve) => {
     ASK_RESOLVE = resolve;
     setTimeout(() => { const b = $("#askKeep"); if (b) b.focus(); }, 30);   // 초점 = 안전한 쪽
@@ -192,6 +235,7 @@ function askDone(v) {
   ASK_RESOLVE = null;
   const m = document.getElementById("askModal");
   if (m) m.classList.add("hidden");
+  if (!_activeModal) lockBodyScroll(false);   // 뒤에 남은 모달이 없을 때만 본문 스크롤을 푼다
   const back = ASK_LASTFOCUS; ASK_LASTFOCUS = null;
   if (back && typeof back.focus === "function") { try { back.focus(); } catch (e) {} }
   if (r) r(v);
@@ -803,6 +847,10 @@ function pwSetMsg(text, kind) {
   box.textContent = text || "";
 }
 
+// 「변경하기」 단추의 «본디 글자». 앞의 🔑 는 icons.js 가 인라인 SVG 로 바꿔 끼운다(규격서 §10).
+// ⚠ 여기 한 곳에서만 정한다 — 열 때와 되돌릴 때가 어긋나면 아이콘이 사라진다.
+const PW_SAVE_LABEL = "🔑 변경하기";
+
 // 화면을 처음 상태로 되돌리고 연다(직전 입력·안내가 남지 않게).
 function openChangePw() {
   ["#pwCur", "#pwNew", "#pwChk"].forEach((s) => { const n = $(s); if (n) n.value = ""; });
@@ -810,7 +858,7 @@ function openChangePw() {
   if (rule) { rule.textContent = ""; rule.className = "pw-rule"; }
   pwSetMsg("");
   const btn = $("#pwSave");
-  if (btn) { btn.disabled = false; btn.textContent = "🔑 변경하기"; btn.onclick = submitChangePw; }
+  if (btn) { btn.disabled = false; btn.textContent = PW_SAVE_LABEL; btn.onclick = submitChangePw; }
   openModal($("#pwModal"));   // 첫 초점은 «현재 비밀번호» 칸(모달 공통 규약)
 }
 
@@ -841,7 +889,10 @@ async function submitChangePw() {
   if (nw === cur) { fail("지금 쓰는 비밀번호와 같습니다. 다른 값으로 정해 주세요.", "#pwNew"); return; }
 
   const btn = $("#pwSave");
-  const label = btn.textContent;
+  // ⚠ btn.textContent 를 그대로 기억해 두면 안 된다 — icons.js 가 «🔑» 글자를 이미 SVG 로
+  //    바꿔 놓은 뒤라 textContent 는 «변경하기» 뿐이고, 되돌릴 때 자물쇠 아이콘이 사라진다.
+  //    openChangePw() 와 «같은 문자열»을 쓰면 icons.js 가 다시 아이콘을 끼워 준다.
+  const label = PW_SAVE_LABEL;
   let needRelogin = false;
   btn.disabled = true; btn.textContent = "변경 중...";
   pwSetMsg("비밀번호를 바꾸는 중입니다...");
@@ -1789,7 +1840,7 @@ async function refreshFormsList(r) {
     const ext = (nm.split(".").pop() || "").toUpperCase();
     const size = SangjuForms.formatSize(row.size);
     const meta = (ext ? ext + " 파일" : "파일") + (size ? " · " + size : "");
-    const url = String(row.public_url || "");
+    const url = safeHref(row.public_url);      // http(s)·상대경로만 링크로 만든다
     const nameHtml = url
       ? `<a class="forms-item-name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">📄 ${esc(nm)}</a>`
       : `<span class="forms-item-name">📄 ${esc(nm)}</span>`;
