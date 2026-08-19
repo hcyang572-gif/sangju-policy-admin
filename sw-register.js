@@ -9,7 +9,9 @@
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
     navigator.serviceWorker
-      .register("sw.js")
+      // updateViaCache:"none" — sw.js 자체도 브라우저 HTTP 캐시(max-age=600)에서
+      // 꺼내 쓰지 말고 «항상 서버에서» 확인하게 한다(새 버전 감지 지연 방지).
+      .register("sw.js", { updateViaCache: "none" })
       .then(function (reg) { console.log("[PWA·공무원] 서비스워커 등록:", reg.scope); })
       .catch(function (e) { console.warn("[PWA·공무원] 서비스워커 등록 실패(무시):", e); });
   });
