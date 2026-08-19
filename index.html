@@ -33,7 +33,7 @@
 <meta name="apple-mobile-web-app-title" content="상주정책(공무원용)">
 <meta name="application-name" content="상주정책(공무원용)">
 
-<link rel="stylesheet" href="style.css?v=0.4.3">
+<link rel="stylesheet" href="style.css?v=0.4.4">
 <link rel="icon" href="assets/icon-admin-192.png">
 </head>
 <body>
@@ -170,18 +170,21 @@
            alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
     </div>
     <div class="top-actions">
-      <!-- 실시간 연결 표시 — 상태가 바뀌면 app.js setRealtimeDot() 이 «글자»(rt-dot-text)와
-           title 을 함께 갱신한다. 색(●)만으로 상태를 전하지 않기 위함(KWCAG 5.4.1)이며,
-           aria-label 을 하드코딩하면 끊겨도 "연결됨"으로 낭독되는 «거짓 정보»가 된다. -->
-      <span id="realtimeDot" class="rt-dot" role="status" title="실시간 연결됨">
-        <span class="rt-dot-mark" aria-hidden="true">●</span>
-        <span class="rt-dot-text">실시간 연결됨</span>
-      </span>
+      <!-- ⛔ 「실시간 연결됨」 알약(#realtimeDot)은 2026-08-19 양호창님 지시로 «화면에서 제거»했습니다.
+           되살리지 마세요 — 좁은 폰에서 이 알약 때문에 계정 버튼이 제목 아래 줄로 밀려
+           헤더가 두 줄이 됐습니다(실제 화면 확인).
+           연결 상태는 사라지지 않았습니다. app.js setRealtimeDot() 이
+             ① 헤더 부제(#dbInfo)를 「사업 N건 · 실시간」 ↔ 「사업 N건 · 실시간 연결 끊김」 으로 바꾸고
+             ② 상태가 «바뀌는 순간»에만 #liveStatus(낭독기 전용)로 알립니다.
+           → 색에 기대지 않고 «글자»로만 알리므로 KWCAG 5.4.1 도 그대로 지켜집니다. -->
       <!-- 계정 메뉴 — 비밀번호 변경·로그아웃을 «하나»로 접었다(규격서 0절: 한 화면 버튼 3개 상한).
            ⚠ 버튼 id(btnChangePw·btnLogout)는 그대로 둔다 — app.js bindUI() 가 그 id 로 연결한다.
-           «새 사업»은 사업 탭 안으로 옮겼다(설계안: 목록에서 바로 올리기). -->
+           «새 사업»은 사업 탭 안으로 옮겼다(설계안: 목록에서 바로 올리기).
+           ⚠ aria-label 「계정 메뉴」 — 아주 좁은 폭(≤400px)에서는 CSS 가 «계정» 글자를 감추므로
+              접근명이 사라지지 않도록 여기서 못 박는다. 보이는 라벨(계정)을 접근명이 품고 있어
+              음성 조작(WCAG 2.5.3 «라벨을 이름에») 도 성립한다. -->
       <div class="acct">
-        <button class="top-btn ghost" id="btnAcct" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="acctPop"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>계정</span></button>
+        <button class="top-btn ghost" id="btnAcct" type="button" aria-label="계정 메뉴" aria-haspopup="true" aria-expanded="false" aria-controls="acctPop"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span class="acct-lab">계정</span></button>
         <div class="acct-pop" id="acctPop" role="menu" aria-labelledby="btnAcct" hidden>
           <!-- 🔑 담당자가 «스스로» 비밀번호를 바꾸는 입구.
                계정은 시스템 담당자가 만들어 임시 비밀번호를 알려 주므로, 그 값을 계속 쓰면
@@ -208,8 +211,10 @@
   <main id="main" tabindex="-1">
   <!-- 섹션 0: 신청 접수 (신규·공무원 1순위) — 시민앱 신청이 Supabase 로 실시간 도착 -->
   <section id="secApplications" class="content" role="tabpanel" aria-labelledby="tabApplications">
-    <h2 class="sr-only">신청 접수</h2>
-    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>시민 신청을 실시간으로 처리합니다. 바꾼 내용은 곧바로 반영됩니다.</span></p>
+    <!-- ⚠ 제목·안내문의 «이름»은 탭 이름(접수 처리)과 «글자 그대로» 같아야 한다.
+         예전엔 탭은 「접수 처리」, 화면 제목은 「신청 접수」로 달라 지금 어느 탭인지 이어지지 않았다. -->
+    <h2 class="sr-only">접수 처리</h2>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span><b class="hint-tab">접수 처리</b> — 시민 신청을 실시간으로 처리합니다. 바꾼 내용은 곧바로 반영됩니다.</span></p>
 
     <!-- 📊 이달의 접수 현황(도넛) — 확정 시안 A 의 도넛을 그대로 옮긴 «현황» 자리.
          수치·조각 길이는 stats.js 가 실제 접수 목록에서 «이번 달»만 골라 채운다(app.js 는 손대지 않는다).
@@ -256,7 +261,10 @@
       </figure>
     </div>
 
-    <div id="aStatusChips" class="chips wrap" role="group" aria-label="상태 필터"></div>
+    <!-- 상태 필터 — «한 개만» 고르는 줄(전체/접수/심사중/승인/반려). 줄바꿈 알약(.chips.wrap).
+         분야 칩(.chips.grid)과 «모양부터» 달라 역할이 헷갈리지 않는다. -->
+    <div class="chips-cap" id="aStatusCap">상태로 좁혀보기 <span class="chips-cap-sub">(하나만)</span></div>
+    <div id="aStatusChips" class="chips wrap" role="group" aria-labelledby="aStatusCap"></div>
     <div class="toolbar">
       <label for="aSearch" class="sr-only">사업명 · 신청자 · 연락처 · 접수번호 검색</label>
       <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="aSearch" class="search-input wide" type="search" placeholder="사업명 · 신청자 · 연락처 · 접수번호 검색" aria-label="사업명 · 신청자 · 연락처 · 접수번호 검색"></span>
@@ -280,20 +288,26 @@
   <!-- 섹션 1: 사업 관리 (기존) — 기본 탭이 신청 접수로 바뀌어 초기엔 숨김 -->
   <section id="secBenefits" class="content hidden" role="tabpanel" aria-labelledby="tabBenefits" hidden>
     <!-- 화면에는 탭 버튼이 제목 역할을 하므로 heading 은 보조기기 전용으로만 둔다 -->
-    <h2 class="sr-only">사업 관리</h2>
-    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>사업을 찾아 고치거나 새로 올립니다.</span></p>
+    <h2 class="sr-only">사업</h2>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span><b class="hint-tab">사업</b> — 사업을 찾아 고치거나 새로 올립니다.</span></p>
     <!-- 요약 띠 — 값은 app.js renderBSummary() 가 채운다(실제로 세는 수만 둔다). -->
     <div id="bSummary" class="sum-mini" hidden>
       <div class="kpi k-now"><b id="kpiBAll"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>전체 사업</span></div>
       <div class="kpi k-rev"><b id="kpiBCat"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>분야</span></div>
       <div class="kpi k-ok"><b id="kpiBNote"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>접수 안내 있음</span></div>
     </div>
-    <div id="catChips" class="chips wrap" role="group" aria-label="분야 필터"></div>
+    <!-- 분야 필터 — «여러 개» 고를 수 있는 격자(.chips.grid). 행·열이 맞아 눈이 편하다.
+         ⚠ 상태 필터(.chips.wrap, 알약 줄)와 «모양»으로 역할이 갈린다. 둘을 같은 모양으로 만들지 말 것. -->
+    <div class="chips-cap" id="catCap" hidden>분야로 좁혀보기 <span class="chips-cap-sub">(여러 개 가능)</span></div>
+    <div id="catChips" class="chips grid" role="group" aria-labelledby="catCap"></div>
     <div class="toolbar">
       <label for="search" class="sr-only">사업명 · 내용 · 담당팀 검색</label>
       <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="search" class="search-input wide" type="search" placeholder="사업명 · 내용 · 담당팀 검색" aria-label="사업명 · 내용 · 담당팀 검색"></span>
       <label for="sortSel" class="sr-only">정렬 기준</label>
-      <select id="sortSel" class="sort-select" aria-label="정렬 기준"><option value="seq">기본순</option><option value="name">사업명순</option></select>
+      <!-- 정렬 — 말투는 시민 제안 탭(#pSortSel «최신순/공감순»)과 맞춘다.
+           «최신순» = 마지막으로 «고친» 시각(updated_at) 기준. 방금 손본 사업이 맨 위로 온다.
+           updated_at 이 없는 옛 행은 created_at → id 순으로 안전하게 떨어진다(app.js benefitTime). -->
+      <select id="sortSel" class="sort-select" aria-label="정렬 기준"><option value="seq">기본순</option><option value="new">최신순</option><option value="name">사업명순</option></select>
       <span id="count" class="count" role="status" aria-live="polite"></span>
       <!-- 설계안: «새 사업 올리기»는 상단이 아니라 사업 목록 바로 위에 둔다.
            ⚠ id(btnAdd)는 그대로 — app.js bindUI() 가 이 id 로 연결한다. -->
@@ -312,8 +326,8 @@
 
   <!-- 섹션 2: 정책제안 관리 (신규) — 비활성 패널은 class 와 hidden 속성을 함께 걸어 보조기기에도 확실히 숨긴다 -->
   <section id="secProposals" class="content hidden" role="tabpanel" aria-labelledby="tabProposals" hidden>
-    <h2 class="sr-only">정책제안 관리</h2>
-    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>시민 제안을 검토하고 답변합니다. 블라인드 글도 여기서는 보입니다.</span></p>
+    <h2 class="sr-only">시민 제안</h2>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span><b class="hint-tab">시민 제안</b> — 시민 제안을 검토하고 답변합니다. 블라인드 글도 여기서는 보입니다.</span></p>
     <!-- 요약 띠 — 설계안 «통계는 각 탭 상단 요약 띠». 값은 app.js renderPSummary() 가 채운다.
          ⚠ 최종값은 .kpi-sr 에 먼저 넣고 .kpi-vis 만 카운트업한다(규격서 §14). -->
     <div id="pSummary" class="sum-mini" hidden>
@@ -321,8 +335,11 @@
       <div class="kpi k-rev"><b id="kpiPNew"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>검토 대기</span></div>
       <div class="kpi k-ok"><b id="kpiPDone"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>답변 완료</span></div>
     </div>
-    <div id="pStatusChips" class="chips wrap" role="group" aria-label="상태 필터"></div>
-    <div id="pCatChips" class="chips wrap mt-8" role="group" aria-label="분야 필터"></div>
+    <!-- 상태(하나만) = 알약 줄 · 분야(여러 개) = 격자. 접수 처리·사업 탭과 같은 규약. -->
+    <div class="chips-cap" id="pStatusCap">상태로 좁혀보기 <span class="chips-cap-sub">(하나만)</span></div>
+    <div id="pStatusChips" class="chips wrap" role="group" aria-labelledby="pStatusCap"></div>
+    <div class="chips-cap" id="pCatCap" hidden>분야로 좁혀보기 <span class="chips-cap-sub">(여러 개 가능)</span></div>
+    <div id="pCatChips" class="chips grid" role="group" aria-labelledby="pCatCap"></div>
     <div class="toolbar">
       <label for="pSearch" class="sr-only">제목 · 내용 · 닉네임 검색</label>
       <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="pSearch" class="search-input wide" type="search" placeholder="제목 · 내용 · 닉네임 검색" aria-label="제목 · 내용 · 닉네임 검색"></span>
@@ -525,13 +542,13 @@
         integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- 공통 버전·개선사항 단일 소스(앱 스크립트보다 먼저 로드) -->
-<script src="version.js?v=0.4.3"></script>
-<script src="config.js?v=0.4.3"></script>
+<script src="version.js?v=0.4.4"></script>
+<script src="config.js?v=0.4.4"></script>
 <!-- 서식 스토리지 공용 헬퍼(세 앱 공통). app.js 보다 먼저 로드 -->
-<script src="forms.js?v=0.4.3"></script>
+<script src="forms.js?v=0.4.4"></script>
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
-<script src="apply_client.js?v=0.4.3"></script>
-<script src="app.js?v=0.4.3"></script>
+<script src="apply_client.js?v=0.4.4"></script>
+<script src="app.js?v=0.4.4"></script>
 <!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
      CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.
        · tap.js   — 버튼 눌림 파동 + 햅틱(진동). 화면에 무엇을 그리지는 않는다.
@@ -540,13 +557,13 @@
        · icons.js — app.js 가 «만들어 내는» 화면의 이모지를 인라인 SVG 로 바꿔 끼운다.
          (app.js 를 고치지 않고 «그려진 뒤의 글자»만 바꾼다 — 세 앱이 글자 단위로 같아야 하는
           문자열까지 원본을 건드리지 않고 다룰 수 있다) -->
-<script src="tap.js?v=0.4.3"></script>
-<script src="icons.js?v=0.4.3"></script>
-<script src="stats.js?v=0.4.3"></script>
-<script src="a2hs.js?v=0.4.3"></script>
+<script src="tap.js?v=0.4.4"></script>
+<script src="icons.js?v=0.4.4"></script>
+<script src="stats.js?v=0.4.4"></script>
+<script src="a2hs.js?v=0.4.4"></script>
 
 <!-- PWA 서비스워커 등록 (상대경로 → /admin/ 하위에서만 동작, 시민앱과 분리) -->
 <!-- 서비스워커 등록 — CSP 적용을 위해 인라인 대신 별도 파일(sw-register.js)로 둔다 -->
-<script src="sw-register.js?v=0.4.3"></script>
+<script src="sw-register.js?v=0.4.4"></script>
 </body>
 </html>

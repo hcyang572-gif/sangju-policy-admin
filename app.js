@@ -1036,6 +1036,17 @@ function isMissingNoteColumn(error) {
   return code === "PGRST204" || (msg.includes("note") && /column|schema cache/.test(msg));
 }
 
+// 🏷 저장 payload 에서 categories 를 제거해야 하는 오류인지(컬럼 미생성) 판정.
+//   schema.sql 에는 처음부터 있는 컬럼이라 보통 일어나지 않지만, 서버가 옛 스키마일 때
+//   «사업 내용 전체가 저장 실패»로 날아가는 것을 막기 위한 마지막 안전망이다.
+function isMissingCatColumn(error) {
+  if (!error) return false;
+  const code = String(error.code || "");
+  const msg = String(error.message || "").toLowerCase();
+  return (code === "PGRST204" || code === "42703") &&
+         (msg.includes("categor") || msg.includes("schema cache"));
+}
+
 async function loadBenefits() {
   showSkeleton("#list", 4);           // 첫 불러오기에만
   const { data, error } = await sb.from("benefits").select("*").order("seq", { nullsFirst: false }).order("id");
@@ -1049,7 +1060,7 @@ async function loadBenefits() {
   await detectNoteColumn(ALL);          // 📌 접수 안내 컬럼이 준비됐는지 확인
   RT_PENDING = 0; syncRtBanners();     // 새로 불러왔으니 «밀린 알림»도 지운다
   CATS = [...new Set(ALL.flatMap((r) => r.categories || []))].sort();
-  $("#dbInfo").textContent = `사업 ${ALL.length}건 · 실시간`;
+  renderDbInfo();      // 「사업 N건 · 실시간」 — 연결이 끊겨 있으면 그 사실도 이 한 줄이 알린다
   renderBSummary();
   renderCats();
   render();
@@ -1110,17 +1121,42 @@ function subscribeRealtime() {
     .subscribe((status) => setRealtimeDot(status === "SUBSCRIBED"));
 }
 
-// 실시간 연결 표시 갱신 — 색·글자·title 을 «함께» 바꾼다.
-// 예전에는 CSS 클래스만 토글해서, 연결이 끊겨도 aria-label 이 "실시간 연결됨"으로
-// 하드코딩돼 화면낭독기에 «거짓 정보»가 전달됐다(그리고 색만으로 상태를 알렸다).
-function setRealtimeDot(ok) {
-  const box = $("#realtimeDot");
+// 실시간 연결 표시 갱신
+// ─────────────────────────────────────────────────────────────────────
+// 2026-08-19 양호창님 지시로 헤더의 「실시간 연결됨」 알약(#realtimeDot)을 «화면에서 뺐다».
+//   (좁은 폰에서 그 알약 때문에 계정 버튼이 아래 줄로 밀려 헤더가 두 줄이 됐다)
+// 그렇다고 «연결 끊김»을 안 알리면 시민 신청이 실시간으로 안 들어오는 것을 아무도 모른다.
+// → 두 가지로 대체한다.
+//   ① 헤더 부제(#dbInfo)의 «글자»를 「사업 N건 · 실시간」 ↔ 「… · 실시간 연결 끊김」 으로 바꾼다.
+//      눈에 띄게 튀지 않으면서 화면 어디서나 항상 보이는 자리다. 색이 아니라 «글자»가 정보다.
+//   ② 상태가 «바뀌는 순간»에만 낭독기(#liveStatus)로 알린다. 매번 알리면 소음이 된다.
+// ⚠ 요소(#realtimeDot)를 지웠으므로 아래 코드는 그 요소를 더 이상 찾지 않는다.
+//    옛 요소가 남아 있는 캐시본에서도 죽지 않도록(널 참조) 애초에 참조하지 않는 구조로 두었다.
+let RT_OK = true;                     // 지금 실시간 연결이 살아 있는가(초기값 = 살아 있음)
+let RT_OK_KNOWN = false;              // 한 번이라도 상태를 받았는가(첫 통보는 낭독하지 않는다)
+
+// 헤더 부제 = 「사업 N건 · 실시간(또는 실시간 연결 끊김)」. 두 곳에서 쓰므로 한 함수로 묶는다.
+function renderDbInfo() {
+  const box = $("#dbInfo");
   if (!box) return;
-  const msg = ok ? "실시간 연결됨" : "실시간 연결 끊김";
-  box.classList.toggle("off", !ok);
-  box.title = msg;
-  const t = box.querySelector(".rt-dot-text");
-  if (t) t.textContent = msg;      // role="status" → 바뀌는 순간 낭독된다
+  const state = RT_OK ? "실시간" : "실시간 연결 끊김";
+  // 아직 사업 목록을 한 번도 못 받았으면 «0건»이라고 단정하지 않는다(index.html 초기 문구를 유지)
+  box.textContent = ALL.length ? `사업 ${ALL.length}건 · ${state}` : `사업 관리 (${state})`;
+  box.classList.toggle("rt-off", !RT_OK);
+}
+
+function setRealtimeDot(ok) {
+  ok = !!ok;
+  const changed = RT_OK_KNOWN && ok !== RT_OK;
+  RT_OK = ok;
+  RT_OK_KNOWN = true;
+  renderDbInfo();
+  // 상태가 «바뀐 순간»에만 알린다(첫 연결 성공은 굳이 알리지 않는다)
+  if (changed) {
+    announce(ok
+      ? "실시간 연결이 복구되었습니다."
+      : "실시간 연결이 끊겼습니다. 새 신청·변경이 자동으로 나타나지 않을 수 있습니다. 화면을 새로고침해 주세요.");
+  }
 }
 
 /* 📊 요약 띠 — 설계안 «통계는 각 탭 상단 요약 띠».
@@ -1147,6 +1183,8 @@ function renderPSummary() {
 
 function renderCats() {
   const box = $("#catChips"); box.innerHTML = "";
+  // 분야가 하나도 없으면 이름표(「분야로 좁혀보기」)만 덩그러니 남는다 → 함께 감춘다
+  const cap = $("#catCap"); if (cap) cap.hidden = !CATS.length;
   CATS.forEach((cat) => {
     const c = el("button", "chip" + (SELCATS.has(cat) ? " on" : ""));
     c.type = "button";
@@ -1156,6 +1194,18 @@ function renderCats() {
     c.onclick = () => { SELCATS.has(cat) ? SELCATS.delete(cat) : SELCATS.add(cat); page = 0; renderCats(); render(); };
     box.appendChild(c);
   });
+}
+
+// 🕘 사업 한 건의 «최신 시각»(밀리초). 최신순 정렬에만 쓴다.
+//    updated_at(마지막 수정) → created_at(등록) → id 순으로 안전하게 떨어진다.
+//    ⚠ 값이 없거나 형식이 이상해도 «절대 NaN 을 돌려주지 않는다» — NaN 이 섞이면
+//      Array.sort 의 비교가 일관성을 잃어 목록 순서가 브라우저마다 달라진다.
+function benefitTime(r) {
+  if (!r) return 0;
+  const t = Date.parse(r.updated_at || r.created_at || "");
+  if (!isNaN(t)) return t;
+  const id = Number(r.id);
+  return isNaN(id) ? 0 : id;          // 시각이 아예 없는 옛 행은 id(증가값)로 대신 줄 세운다
 }
 
 function render() {
@@ -1172,6 +1222,9 @@ function render() {
     return true;
   });
   if (sortKey === "name") rows.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+  // 🕘 최신순 — «마지막으로 고친 시각» 내림차순. 방금 등록·수정한 사업이 맨 위로 온다.
+  //    (기본순 seq 는 엑셀 순번 그대로라, 새로 올린 사업이 목록 한복판에 묻혀 찾기 어려웠다)
+  else if (sortKey === "new") rows.sort((a, b) => benefitTime(b) - benefitTime(a));
   $("#count").textContent = `총 ${rows.length}건`;
   const list = $("#list");
   if (!rows.length) { list.innerHTML = '<div class="empty">조건에 맞는 사업이 없습니다.</div>'; $("#pager").innerHTML = ""; return; }
@@ -1241,6 +1294,184 @@ function renderPager(total, pages) {
 // [화면 라벨, 컬럼명, 여러 줄 여부, 도움말(선택), 강조박스 여부(선택)]
 // ※ 📌 접수 안내(note)는 «지금 신청 가능한지»를 좌우하므로 긴 본문 칸보다 «위»에 둔다
 //    (PC앱 webui/app.js EDIT_FIELDS 와 같은 순서·같은 라벨).
+/* ════════════════════════════════════════════════════════════════════════
+   🏷 분야(카테고리) 자동 분류 — PC config.py 의 규칙을 «그대로» 옮긴 것
+   ────────────────────────────────────────────────────────────────────────
+   왜 필요한가 (2026-08-19 확인된 결함):
+     공무원앱의 「새 사업 올리기」에는 분야를 고르는 자리가 «아예 없었다».
+     benefits.categories 가 빈 배열로 저장되고, 시민앱은 분야 버튼으로 사업을 찾으므로
+     이렇게 올린 사업은 «분야 검색에 영영 안 걸렸다». (엑셀→클라우드 동기화로 들어온
+     사업만 cloud_sync.py 가 config.categories_for_record() 로 채워 주고 있었다.)
+
+   어떻게 고쳤나 — «자동으로 채우고, 그래도 비면 못 넘어가게» 둘 다 한다.
+     ① 사업명·지원 대상·사업 내용에서 키워드를 찾아 «미리 골라» 둔다(아래 suggestCategories).
+     ② 담당자가 그 결과를 눈으로 보고 고칠 수 있다(칩을 눌러 켜고 끈다).
+     ③ 저장할 때 하나도 안 골랐으면 한 번 더 자동 분류를 돌리고,
+        그래도 비면 «저장을 막고» 분야를 고르게 한다(빈 분야로 저장되는 길을 없앤다).
+
+   ⚠⚠ 단일 출처 주의 — 아래 표는 PC `config.py` 의 POLICY_CATEGORIES 를 옮긴 «사본»이다.
+      정적 웹앱이라 파이썬을 부를 방법이 없어 어쩔 수 없이 둔 사본이며,
+      config.py 를 고치면 «여기도 같이» 고쳐야 한다(한쪽만 고치면 PC·시민앱과 분류가 갈린다).
+      ⛔ 여기서 카테고리 «이름»을 새로 지어내지 마세요 — 이름이 한 글자라도 다르면
+         시민앱 분야 버튼과 안 맞아 그 사업이 검색에서 사라집니다.
+      ⛔ config.py 의 CATEGORY_OVERRIDES(사업명별 교체 보정맵 100여 건)는 옮기지 않았다.
+         그것은 «엑셀에서 들어오는 기존 사업명»을 바로잡는 표라, 담당자가 손으로 올리는
+         새 사업에는 해당이 없다. 필요하면 담당자가 칩으로 직접 고르면 된다.
+   ════════════════════════════════════════════════════════════════════════ */
+const POLICY_CATEGORIES = {
+  "👶 임신·출산": ["임신", "임산부", "임신부", "출산", "출생", "난임", "산모", "산후"],
+  "🧸 영유아·보육": ["영유아", "아동", "어린이", "보육", "유아", "어린이집", "유치원", "아이돌봄", "영유아돌봄", "아동돌봄"],
+  "📚 청소년·교육": ["청소년", "학생", "대학생", "초등", "중등", "고등학교", "고등학생", "학교", "장학", "교육비", "교육활동비", "방과후", "학용품", "교복", "수업료",
+               "입학준비", "돌봄교실", "진로", "체험학습"],
+  "🎓 청년": ["청년", "20대", "30대", "대학생", "대학교", "취준생"],
+  "👩 여성": ["여성", "경력단절", "여성기업"],
+  "👴 노인·어르신": ["노인", "어르신", "65세 이상", "고령", "경로", "치매", "장수사진"],
+  "♿ 장애인": ["장애", "장애인", "발달장애", "중증장애"],
+  "👨‍👩‍👧‍👦 다자녀·가족": ["다자녀", "셋째", "둘째", "세자녀", "다둥이", "가족", "입양"],
+  "👤 1인가구": ["1인가구", "1인 가구", "독거"],
+  "👩‍👦 한부모·조손": ["한부모", "조손", "미혼모", "미혼부"],
+  "🌏 다문화·외국인": ["다문화", "결혼이주", "외국인", "이민자", "귀화"],
+  "💰 저소득·기초수급": ["기초생활", "기초수급", "수급자", "수급권자", "차상위", "저소득", "빈곤", "생계", "소득재산", "소득,재산", "소득·재산"],
+  "🏥 건강·의료": ["의료", "질환", "환자", "입원", "보건", "건강", "수술", "요양", "의료급여", "예방접종", "접종", "진료비", "검사비", "재활", "치료비", "약제비",
+              "구강"],
+  "🌾 농림축수산업": ["농업", "축산", "임업", "어업", "농가", "농민", "농산물", "영농", "농지", "농기계", "농장"],
+  "🏡 귀농·귀촌": ["귀농", "귀촌", "귀어", "귀산촌", "농촌 정착", "농촌정착", "전원생활", "농촌 이주", "농촌이주"],
+  "🏪 소상공인·기업": ["소상공인", "중소기업", "스타트업", "소기업", "창업", "시장상인", "상인회", "전통시장", "자영업", "가맹점", "점포", "기업체", "공장", "제조업"],
+  "💼 일자리·구직": ["구직", "실업", "실직", "근로자", "재직자", "일자리", "고용", "취업", "노동", "자격증", "직업훈련", "채용", "면접", "인턴", "구인"],
+  "🏠 주거·부동산": ["무주택", "전세", "월세", "주거", "주택", "임대", "집수리", "집 마련", "이사비", "이사지원", "이주비", "기숙사", "빈집", "슬레이트",
+               "화장실 개선"],
+  "🎖️ 보훈·유공자": ["유공자", "보훈", "참전", "제대군인", "독립유공자"],
+  "🎨 문화·체육·관광": ["문화예술", "문화행사", "문화시설", "체육", "관광", "예술", "도서관", "스포츠", "여행", "공연", "전시", "평생학습", "문화강좌", "문화누리"],
+  "🚌 교통·안전": ["교통", "안전", "자동차", "대중교통", "자전거", "재난", "피해", "방범", "폭염", "한파", "차량", "운전면허", "횡단보도", "방재", "소방"],
+  "🌱 환경·에너지": ["환경", "에너지", "탄소", "친환경", "쓰레기", "폐기물", "종량제", "폐건전지", "종이팩", "페트병", "재활용", "분리배출", "자원순환", "전기차",
+               "수소차", "경유차", "폐차", "태양광", "도시가스", "새활용", "그린리모델링"],
+  "🎉 행사·축제·공연": ["행사", "축제", "공연", "전시", "박람회", "페스티벌", "체험행사"],
+  "📢 모집·공모": ["모집", "공모", "공모전", "선발", "참가자", "참가 신청"],
+};
+const CATEGORY_KEYS = Object.keys(POLICY_CATEGORIES);
+
+// 분류용 글에서 걷어낼 «잡음 문구» — config.py _CATEGORY_NOISE_RES 와 같은 값.
+//   이 문구들을 지우지 않으면 자격 요건 표기가 키워드에 부분매칭돼 엉뚱한 분야가 붙는다.
+//   예) "생계·의료·주거·교육 급여 수급자" → 📚 청소년·교육 / 🏠 주거·부동산 오분류
+//   [정규식, 그 자리에 넣을 글] 짝으로 둔다. 마지막 줄이 짝이 필요한 이유는 주석 참조.
+const CATEGORY_NOISE_RES = [
+  [/생계\s*[·ㆍ․‧,、/]\s*의료\s*[·ㆍ․‧,、/]\s*주거\s*[·ㆍ․‧,、/]\s*교육\s*급여/g, " "],
+  [/교육\s*[·ㆍ․‧,、/]\s*주거\s*[·ㆍ․‧,、/]\s*의료\s*[·ㆍ․‧,、/]\s*생계\s*급여/g, " "],
+  [/이후\s*출생/g, " "],           // '2024.1. 이후 출생 자녀' 는 나이 요건이지 출산지원이 아니다
+  [/출생\s*[연년]도/g, " "],
+  // '창업' 만 지우고 «앞의 농업·영농·귀농은 남긴다» — 🌾·🏡 분류는 그대로 살아야 하기 때문.
+  // (config.py 는 뒤돌아보기(?<=농업)창업 로 같은 일을 한다. 뒤돌아보기를 못 읽는 옛 사파리에서도
+  //  똑같이 동작하도록 여기서는 «잡아서 되돌려 넣는» 방식을 쓴다 — 결과는 완전히 같다)
+  //   (config.py 는 붙여 쓴 «영농창업» 만 본다. 여기서는 담당자가 손으로 「영농 창업」처럼
+  //    띄어 쓸 수 있으므로 \s* 를 넣었다 — 같은 뜻을 더 넓게 잡을 뿐, 분류 결과의 방향은 같다)
+  [/(농업|영농|귀농)\s*창업/g, "$1 "],
+];
+// 「기준중위소득 N% 이하」에서 N ≤ 100 이면 사실상 소득 요건 → 💰 저소득·기초수급.
+// (120·130·180% 는 저소득 요건이 아니라 일반 지원 상한이므로 제외)
+const MEDIAN_INCOME_RE = /중위\s*소득\s*(\d{2,3})\s*%/g;
+
+/** 사업 입력값에서 «붙일 만한» 분야를 골라 돌려준다(config.categories_for_record 와 같은 규칙).
+ *  ⚠ config.py 와 «일부러 다른» 점이 하나 있다 — 읽는 글의 범위.
+ *     config.py 는 「사업명 + 대상자 상세기준」만 본다(엑셀에는 그 칸이 늘 채워져 있다).
+ *     여기서는 「사업명 + 지원 대상 + 사업 내용」을 본다. 담당자가 손으로 올리는 새 사업은
+ *     지원 대상 칸을 비워 두는 일이 잦아, 그대로 두면 «분야를 하나도 못 찾는» 경우가 많다.
+ *     넓게 잡아 «미리 골라 주고», 담당자가 눈으로 보고 끄는 편이 안전하다(빈 분야로 저장되는 것보다).
+ */
+function suggestCategories(rec) {
+  rec = rec || {};
+  let text = [rec.name, rec.target, rec.content].map((v) => String(v || "")).join(" ");
+  CATEGORY_NOISE_RES.forEach((pair) => { text = text.replace(pair[0], pair[1]); });
+  const extra = new Set();
+  let m;
+  MEDIAN_INCOME_RE.lastIndex = 0;
+  while ((m = MEDIAN_INCOME_RE.exec(text)) !== null) {
+    const pct = parseInt(m[1], 10);
+    if (!isNaN(pct) && pct <= 100) { extra.add("💰 저소득·기초수급"); break; }
+  }
+  return CATEGORY_KEYS.filter((cat) =>
+    extra.has(cat) || POLICY_CATEGORIES[cat].some((k) => text.indexOf(k) !== -1));
+}
+
+// 편집 모달에서 «지금 골라 둔» 분야. 모달을 열 때마다 새로 채운다.
+let EDIT_CATS = new Set();
+
+// 칩으로 보여 줄 분야 목록 — 기본 26종 + «이미 붙어 있는데 목록에 없는» 것.
+//   왜 더하나: 목록에 없는 분야를 그냥 버리면, 그 사업을 한 번 수정하는 것만으로
+//   시민앱에서 그 분야로 찾던 길이 «조용히» 끊긴다. 모르는 값도 보여 주고 지키게 한다.
+function editCatKeys() {
+  const extra = [...EDIT_CATS, ...CATS].filter((c) => c && CATEGORY_KEYS.indexOf(c) === -1);
+  return CATEGORY_KEYS.concat([...new Set(extra)].sort());
+}
+
+// 분야 칩 다시 그리기(편집 모달 안). 켜고 끄기는 aria-pressed 로도 알린다(색 의존 금지).
+function renderEditCats() {
+  const box = $("#editCatChips");
+  if (!box) return;
+  box.innerHTML = "";
+  editCatKeys().forEach((cat) => {
+    const on = EDIT_CATS.has(cat);
+    const c = el("button", "chip" + (on ? " on" : ""));
+    c.type = "button";
+    c.textContent = cat;
+    c.setAttribute("aria-pressed", on ? "true" : "false");
+    // ★ «복수 선택» — 누를 때마다 그 분야 하나만 켜고 끈다(다른 선택은 그대로 남는다).
+    //   ⛔ 드롭다운(select)으로 바꾸지 마세요. 한 사업이 여러 분야에 걸치는 일이 흔합니다
+    //      (예: 청년 + 주거 + 저소득). 2026-08-19 양호창님 조건.
+    c.onclick = () => {
+      if (EDIT_CATS.has(cat)) EDIT_CATS.delete(cat); else EDIT_CATS.add(cat);
+      renderEditCats();
+      setEditCatErr("");          // 하나라도 고르면 오류 안내를 지운다
+      refreshEditCatStale();      // 방금 켠 분야가 «추천 남은 것»에서 빠지도록 다시 계산
+    };
+    box.appendChild(c);
+  });
+  updateEditCatCount();
+}
+// 분야 미선택 오류 — 브라우저 alert() 이 아니라 «화면 안» 안내로 알린다(PC앱 webui 와 같은 말투).
+function setEditCatErr(msg) {
+  const box = $("#editCatErr"), txt = $("#editCatErrText");
+  if (!box || !txt) return;
+  txt.textContent = msg || "";        // ⚠ 표식(SVG)은 그대로 두고 «글»만 갈아 끼운다
+  box.hidden = !msg;
+  if (msg) announce(msg);             // role="alert" 와 별개로 라이브영역에도 한 번 실어 보낸다
+}
+function updateEditCatCount() {
+  const n = $("#editCatCount");
+  // 몇 개를 골랐는지 «수»로 알린다 — 복수 선택이라는 사실이 화면에서도 드러난다.
+  if (n) n.textContent = EDIT_CATS.size ? `분야 ${EDIT_CATS.size}개 선택됨` : "아직 고르지 않았습니다";
+  // «작성 중 내용 지킴»(formSnapshot)은 input/textarea/select 만 본다 → 고른 결과를 숨은 칸에 적어 둔다.
+  const s = $("#editCatState");
+  if (s) s.value = [...EDIT_CATS].sort().join("|");
+}
+// 지금 입력칸에 적힌 내용으로 분야를 «다시» 자동 분류한다(담당자가 누를 때 + 저장 직전 마지막 방어).
+function autofillEditCats() {
+  const get = (k) => { const e = $(`#f_${k}`); return e ? e.value : ""; };
+  const found = suggestCategories({ name: get("name"), target: get("target"), content: get("content") });
+  found.forEach((c) => EDIT_CATS.add(c));      // 담당자가 손으로 고른 것은 지우지 않는다(더하기만)
+  renderEditCats();
+  return found;
+}
+
+/* 🔁 «수정» 화면에서만 — 사업명·지원 대상·사업 내용을 고쳤을 때 분야를 다시 보라고 알린다.
+   왜: 지금까지 공무원앱은 지원 대상을 고쳐도 categories 가 옛 값 그대로 저장됐다(🟢곳간 지적).
+       담당자가 «분야도 같이 봐야 한다»는 것을 알 방법이 화면에 없었던 것이 원인이다.
+   ⚠ 모달을 «열자마자» 띄우지 않는다 — 저장된 분야는 보정맵(CATEGORY_OVERRIDES)으로 좁혀 둔
+      경우가 많아, 열 때마다 뜨면 «늘 뜨는 잔소리»가 되어 아무도 안 읽는다.
+      담당자가 실제로 글을 «고친 뒤», 그리고 «아직 안 고른 분야가 있을 때»만 뜬다. */
+let EDIT_TEXT_TOUCHED = false;
+function refreshEditCatStale() {
+  const box = $("#editCatStale"), txt = $("#editCatStaleText");
+  if (!box || !txt) return;
+  if (!EDIT_TEXT_TOUCHED) { box.hidden = true; return; }
+  const get = (k) => { const e = $(`#f_${k}`); return e ? e.value : ""; };
+  const missing = suggestCategories({ name: get("name"), target: get("target"), content: get("content") })
+    .filter((c) => !EDIT_CATS.has(c));
+  if (!missing.length) { box.hidden = true; return; }
+  txt.textContent = `고치신 내용에는 «${missing.join(", ")}» 도 어울립니다. `
+    + `맞다면 «자동 분류로 채우기»를 누르거나 아래에서 직접 켜 주세요.`;
+  box.hidden = false;
+}
+
 const FIELDS = [
   ["사업명", "name", false], ["담당팀", "team", false], ["담당 연락처", "contact", false],
   ["담당자 이메일", "manager_email", false],
@@ -1355,28 +1586,118 @@ function openEdit(r) {
       (multi ? `<textarea id="${fid}" class="form-textarea" data-k="${key}"${aria}>${esc(v)}</textarea>`
              : `<input id="${fid}" class="form-input" data-k="${key}"${aria} value="${esc(v)}">`) + `</div>`;
   });
+  // 🏷 분야(카테고리) — 새 사업·수정 «둘 다»에 둔다.
+  //    ⛔ 이 자리를 없애지 마세요. 없던 시절에는 공무원앱으로 올린 사업의 categories 가
+  //       빈 배열이라 시민앱 «분야로 찾기»에서 통째로 사라졌습니다(2026-08-19 확인).
+  html += `<div class="field">
+      <div class="field-label" id="editCatLab">🏷 분야${r
+        ? ` <span class="field-opt">(여러 개 고를 수 있습니다 · 비워 두면 자동으로 분류합니다)</span>`
+        : ` <span class="req-note">(필수 · 하나 이상 · 여러 개 고를 수 있습니다)</span>`}</div>
+      <p class="field-hint" id="editCatHint">시민이 <b>«분야로 찾기»</b>에서 이 사업을 만나는 길입니다. 칩을 눌러 켜고 끕니다 — <b>여러 개</b>를 동시에 고를 수 있습니다.${r
+        ? ` 비워 두고 저장하면 사업명·내용을 보고 자동으로 분류합니다.`
+        : ` <b>하나 이상</b> 골라야 저장됩니다. «자동 분류로 채우기»를 누르면 사업명·내용을 보고 골라 드립니다(고른 뒤 확인해 주세요).`}</p>
+      <div class="forms-upload">
+        <button type="button" id="editCatAuto" class="top-btn ghost">🔄 자동 분류로 채우기</button>
+        <span class="forms-status" id="editCatCount" role="status" aria-live="polite"></span>
+      </div>
+      <!-- ⛔ 드롭다운으로 바꾸지 마세요 — 복수 선택이 «필수 조건»입니다(2026-08-19 양호창님).
+           칩마다 aria-pressed 를 켜고 꺼서, 낭독기에도 «여러 개를 켜고 끄는 자리»로 전달된다.
+           키보드는 Tab 으로 칩 사이를 옮기고 Enter·Space 로 켜고 끈다(button 기본 동작 그대로). -->
+      <div id="editCatChips" class="chips grid mt-8" role="group" aria-labelledby="editCatLab" aria-describedby="editCatHint"></div>
+      <!-- 미선택 오류 — 브라우저 alert() 대신 «화면 안» 경고. role="alert" 이라 뜨는 순간 낭독된다. -->
+      <p class="field-err" id="editCatErr" role="alert" hidden><span aria-hidden="true">⚠</span><span id="editCatErrText"></span></p>
+      <!-- 🔁 «내용을 고쳤는데 분야는 옛 값 그대로» 를 막는 알림(수정 화면에서만 뜬다).
+           지원 대상·사업 내용을 손보면 어울리는 분야가 달라지는데, 칩을 안 건드리면
+           예전 분야가 그대로 저장돼 시민앱 분야 검색이 어긋난다(2026-08-19 🟢곳간 지적). -->
+      <p class="field-note" id="editCatStale" role="status" aria-live="polite" hidden><span aria-hidden="true">🔄</span><span id="editCatStaleText"></span></p>
+      <!-- 칩은 <button> 이라 «작성 중 내용 지킴»(formSnapshot) 이 못 본다.
+           고른 결과를 이 숨은 칸에 같이 적어 두어, 분야만 바꾸고 닫아도 되묻게 한다. -->
+      <input type="hidden" id="editCatState" value="">
+    </div>`;
   html += `<div class="modal-actions"><button id="mSave" class="top-btn solid">💾 저장</button>` +
     (r ? `<button id="mDel" class="top-btn danger">🗑 삭제</button>` : ``) + `</div>`;
-  // 📎 필요서류 서식 — 저장된 사업(r)에서만. 새 사업은 먼저 저장해야 키가 생긴다.
-  if (r) {
+  // 📎 필요서류 서식 — 저장된 사업(r)은 «바로 등록», 새 사업은 «저장 시 함께 올림».
+  //    새 사업에서 곧바로 올릴 수 없는 이유: 서식은 benefit_key(= 공백 뺀 사업명)로 이어지는데,
+  //    사업명은 저장 버튼을 누르는 순간까지 얼마든지 바뀐다. 먼저 올리면 «옛 이름»에 붙어
+  //    영영 찾을 수 없는 파일이 된다. → 목록에 담아 뒀다가 저장이 성공한 «뒤에» 올린다.
+  if (window.SangjuForms) {
     html += `<div class="forms-section" id="formsSection">
       <div class="field-label">📎 필요서류 서식</div>
-      <p class="field-hint">시민이 상세 화면에서 내려받을 서식 파일입니다. 허용: hwp·hwpx·pdf·doc(x)·xls(x)·ppt(x)·jpg·png·zip·txt · 최대 10MB.</p>
-      <ul class="forms-list" id="formsList" aria-live="polite"><li class="forms-empty">불러오는 중…</li></ul>
+      <p class="field-hint">시민이 상세 화면에서 내려받을 서식 파일입니다. 허용: hwp·hwpx·pdf·doc(x)·xls(x)·ppt(x)·jpg·png·zip·txt · 최대 10MB.${
+        r ? "" : "<br>새 사업은 <b>저장한 뒤에</b> 자동으로 함께 올라갑니다(사업명이 정해져야 파일을 이을 수 있습니다)."}</p>
+      <ul class="forms-list" id="formsList" aria-live="polite"><li class="forms-empty">${r ? "불러오는 중…" : "아직 고른 서식이 없습니다."}</li></ul>
       <div class="forms-upload">
         <input type="file" id="formsFile" class="forms-file"
           accept=".hwp,.hwpx,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip,.txt"
           aria-label="등록할 서식 파일 선택">
-        <button type="button" id="formsUpload" class="top-btn solid">⬆ 서식 등록</button>
+        <button type="button" id="formsUpload" class="top-btn solid">${r ? "⬆ 서식 등록" : "➕ 목록에 담기"}</button>
       </div>
       <p class="forms-status" id="formsStatus" role="status" aria-live="polite"></p>
     </div>`;
   }
   $("#mBody").innerHTML = html;
+
+  // 분야 칩 채우기.
+  //   · 수정  = 지금 붙어 있는 분야를 그대로 켜 둔다(모르는 값도 버리지 않는다 — editCatKeys 참조).
+  //   · 새 사업 = «비운 채»로 시작한다. 담당자가 저장 전에 «직접» 고르는 것이 이 화면의 요구사항이라
+  //     (2026-08-19 양호창님 결정) 미리 채워 두면 확인 없이 그대로 저장되기 때문이다.
+  //     대신 「자동 분류로 채우기」 버튼 한 번으로 후보를 받아 보고 고칠 수 있다.
+  EDIT_CATS = new Set(r && Array.isArray(r.categories) ? r.categories.filter(Boolean) : []);
+  EDIT_TEXT_TOUCHED = false;
+  renderEditCats();
+  setEditCatErr("");
+  refreshEditCatStale();
+  // 🔁 «수정» 화면에서만 — 분류에 쓰이는 세 칸을 지켜보다가, 고치면 분야를 다시 보라고 알린다.
+  //    새 사업은 어차피 «하나 이상 필수»라 따로 알릴 것이 없다.
+  if (r) ["name", "target", "content"].forEach((k) => {
+    const box = $(`#f_${k}`);
+    if (box) box.addEventListener("input", debounce(() => {
+      EDIT_TEXT_TOUCHED = true;
+      refreshEditCatStale();
+    }, 400));
+  });
+  $("#editCatAuto").onclick = () => {
+    const found = autofillEditCats();
+    setEditCatErr("");
+    refreshEditCatStale();
+    announce(found.length
+      ? `분야 ${found.length}개를 자동으로 골랐습니다. 맞는지 확인해 주세요.`
+      : "사업명·내용에서 알아볼 수 있는 분야가 없습니다. 직접 골라 주세요.");
+  };
+
   $("#mSave").onclick = async () => {
+    const saveBtn = $("#mSave");
     const obj = {};
     document.querySelectorAll("#mBody [data-k]").forEach((e) => { obj[e.dataset.k] = e.value; });
     if (!(obj.name || "").trim()) { announce("사업명을 입력하세요."); alert("사업명을 입력하세요."); const nm = $("#f_name"); if (nm) nm.focus(); return; }
+    // 🏷 분야 — 새 사업과 수정의 규칙이 «다르다»(2026-08-19 양호창님 결정, PC앱 webui 와 동일).
+    //   · 새 사업 : 하나 이상 «직접» 골라야 저장된다. 안 골랐으면 화면 안 오류로 알리고 멈춘다.
+    //     (키워드 자동분류만 믿으면 「문화누리 이용권 지원」·「상주 화장품 산업 육성」처럼
+    //      한 개도 안 붙는 사업이 생겨, 시민앱 분야 검색에서 영영 빠진다 — 실측 확인됨)
+    //   · 수정   : 강제하지 않는다. 비워 두면 예전처럼 자동분류 결과로 채워 저장한다.
+    if (!r && !EDIT_CATS.size) {
+      setEditCatErr("분야를 하나 이상 골라 주세요. 분야가 없으면 시민 앱의 «분야로 찾기»에서 이 사업이 보이지 않습니다.");
+      const c = $("#editCatChips button"); if (c) c.focus();     // 초점을 «고쳐야 할 자리»로 옮긴다
+      return;                                                    // ⛔ 여기서 alert() 을 쓰지 말 것
+    }
+    if (r && !EDIT_CATS.size) autofillEditCats();
+    // ── 저장 형식 (2026-08-19 🟢곳간 확정) ────────────────────────────────
+    //   클라우드 benefits.categories 는 «text[]» → 고른 키를 그대로 «배열»로 넣는다.
+    //   ⛔ ", " 로 이어 붙인 «한 줄 문자열»로 바꾸지 마세요 — 그 표기는 «엑셀 한 칸» 전용이고
+    //      (config.categories_to_cell), 클라우드에 넣으면 통째로 «분야 이름 한 개»가 됩니다.
+    //   값은 POLICY_CATEGORIES 키 원문(이모지·가운뎃점·띄어쓰기 포함) 그대로다 —
+    //   PC cloud_sync.sync_benefits 도, 시민앱 adaptCloudRow 도 같은 문자열을 읽는다.
+    obj.categories = [...EDIT_CATS];
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      await saveBenefit(r, obj);
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  };
+
+  // 저장 본체 — 위 onclick 이 길어져 흐름이 안 보이게 되므로 따로 뺐다(동작은 그대로).
+  async function saveBenefit(r, obj) {
     if (r) {
       // 낙관적 잠금: 내가 연 이후 다른 담당자가 먼저 수정했는지 updated_at으로 확인
       let { data, error } = await sb.from("benefits")
@@ -1385,6 +1706,12 @@ function openEdit(r) {
       // (사업 내용 전체가 저장 실패로 날아가는 것보다, 접수 안내만 못 담는 편이 낫다)
       if (error && isMissingNoteColumn(error) && NOTE_KEY in obj) {
         NOTE_OK = false; delete obj[NOTE_KEY];
+        ({ data, error } = await sb.from("benefits")
+          .update(obj).eq("id", r.id).eq("updated_at", r.updated_at).select());
+      }
+      // 🏷 categories 컬럼이 없는 옛 스키마라면 그 칸만 빼고 한 번 더(사업 내용이 통째로 날아가지 않게)
+      if (error && isMissingCatColumn(error) && "categories" in obj) {
+        delete obj.categories;
         ({ data, error } = await sb.from("benefits")
           .update(obj).eq("id", r.id).eq("updated_at", r.updated_at).select());
       }
@@ -1397,18 +1724,28 @@ function openEdit(r) {
         return;
       }
     } else {
-      let { error } = await sb.from("benefits").insert(obj);
+      // 새 사업 — 저장된 «행»을 돌려받는다(.select()). 그 행이 있어야 뒤이어 서식을 올릴 수 있다.
+      let { data, error } = await sb.from("benefits").insert(obj).select();
       if (error && isMissingNoteColumn(error) && NOTE_KEY in obj) {
         NOTE_OK = false; delete obj[NOTE_KEY];
-        ({ error } = await sb.from("benefits").insert(obj));
+        ({ data, error } = await sb.from("benefits").insert(obj).select());
+      }
+      // 🏷 categories 컬럼이 없는 옛 스키마라면 그 칸만 빼고 한 번 더(사업 자체는 저장되게)
+      if (error && isMissingCatColumn(error) && "categories" in obj) {
+        delete obj.categories;
+        ({ data, error } = await sb.from("benefits").insert(obj).select());
       }
       if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
+      // 📎 「저장 시 함께 올림」으로 담아 둔 서식을 «지금» 올린다(사업명이 확정된 뒤).
+      //    ⚠ 여기서 실패해도 사업 저장은 이미 끝났다 — 되돌리지 않고 «무엇이 안 올라갔는지»만 알린다.
+      const saved = (data && data[0]) || { name: obj.name };
+      await uploadPendingForms(saved);
     }
     closeModal($("#modal"));
     showDoneCheck("저장했습니다");
     announce("저장되었습니다.");
     await loadBenefits();
-  };
+  }
   if (r) $("#mDel").onclick = async () => {
     // 되돌릴 수 없는 삭제 — 초점은 «취소»에 놓인다(askConfirm 규약).
     const ok = await askConfirm({
@@ -1424,7 +1761,8 @@ function openEdit(r) {
     announce("삭제되었습니다.");
     await loadBenefits();
   };
-  if (r) initFormsSection(r);
+  PENDING_FORMS = [];                       // 「저장 시 함께 올림」 목록은 모달을 열 때마다 비운다
+  if (window.SangjuForms) initFormsSection(r);
   openModal($("#modal"));
 }
 
@@ -1488,16 +1826,85 @@ async function refreshFormsList(r) {
     };
   });
 }
+/* ── 📎 «새 사업» 의 서식 — 저장 시 함께 올림 ────────────────────────────
+   서식은 benefit_key(= 공백 뺀 사업명)로 사업과 이어진다. 그래서 사업명이 확정되기 «전»에
+   올리면 옛 이름에 붙어 버려 시민 화면에서 영영 찾을 수 없다.
+   → 등록 화면에서는 파일을 «담아만» 두고(PENDING_FORMS), 저장이 성공한 직후 순서대로 올린다.
+   ⚠ 업로드가 실패해도 사업 저장은 되돌리지 않는다 — 무엇이 안 올라갔는지 «이름»으로 알린다. */
+let PENDING_FORMS = [];
+
+// 담아 둔 파일 목록 그리기(아직 서버에 없는 파일이라 «저장 시 함께 올림» 표를 단다)
+function renderPendingForms() {
+  const list = $("#formsList");
+  if (!list) return;
+  if (!PENDING_FORMS.length) {
+    list.innerHTML = `<li class="forms-empty">아직 고른 서식이 없습니다.</li>`;
+    return;
+  }
+  list.innerHTML = PENDING_FORMS.map((f, i) => {
+    const size = SangjuForms.formatSize(f.size);
+    return `<li class="forms-item" data-i="${i}">
+        <span class="forms-item-main"><span class="forms-item-name">📄 ${esc(f.name)}</span>
+          <span class="forms-item-meta">${esc(size)}${size ? " · " : ""}저장 시 함께 올림</span></span>
+        <button type="button" class="forms-del" aria-label="${esc(f.name)} 목록에서 빼기">🗑 빼기</button>
+      </li>`;
+  }).join("");
+  list.querySelectorAll(".forms-item").forEach((li) => {
+    const btn = li.querySelector(".forms-del");
+    if (btn) btn.onclick = () => {
+      PENDING_FORMS.splice(Number(li.dataset.i), 1);
+      renderPendingForms();
+      fSetStatus("목록에서 뺐습니다.");
+    };
+  });
+}
+
+// 저장 성공 직후 호출 — 담아 둔 파일을 «하나씩 차례로» 올린다(동시에 올리면 이름 충돌 회피가 꼬인다).
+async function uploadPendingForms(benefit) {
+  if (!PENDING_FORMS.length || !window.SangjuForms) return;
+  const failed = [];
+  for (const f of PENDING_FORMS) {
+    fSetStatus(`서식 올리는 중… (${f.name})`);
+    try { await SangjuForms.uploadForm(benefit, f); }
+    catch (e) { failed.push(f.name + " — " + ((e && e.message) || "업로드 실패")); }
+  }
+  const total = PENDING_FORMS.length;
+  PENDING_FORMS = [];
+  if (failed.length) {
+    // 사업은 이미 저장됐다. 되돌리지 않고 «무엇을 다시 올려야 하는지»만 분명히 알린다.
+    const m = `사업은 저장했습니다.\n다만 서식 ${total}건 중 ${failed.length}건을 올리지 못했습니다.\n\n`
+            + failed.join("\n")
+            + `\n\n목록에서 이 사업을 다시 열어 «서식 등록»으로 올려 주세요.`;
+    announce(`서식 ${failed.length}건을 올리지 못했습니다.`);
+    alert(m);
+  } else {
+    announce(`서식 ${total}건을 함께 올렸습니다.`);
+  }
+}
+
 function initFormsSection(r) {
   const fileInput = $("#formsFile");
   const upBtn = $("#formsUpload");
-  refreshFormsList(r);
+  if (r) refreshFormsList(r); else renderPendingForms();
   if (!upBtn || !fileInput) return;
   upBtn.onclick = async () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) { fSetStatus("등록할 파일을 선택해 주세요.", true); return; }
+    // 검증은 «담을 때»도 «올릴 때»와 똑같이 한다(forms.js validateFile 하나만 쓴다).
     const bad = SangjuForms.validateFile(file);
     if (bad) { fSetStatus(bad, true); alert(bad); return; }
+    // ── 새 사업: 서버에 올리지 않고 목록에 담아만 둔다 ──
+    if (!r) {
+      if (PENDING_FORMS.some((f) => f.name === file.name && f.size === file.size)) {
+        fSetStatus("이미 목록에 있는 파일입니다.", true); return;
+      }
+      PENDING_FORMS.push(file);
+      fileInput.value = "";
+      renderPendingForms();
+      fSetStatus("목록에 담았습니다. 저장하면 함께 올라갑니다.");
+      return;
+    }
+    // ── 이미 저장된 사업: 예전 그대로 바로 올린다 ──
     upBtn.disabled = true;
     fSetStatus("업로드 중…");
     try {
@@ -1667,6 +2074,8 @@ function renderPStatusChips() {
 
 function renderPCatChips() {
   const box = $("#pCatChips"); box.innerHTML = "";
+  // 분야가 하나도 없으면 이름표만 남으므로 함께 감춘다(사업 탭 renderCats 와 같은 규약)
+  const cap = $("#pCatCap"); if (cap) cap.hidden = !PCATS.length;
   PCATS.forEach((cat) => {
     const c = el("button", "chip" + (P_SELCAT.has(cat) ? " on" : ""));
     c.type = "button";
@@ -1851,11 +2260,14 @@ async function loadReportDetail(proposalId) {
    ============================================================ */
 // ⚠ 상태값은 «접수/심사중/승인/반려» 4값(PC config.APPLICATION_STATUSES·SQL CHECK 와 동일)
 const A_STATUSES = (window.SangjuApply && SangjuApply.STATUSES) || ["접수", "심사중", "승인", "반려"];
-// 📥 접수 탭 «기본 필터 = 처리 대기»(설계안 확정) — 들어오자마자 손볼 것만 보인다.
-//    (예전엔 «전체»가 기본이라 처리할 건을 고르는 데 클릭이 두 번 더 들었다)
-const A_WAIT = "처리 대기";                 // 접수 + 심사중 을 한 칩으로 묶은 «가상» 상태
-const A_WAIT_SET = new Set(["접수", "심사중"]);
-let AALL = [], A_STATUS = A_WAIT, aPage = 0, A_LOADED = false;
+// 📥 접수 탭 «기본 필터 = 전체» (2026-08-19 양호창님 지시).
+//    ⛔ 「처리 대기」(접수+심사중을 묶은 «가상» 상태) 칩은 «영구 삭제»했습니다. 되살리지 마세요.
+//       왜 뺐나: ① 실제 상태값이 아니라 화면에만 있는 말이라, 승인·반려까지 포함한 전체 건수와
+//       머릿속에서 어긋났습니다. ② 기본이 «처리 대기»라 들어오자마자 목록이 비어 보이는 일이
+//       잦았고(오늘 처리할 게 없는 날), 그때마다 «자료가 안 들어왔나» 하고 되묻게 됐습니다.
+//       손볼 건만 보려면 「접수」·「심사중」 칩을 그대로 쓰면 됩니다.
+//    ⚠ 칩 순서는 「전체」가 «맨 앞» — 목록의 기본 상태를 왼쪽 첫 자리에 둔다.
+let AALL = [], A_STATUS = "전체", aPage = 0, A_LOADED = false;
 
 function bindApplicationsUI() {
   const s = $("#aSearch");
@@ -1864,6 +2276,27 @@ function bindApplicationsUI() {
   const m = $("#aModal");
   if (m) m.addEventListener("click", (e) => { if (e.target.id === "aModal") requestCloseModal($("#aModal")); });
   // Esc·포커스 트랩은 공통 _trapKeydown 이 처리(중복 등록 없음)
+}
+
+/* 🔒 접수 행에서 «자격증명» 열을 떼어 낸다 — supabase/신청첨부.sql [1-A] 규약.
+   ────────────────────────────────────────────────────────────────────────
+   applications 를 select * 로 읽으면 attach_ticket 이 «함께» 실려 온다.
+   이것은 접수 직후 30분 동안 살아 있는 «업로드 통행증»이다. 이 값을 아는 사람은
+   그 신청의 첨부 폴더에 파일을 밀어 넣을 수 있다.
+   ⛔ 화면·검색 대상·콘솔 로그·admin_audit 어디에도 나가면 안 된다.
+      SQL 쪽에서 컬럼 권한으로 막지 «못하는» 이유도 그 파일에 적혀 있다
+      (PostgREST 가 select=* 를 열 목록으로 펼쳐 보내므로, 권한을 회수하면
+       공무원앱의 접수 목록이 통째로 실패한다) → 그래서 «받는 쪽»이 지운다.
+   ★ 여기서 한 번만 지우면 그 뒤 모든 화면(목록·검색·상세·첨부·감사기록)이 안전하다.
+     AALL 에 담기기 «전»이 유일한 관문이므로, 새 조회 경로를 만들면 여기를 꼭 거치게 할 것.
+   ⛔ 이 목록에서 attach_ticket 을 빼지 마세요. 새 비밀 열이 생기면 여기에 «더하세요». */
+const APPLICATION_SECRET_KEYS = ["attach_ticket"];
+function scrubApplications(rows) {
+  return (rows || []).map((row) => {
+    if (!row || typeof row !== "object") return row;
+    APPLICATION_SECRET_KEYS.forEach((k) => { if (k in row) delete row[k]; });
+    return row;
+  });
 }
 
 async function loadApplications() {
@@ -1879,7 +2312,7 @@ async function loadApplications() {
     $("#aPager").innerHTML = "";
     return;
   }
-  AALL = data || [];
+  AALL = scrubApplications(data);     // 🔒 자격증명(attach_ticket) 을 «앱에 들이기 전에» 떼어 낸다
   A_LOADED = true;
   ART_PENDING = 0; syncRtBanners();   // 새로 불러왔으니 «밀린 알림»도 지운다
   renderAStatusChips();
@@ -1897,8 +2330,8 @@ function subscribeApplicationsRealtime() {
 function renderAStatusChips() {
   const box = $("#aStatusChips"); if (!box) return;
   box.innerHTML = "";
-  // «처리 대기»를 맨 앞에 — 자주 쓰는 것을 손 가까이(규격서 0절)
-  [A_WAIT, "전체", ...A_STATUSES].forEach((st) => {
+  // 「전체」가 맨 앞 — 기본 상태를 첫 자리에(2026-08-19 양호창님 지시). 뒤는 실제 상태값 4종 순서.
+  ["전체", ...A_STATUSES].forEach((st) => {
     const c = el("button", "chip" + (A_STATUS === st ? " on" : ""));
     c.type = "button";
     c.textContent = st;
@@ -1922,8 +2355,7 @@ function renderApplications() {
   const q = ($("#aSearch") ? $("#aSearch").value : "").trim().toLowerCase();
   let rows = AALL.filter((r) => {
     const rst = r.status || "접수";
-    if (A_STATUS === A_WAIT) { if (!A_WAIT_SET.has(rst)) return false; }
-    else if (A_STATUS !== "전체" && rst !== A_STATUS) return false;
+    if (A_STATUS !== "전체" && rst !== A_STATUS) return false;
     if (q) {
       const blob = `${r.benefit_name || ""} ${r.applicant_name || ""} ${r.phone || ""} ${r.receipt_no || ""} ${r.team || ""}`.toLowerCase();
       if (!blob.includes(q)) return false;
@@ -1935,10 +2367,12 @@ function renderApplications() {
 
   $("#aCount").textContent = `총 ${rows.length}건`;
   if (!rows.length) {
-    // 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절) — 기본이 «처리 대기»라 0건일 수 있다.
-    list.innerHTML = A_STATUS === A_WAIT
-      ? '<div class="empty">처리할 신청이 없습니다. 위 «전체»를 눌러 지난 접수를 볼 수 있습니다.</div>'
-      : '<div class="empty">조건에 맞는 신청이 없습니다.</div>';
+    // 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절).
+    //   · 「전체」인데 0건 = 아직 접수 자체가 없는 것 → 기다리면 된다고 알린다.
+    //   · 상태 칩을 좁혀서 0건 = 조건을 넓히면 된다고 알린다.
+    list.innerHTML = A_STATUS === "전체"
+      ? '<div class="empty">아직 들어온 신청이 없습니다. 시민이 신청하면 이 자리에 바로 나타납니다.</div>'
+      : `<div class="empty">«${esc(A_STATUS)}» 상태인 신청이 없습니다. 위 «전체»를 누르면 모든 접수를 볼 수 있습니다.</div>`;
     $("#aPager").innerHTML = "";
     return;
   }
@@ -2027,6 +2461,16 @@ async function openApplication(r) {
     <div class="field"><div class="field-label">담당팀</div><div class="field-value">${esc(r.team || "-")}${r.manager_email ? ` · ${esc(r.manager_email)}` : ""}</div></div>
     <div class="field"><div class="field-label">문의사항</div><div class="pm-body-text">${esc(r.memo || "(없음)")}</div></div>
     <div class="field"><div class="field-label">신청일시</div><div class="field-value"><span aria-hidden="true">🗓</span> ${esc(fmtDateTime(r.created_at))}${r.source ? ` · ${esc(r.source)}` : ""}</div></div>
+    <!-- 📎 시민이 신청할 때 낸 첨부파일 — supabase/신청첨부.sql 이 «적용된 뒤에만» 나타난다.
+         적용 전(테이블 없음)·권한 없음·첨부 0건이면 이 칸은 통째로 감춘 채 나머지 기능은 그대로 돈다.
+         ⚠ 이 파일들은 «비공개» submissions 버킷에 있다 — 공개 URL 이 아예 없고,
+            열 때마다 5분짜리 서명 URL 을 새로 발급받는다. 링크를 복사해 두어도 곧 죽는다. -->
+    <div class="field" id="amFilesField" hidden>
+      <div class="field-label">📎 신청 첨부파일 <span class="req-note">(개인정보 — 여는 기록이 남습니다)</span></div>
+      <p class="field-hint">누르면 새 창으로 내려받습니다. 내려받은 파일은 업무에 쓴 뒤 지워 주세요.</p>
+      <ul class="forms-list" id="amFiles" aria-live="polite"></ul>
+      <p class="forms-status" id="amFilesStatus" role="status" aria-live="polite"></p>
+    </div>
     <div class="field">
       <label class="field-label" for="amStatus">처리 상태 변경</label>
       <select id="amStatus" class="st-select">${optHtml}</select>
@@ -2052,6 +2496,10 @@ async function openApplication(r) {
       <button id="amDelete" class="nav-btn danger" type="button">🗑 삭제</button>
       <button id="amSave" class="nav-btn" type="button">💾 저장</button>
     </div>`;
+
+  // 📎 첨부 목록 — 있을 때만 나타난다. 어떤 이유로 실패해도 접수 처리 화면은 멀쩡해야 하므로
+  //    기다리지 않고(await 없이) 띄우되, 남은 오류도 삼켜 «처리되지 않은 거부»가 나지 않게 한다.
+  renderApplicationFiles(r).catch(() => {});
 
   $("#amSave").onclick = async () => {
     const newStatus = $("#amStatus").value;
@@ -2120,11 +2568,17 @@ async function openApplication(r) {
   $("#amDelete").onclick = async () => {
     const ok = await askConfirm({
       title: "이 신청을 삭제할까요?",
-      body: `접수번호 ${r.receipt_no || "-"} 신청을 지웁니다.\n되돌릴 수 없습니다.`,
+      body: `접수번호 ${r.receipt_no || "-"} 신청을 지웁니다.\n첨부파일이 있으면 함께 파기됩니다.\n되돌릴 수 없습니다.`,
       cancelText: "취소",
       okText: "삭제"
     });
     if (!ok) return;
+    // 📎 ★ 순서가 «정해져 있다» (supabase/신청첨부.sql [7]·B-5).
+    //    application_files 는 접수를 지우면 cascade 로 함께 사라진다. 그러면 storage_path 를
+    //    «잃어버려» 창고(submissions 버킷)의 실제 파일을 지울 방법이 없어진다
+    //    → 주인 없는 개인정보 파일이 남는다(개인정보보호법 §21 파기 의무 위반).
+    //    그래서 «파일 먼저, 접수 나중». 이 순서를 바꾸지 마세요.
+    await purgeApplicationFiles(r);
     try {
       await SangjuApply.deleteApplication(r.id);
     } catch (err) {
@@ -2137,4 +2591,159 @@ async function openApplication(r) {
   };
 
   openModal($("#aModal"));
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   📎 시민 신청 첨부파일 열람 (접수 상세 안)
+   ────────────────────────────────────────────────────────────────────────
+   설계·규약 출처: supabase/신청첨부.sql 머리말 (B) 항목. 그대로 따른다.
+
+   🔒 이 화면은 «개인정보 그 자체»를 다룬다.
+      · 파일명("장애인등록증.jpg")만으로도 민감정보의 실마리가 된다.
+      · 파일은 비공개(submissions) 버킷에 있고 공개 URL 이 아예 없다.
+        열 때마다 5분짜리 서명 URL 을 새로 받는다 — 그 링크 자체가 «열쇠»다.
+      · 여는 순간 admin_audit 에 기록을 남긴다(개인정보보호법 §29 접속기록).
+        ⛔ 기록에 파일명·저장경로·서명 URL 을 남기지 않는다. 접수번호 + 확장자 + 건수만.
+           (저장경로에는 통행증이 박혀 있어 로그에 남기면 그 자체가 자격증명 유출이다)
+
+   🛡 방어 원칙 — 서버에 신청첨부.sql 이 «아직 적용되지 않았을 수 있다».
+      테이블이 없거나(PGRST205) 권한이 없으면 첨부 칸을 «조용히 감춘 채» 넘어간다.
+      접수 처리(상태 변경·메모·안내문)는 어떤 경우에도 멀쩡히 돌아가야 한다.
+
+   ⛔ file_name 을 날것으로 innerHTML 에 넣지 마세요 — 시민이 «자기 기기에서 지은 이름»이라
+      꺾쇠가 들어올 수 있고, 여기는 로그인 세션을 가진 화면이라 피해가 가장 큽니다.
+      아래는 전부 esc() 를 거칩니다.
+   ════════════════════════════════════════════════════════════════════════ */
+const ATTACH_BUCKET = "submissions";
+const ATTACH_URL_SEC = 300;          // 서명 URL 수명 5분. ⛔ 더 늘리지 마세요.
+
+function afSetStatus(msg, isErr) {
+  const box = $("#amFilesStatus");
+  if (box) { box.textContent = msg || ""; box.classList.toggle("err", !!isErr); }
+  if (msg) announce(msg);
+}
+
+// 확장자만 뽑는다(감사기록에 «파일명 대신» 남길 값)
+function attachExt(name) {
+  const e = String(name || "").split(".").pop();
+  return (e && e.length <= 6) ? e.toLowerCase() : "기타";
+}
+
+// 🔒 접속기록 — 실패해도 업무를 멈추지 않는다(PC앱 access_log.py 와 같은 원칙).
+async function auditAttachment(action, receiptNo, detail) {
+  try {
+    await sb.from("admin_audit").insert({
+      action: action,                    // VIEW_ATTACHMENT · DELETE_ATTACHMENT (영문 대문자 규약)
+      target: receiptNo || "",           // ★ 접수번호만. 이름·연락처 금지
+      target_type: "접수(공무원앱)",
+      detail: detail || "",              // ★ 건수·확장자만. 파일명·경로·URL 금지
+      result: "성공",
+    });
+  } catch (e) { /* 기록 실패는 조용히 넘어간다 */ }
+}
+
+// 접수 한 건의 첨부 목록을 읽는다. 못 읽으면 «빈 배열»(원인은 콘솔에만) — 화면은 감춘다.
+async function listApplicationFiles(receiptNo) {
+  if (!receiptNo) return [];
+  try {
+    const res = await sb.from("application_files")
+      .select("id,receipt_no,file_name,storage_path,size,content_type,created_at")
+      .eq("receipt_no", receiptNo)
+      .order("created_at", { ascending: true });
+    if (res.error) {
+      // PGRST205(테이블 없음) = 아직 신청첨부.sql 미적용. 정상 상황으로 취급한다.
+      console.warn("[첨부] 목록 조회 생략:", res.error.message || res.error);
+      return [];
+    }
+    return res.data || [];
+  } catch (e) {
+    console.warn("[첨부] 목록 조회 실패:", e);
+    return [];
+  }
+}
+
+async function renderApplicationFiles(r) {
+  const field = $("#amFilesField"), list = $("#amFiles");
+  if (!field || !list) return;
+  const rows = await listApplicationFiles(r && r.receipt_no);
+  if (!rows.length) { field.hidden = true; return; }   // 첨부 없음·미적용·권한없음 → 조용히 감춘다
+  field.hidden = false;
+  list.innerHTML = rows.map((row) => {
+    const nm = String(row.file_name || "첨부파일");
+    const ext = attachExt(nm).toUpperCase();
+    // ⚠ 전역 SangjuForms 를 «맨이름»으로 부르면 forms.js 가 없을 때 ReferenceError 로 화면이 죽는다
+    const size = (window.SangjuForms && SangjuForms.formatSize) ? SangjuForms.formatSize(row.size) : "";
+    const meta = (ext ? ext + " 파일" : "파일") + (size ? " · " + size : "");
+    return `<li class="forms-item" data-id="${esc(String(row.id))}">
+        <span class="forms-item-main"><span class="forms-item-name">📄 ${esc(nm)}</span>
+          <span class="forms-item-meta">${esc(meta)}</span></span>
+        <button type="button" class="forms-open" aria-label="${esc(nm)} 내려받기">내려받기</button>
+      </li>`;
+  }).join("");
+  const byId = {};
+  rows.forEach((row) => { byId[String(row.id)] = row; });
+  list.querySelectorAll(".forms-item").forEach((li) => {
+    const row = byId[li.dataset.id];
+    const btn = li.querySelector(".forms-open");
+    if (!btn || !row) return;
+    btn.onclick = async () => {
+      // ★ 새 창은 «누른 그 순간» 미리 열어 둔다.
+      //   서명 URL 을 받아 온 «뒤에» window.open 을 부르면 브라우저가 «사용자가 누른 결과»로
+      //   보지 않아 팝업 차단에 걸린다(await 를 건너면 사용자 동작 표식이 풀린다).
+      //   ⚠ 세 번째 인자에 "noopener" 를 주면 «창 핸들이 null 로» 돌아와 주소를 넣을 수 없다.
+      //      그래서 열어 두고 opener 를 직접 끊는다(같은 효과).
+      const win = window.open("", "_blank");
+      if (win) { try { win.opener = null; } catch (_) { /* 브라우저가 막으면 그대로 둔다 */ } }
+      btn.disabled = true;
+      afSetStatus("파일을 여는 중…");
+      try {
+        const res = await sb.storage.from(ATTACH_BUCKET)
+          .createSignedUrl(row.storage_path, ATTACH_URL_SEC, { download: row.file_name });
+        if (res && res.error) throw res.error;
+        const url = res && res.data && res.data.signedUrl;
+        if (!url) throw new Error("파일 주소를 받지 못했습니다.");
+        // 🔒 «여는 순간» 기록한다 — 개인정보에 접근했다는 사실 자체가 남아야 한다.
+        auditAttachment("VIEW_ATTACHMENT", row.receipt_no, `파일 1건(${attachExt(row.file_name)})`);
+        if (win) {
+          win.location.replace(url);
+          afSetStatus("새 창에서 내려받습니다. 이 링크는 5분 뒤 만료됩니다.");
+        } else {
+          // 팝업이 막힌 경우 — 한 번 더 시도하고, 그래도 안 되면 «무엇을 해야 하는지» 알린다.
+          const w2 = window.open(url, "_blank", "noopener");
+          afSetStatus(w2 ? "새 창에서 내려받습니다. 이 링크는 5분 뒤 만료됩니다."
+                         : "브라우저가 새 창을 막았습니다. 주소창 오른쪽의 «팝업 허용»을 켠 뒤 다시 눌러 주세요.", !w2);
+        }
+      } catch (e) {
+        if (win) { try { win.close(); } catch (_) { /* 이미 닫혔으면 그만 */ } }
+        const m = errKind(e) === "perm"
+          ? "이 계정에는 첨부파일 열람 권한이 없습니다. 시스템 담당자에게 확인해 주세요."
+          : ((e && e.message) || "파일을 열지 못했습니다.");
+        afSetStatus(m, true);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+}
+
+/* 📎 접수 «삭제» 전에 첨부 실물부터 파기한다 (신청첨부.sql B-5).
+   ⚠ 반드시 접수 행을 지우기 «전»에 부를 것 — 접수를 먼저 지우면 cascade 로 목록이 사라져
+      storage_path 를 잃고, 창고에 주인 없는 개인정보 파일이 남는다(§21 파기 의무).
+   ⚠ 실패해도 삭제 자체는 막지 않는다. 다만 «남은 파일이 있다»는 사실은 담당자에게 알린다. */
+async function purgeApplicationFiles(r) {
+  const receiptNo = r && r.receipt_no;
+  const rows = await listApplicationFiles(receiptNo);
+  if (!rows.length) return;
+  const paths = rows.map((x) => x.storage_path).filter(Boolean);
+  let failed = 0;
+  try {
+    const res = await sb.storage.from(ATTACH_BUCKET).remove(paths);
+    if (res && res.error) failed = paths.length;
+  } catch (e) { failed = paths.length; }
+  auditAttachment("DELETE_ATTACHMENT", receiptNo, `파일 ${paths.length}건 파기(실패 ${failed}건)`);
+  if (failed) {
+    alert(`⚠️ 첨부파일 ${failed}건을 저장소에서 지우지 못했습니다.\n`
+        + `접수는 그대로 삭제합니다만, 남은 파일은 시스템 담당자에게 파기를 요청해 주세요.\n`
+        + `(접수번호 ${receiptNo || "-"})`);
+  }
 }
