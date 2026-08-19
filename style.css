@@ -812,6 +812,33 @@ button:active,[role="button"]:active,.foot-link:active{transform:scale(.97);}
      1180px 안폭 기준 392 + 16 + 350 + 16 + 350, 1320px 안폭 기준 392 + 16 + 420 + 16 + 420. */
 .stats-card{flex:0 0 392px;}
 @media (max-width:900px){ .stats-card,.rank-card{flex:1 1 100%;} }
+/* ── 🔎 눌리는 요약 카드 (2026-08-19 양호창님 지시) ─────────────────────────────
+   접수 처리 탭의 네 카드만 <button> 이다(사업·시민 제안 탭의 .kpi 는 그대로 <div>).
+   button 기본 꼴(굴림체·가운데 정렬·회색 테두리)을 지우고 위 .kpi 모양을 그대로 잇는다.
+   ⚠ 크기(높이·글자)는 위 .kpi 한 곳에서만 정한다 — 여기서 다시 키우지 말 것. */
+button.kpi{font-family:inherit;color:inherit;text-align:left;width:100%;cursor:pointer;
+  -webkit-appearance:none;appearance:none;
+  transition:border-color var(--dur-micro,.15s) ease, background var(--dur-micro,.15s) ease;}
+button.kpi:hover{border-color:var(--gotgam-l);background:var(--gotgam-ll);}
+/* 선택된 카드 — ⚠ 색만으로 알리지 않는다.
+   ① 테두리가 1.5px → 3px 로 «두꺼워지고»(안여백을 1.5px 줄여 카드 크기는 그대로),
+   ② 라벨 앞에 «✓» 가 붙고, ③ 라벨에 밑줄이 그어진다. 낭독기에는 aria-pressed 로 알린다. */
+button.kpi[aria-pressed="true"]{border:3px solid var(--gotgam-d);padding:7.5px 12.5px;
+  background:var(--gotgam-ll);}
+button.kpi[aria-pressed="true"] > span{color:var(--gotgam-t);text-decoration:underline;}  /* 연한 바탕 위 6.67:1 */
+button.kpi[aria-pressed="true"] > span::before{content:"✓ ";font-weight:800;}
+
+/* 「무엇만 보는 중」 알림 띠 — 칩을 늘리지 않고 한 줄로 알리고, 되돌리는 단추를 함께 둔다 */
+.scope-bar{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 14px;
+  background:var(--gotgam-ll);border:1.5px solid var(--gotgam-l);border-radius:var(--r-card);
+  color:var(--gotgam-t);font-size:0.875rem;font-weight:700;}  /* 연한 바탕 위 6.67:1 · 테두리 4.65:1 */
+.scope-bar .ico{width:18px;height:18px;flex-shrink:0;}
+.scope-text{flex:1;min-width:0;}
+.scope-clear{flex-shrink:0;border:1.5px solid var(--gotgam-d);border-radius:var(--r-pill);
+  padding:0 14px;min-height:36px;background:var(--card);color:var(--gotgam-t);
+  font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;white-space:nowrap;}
+.scope-clear:hover{background:var(--gotgam-d);color:#fff;}   /* 흰글자 5.21:1 */
+
 .kpi.k-now b{color:var(--gotgam-t);}   /* 오늘 접수 — 흰 7.47:1 */
 .kpi.k-rev b{color:#7A5B00;}           /* 심사중  — 흰 6.9:1 (보조 금빛은 «글자색 금지»라 어두운 갈금색) */
 .kpi.k-ok  b{color:var(--navy-d);}     /* 승인    — 흰 7.70:1 */

@@ -1926,6 +1926,8 @@ function initFormsSection(r) {
    기존 사업관리·로그인·게스트·실시간 무손상. 추가 모듈.
    ============================================================ */
 const P_STATUSES = ["접수", "검토중", "반영", "불채택", "보류"];
+// 정책제안에서 읽어 올 칸 — pin_hash 제외(아래 loadProposals 머리말 참고).
+const P_COLS = "id,title,body,category,author_nick,region,status,admin_reply,like_count,is_hidden,created_at";
 const REPLY_REQUIRED = new Set(["반영", "불채택"]); // 전환 시 답변/사유 필수
 let PALL = [], PCATS = [], P_SELCAT = new Set(), P_STATUS = "전체";
 let pSort = "new", pPage = 0, P_LOADED = false;
@@ -2026,7 +2028,12 @@ function switchTab(which, opts) {
 async function loadProposals() {
   showSkeleton("#pList", 4);          // 첫 불러오기에만(이미 목록이 있으면 그대로 둔다)
   // 공무원은 숨김(is_hidden) 글도 모두 본다 → 필터 없이 전체 조회
-  const { data, error } = await sb.from("proposals").select("*").order("created_at", { ascending: false });
+  /* 조회할 «칸» 목록 — pin_hash 는 «절대» 넣지 않는다 (2026-08-19).
+     본인확인용 PIN 해시가 필요 없는 화면에까지 딸려 나오지 않게 «쓰는 칸만» 적는다.
+     시민앱(모바일웹/proposals.js)에서는 anon 에게 pin_hash 권한이 없어 select("*") 가
+     통째로 401(42501) 이 됐다. 여기(로그인 사용자)는 아직 전체 권한이 남아 있지만,
+     같은 사고를 반복하지 않도록 같은 방식으로 맞춘다. */
+  const { data, error } = await sb.from("proposals").select(P_COLS).order("created_at", { ascending: false });
   if (error) {
     console.error(error);
     showLoadError("#pList", error, "pListRetry", loadProposals);
@@ -2269,9 +2276,51 @@ const A_STATUSES = (window.SangjuApply && SangjuApply.STATUSES) || ["접수", "�
 //    ⚠ 칩 순서는 「전체」가 «맨 앞» — 목록의 기본 상태를 왼쪽 첫 자리에 둔다.
 let AALL = [], A_STATUS = "전체", aPage = 0, A_LOADED = false;
 
+/* 🔎 요약 카드로 좁혀보기 (2026-08-19 양호창님 지시) ─────────────────────────
+   「오늘 접수 / 심사중 / 이달 승인 / 이달 반려」 카드를 누르면 그 건만 목록에 남는다.
+   ⚠ 판정 기준은 여기서 «새로 짜지 않는다» — stats.js 가 카드의 숫자를 셀 때 쓰는
+      window.sjScopes[키].test(행) 를 그대로 가져다 쓴다. 그래야 카드에 적힌 숫자와
+      목록 건수가 어긋날 수 없다(한 곳만 고치면 양쪽이 함께 바뀐다).
+   ⚠ 상태 칩과는 «둘 중 하나»만 걸린다 — 카드를 누르면 칩은 「전체」로, 칩을 누르면
+      카드 선택이 풀린다. (예: «이달 승인» + 칩 «반려» 처럼 영영 0건인 조합을 막는다)
+   값: "" (전체) | "today" | "review" | "okM" | "noM" */
+let A_SCOPE = "";
+function aScopeDef() {
+  const t = window.sjScopes;
+  return (t && A_SCOPE && t[A_SCOPE]) ? t[A_SCOPE] : null;
+}
+// 카드 누름 — 같은 카드를 다시 누르면 «전체»로 되돌아온다(요건 ②)
+function toggleAScope(key) {
+  const t = window.sjScopes;
+  if (!key || !t || !t[key]) return;
+  A_SCOPE = (A_SCOPE === key) ? "" : key;
+  if (A_SCOPE) A_STATUS = "전체";
+  aPage = 0;
+  renderAStatusChips();
+  renderApplications();
+}
+// 「무엇만 보는 중인지」 한 줄 띠 + 카드의 눌림 표시를 실제 상태에 맞춘다.
+// ⚠ renderApplications() 안에서 매번 부른다 — 실시간 접수로 목록을 다시 그려도 표시가 안 풀린다(요건 ⑥).
+function renderAScopeUI() {
+  const def = aScopeDef();
+  document.querySelectorAll("#aSummary button.kpi[data-scope]").forEach((b) => {
+    b.setAttribute("aria-pressed", b.getAttribute("data-scope") === A_SCOPE ? "true" : "false");
+  });
+  const bar = $("#aScopeBar"), txt = $("#aScopeText");
+  if (!bar) return;
+  if (txt) txt.textContent = def ? def.note : "";
+  bar.hidden = !def;
+}
+
 function bindApplicationsUI() {
   const s = $("#aSearch");
   if (s) s.addEventListener("input", debounce(() => { aPage = 0; renderApplications(); }, 300));
+  // 요약 카드 네 장 — 진짜 <button> 이라 Enter·Space·Tab 은 브라우저가 알아서 해 준다
+  document.querySelectorAll("#aSummary button.kpi[data-scope]").forEach((b) => {
+    b.addEventListener("click", () => toggleAScope(b.getAttribute("data-scope")));
+  });
+  const sc = $("#aScopeClear");
+  if (sc) sc.onclick = () => { A_SCOPE = ""; aPage = 0; renderAStatusChips(); renderApplications(); };
   const c = $("#amClose"); if (c) c.onclick = () => requestCloseModal($("#aModal"));
   const m = $("#aModal");
   if (m) m.addEventListener("click", (e) => { if (e.target.id === "aModal") requestCloseModal($("#aModal")); });
@@ -2337,7 +2386,8 @@ function renderAStatusChips() {
     c.textContent = st;
     // 색만으로 필터 상태를 알리지 않도록 접근명에 «선택됨»을 함께 넣는다
     c.setAttribute("aria-pressed", A_STATUS === st ? "true" : "false");
-    c.onclick = () => { A_STATUS = st; aPage = 0; renderAStatusChips(); renderApplications(); };
+    // 칩을 고르면 요약 카드로 좁혀둔 것은 푼다(둘이 겹쳐 영영 0건이 되는 일을 막는다)
+    c.onclick = () => { A_STATUS = st; A_SCOPE = ""; aPage = 0; renderAStatusChips(); renderApplications(); };
     box.appendChild(c);
   });
 }
@@ -2353,8 +2403,11 @@ function fmtDateTime(s) {
 function renderApplications() {
   const list = $("#aList"); if (!list) return;
   const q = ($("#aSearch") ? $("#aSearch").value : "").trim().toLowerCase();
+  const scope = aScopeDef();          // 요약 카드로 좁혀보는 중이면 그 판정 함수
+  renderAScopeUI();
   let rows = AALL.filter((r) => {
     const rst = r.status || "접수";
+    if (scope && !scope.test(r)) return false;
     if (A_STATUS !== "전체" && rst !== A_STATUS) return false;
     if (q) {
       const blob = `${r.benefit_name || ""} ${r.applicant_name || ""} ${r.phone || ""} ${r.receipt_no || ""} ${r.team || ""}`.toLowerCase();
@@ -2370,9 +2423,12 @@ function renderApplications() {
     // 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절).
     //   · 「전체」인데 0건 = 아직 접수 자체가 없는 것 → 기다리면 된다고 알린다.
     //   · 상태 칩을 좁혀서 0건 = 조건을 넓히면 된다고 알린다.
-    list.innerHTML = A_STATUS === "전체"
-      ? '<div class="empty">아직 들어온 신청이 없습니다. 시민이 신청하면 이 자리에 바로 나타납니다.</div>'
-      : `<div class="empty">«${esc(A_STATUS)}» 상태인 신청이 없습니다. 위 «전체»를 누르면 모든 접수를 볼 수 있습니다.</div>`;
+    //   · 요약 카드로 좁혀서 0건 = 「오늘 들어온 접수가 없습니다」처럼 «그 칸의 말»로 알린다.
+    list.innerHTML = scope
+      ? `<div class="empty">${esc(scope.empty)} 위 «전체 보기»를 누르면 모든 접수를 볼 수 있습니다.</div>`
+      : (A_STATUS === "전체"
+        ? '<div class="empty">아직 들어온 신청이 없습니다. 시민이 신청하면 이 자리에 바로 나타납니다.</div>'
+        : `<div class="empty">«${esc(A_STATUS)}» 상태인 신청이 없습니다. 위 «전체»를 누르면 모든 접수를 볼 수 있습니다.</div>`);
     $("#aPager").innerHTML = "";
     return;
   }

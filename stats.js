@@ -62,6 +62,37 @@
            d.getDate() === now.getDate();
   }
 
+  /* ── 🔎 요약 카드 «네 칸»의 뜻 — 세는 곳도, 목록을 좁히는 곳도 여기 하나뿐 ──────────
+     양호창님 지시(2026-08-19): 「오늘 접수 / 심사중 / 이달 승인 / 이달 반려」를 누르면
+     그 건만 목록에 남는다. 그러려면 «카드가 센 기준»과 «목록이 거르는 기준»이 같아야 한다.
+     ⚠ app.js 는 이 window.sjScopes 를 그대로 가져다 쓴다 — 판정을 저쪽에 베껴 쓰지 말 것.
+        (베끼면 언젠가 한쪽만 고쳐져 «3건이라 해 놓고 2건만 나오는» 앱이 된다)
+     test(r) 는 접수 한 줄을 받아 그 칸에 드는지만 답한다. 개인정보는 보지 않는다
+     (status·created_at 두 칸만 읽는다). */
+  var SCOPES = {
+    today: {
+      label: "오늘 접수", note: "오늘 들어온 접수만 보는 중입니다",
+      empty: "오늘 들어온 접수가 없습니다.",
+      test: function (r) { return isToday(r && r.created_at); }
+    },
+    review: {
+      label: "심사중", note: "심사중인 접수만 보는 중입니다",
+      empty: "심사중인 접수가 없습니다.",
+      test: function (r) { return ((r && r.status) || "접수") === "심사중"; }
+    },
+    okM: {
+      label: "이달 승인", note: "이달 승인한 접수만 보는 중입니다",
+      empty: "이달 승인한 접수가 없습니다.",
+      test: function (r) { return isThisMonth(r && r.created_at) && ((r && r.status) || "접수") === "승인"; }
+    },
+    noM: {
+      label: "이달 반려", note: "이달 반려한 접수만 보는 중입니다",
+      empty: "이달 반려한 접수가 없습니다.",
+      test: function (r) { return isThisMonth(r && r.created_at) && ((r && r.status) || "접수") === "반려"; }
+    }
+  };
+  window.sjScopes = SCOPES;
+
   /* 요약 지표 — 규격서 §14 «숫자 카운트업».
      app.js 의 countUp(window.sjCountUp) 이 최종값을 «먼저» 보조기기용 칸(.kpi-sr)에 넣고,
      눈에 보이는 칸(.kpi-vis, aria-hidden)만 0 → 실제값으로 흐르게 한다.
@@ -70,6 +101,13 @@
   function setNum(id, n) {
     var e = $(id);
     if (!e) return;
+    /* 낭독기에는 「오늘 접수 3건, 누르면 해당 접수만 봅니다」로 읽힌다.
+       ⚠ 단추에 aria-label 이 걸리면 그 «이름»이 안쪽 글자보다 앞선다 → 건수를 여기 담는다. */
+    var btn = (e.closest ? e.closest("button.kpi[data-scope]") : null);
+    if (btn) {
+      var sd = SCOPES[btn.getAttribute("data-scope")];
+      if (sd) btn.setAttribute("aria-label", sd.label + " " + n + "건, 누르면 해당 접수만 봅니다");
+    }
     if (typeof window.sjCountUp === "function" && e.querySelector(".kpi-vis")) { window.sjCountUp(e, n); return; }
     e.textContent = String(n);
   }
@@ -177,18 +215,15 @@
 
     // ── 요약 지표 4개 (목업의 «오늘의 접수 요약») ──────────────────
     //    라벨에 기간(오늘/이달/전체)을 함께 적어 «무엇을 센 수인지» 오해가 없게 한다.
-    var today = 0, review = 0, okM = 0, noM = 0;
+    /* ⚠ 세는 자리는 여기 한 곳 — 위 SCOPES 의 test 를 그대로 쓴다.
+       app.js 가 목록을 거를 때도 같은 test 를 쓰므로 «숫자 = 목록 건수»가 보장된다. */
+    var kn = { today: 0, review: 0, okM: 0, noM: 0 };
     for (var q = 0; q < all.length; q++) {
-      var rr = all[q], sst = (rr && rr.status) || "접수";
-      if (isToday(rr && rr.created_at)) today += 1;
-      if (sst === "심사중") review += 1;
-      if (isThisMonth(rr && rr.created_at)) {
-        if (sst === "승인") okM += 1;
-        else if (sst === "반려") noM += 1;
-      }
+      var rr = all[q];
+      for (var kk in kn) if (SCOPES[kk].test(rr)) kn[kk] += 1;
     }
-    setNum("kpiToday", today); setNum("kpiReview", review);
-    setNum("kpiOk", okM); setNum("kpiNo", noM);
+    setNum("kpiToday", kn.today); setNum("kpiReview", kn.review);
+    setNum("kpiOk", kn.okM); setNum("kpiNo", kn.noM);
 
     // 이번 달 접수만 상태별로 센다
     var cnt = { "승인": 0, "심사중": 0, "접수": 0, "반려": 0 };
