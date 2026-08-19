@@ -42,12 +42,48 @@
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   }
 
+  function isToday(v) {
+    if (!v) return false;
+    var d = new Date(v);
+    if (isNaN(d)) return false;
+    var now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() &&
+           d.getDate() === now.getDate();
+  }
+
+  /* 요약 지표 — 규격서 §14 «숫자 카운트업».
+     app.js 의 countUp(window.sjCountUp) 이 최종값을 «먼저» 보조기기용 칸(.kpi-sr)에 넣고,
+     눈에 보이는 칸(.kpi-vis, aria-hidden)만 0 → 실제값으로 흐르게 한다.
+     ⚠ 값이 그대로면 아무 움직임도 없다(다시 그릴 때마다 껌뻑이지 않게).
+     ⚠ app.js 가 아직 안 올라왔거나 옛 마크업이면 그냥 글자만 바꾼다(안전 폴백). */
+  function setNum(id, n) {
+    var e = $(id);
+    if (!e) return;
+    if (typeof window.sjCountUp === "function" && e.querySelector(".kpi-vis")) { window.sjCountUp(e, n); return; }
+    e.textContent = String(n);
+  }
+
   function draw() {
-    var fig = $("aStats");
-    if (!fig) return;
+    var wrap = $("aSummary"), fig = $("aStats");
+    if (!wrap || !fig) return;
 
     var all = rows();
-    if (!all) { fig.hidden = true; return; }
+    if (!all) { wrap.hidden = true; return; }
+
+    // ── 요약 지표 4개 (목업의 «오늘의 접수 요약») ──────────────────
+    //    라벨에 기간(오늘/이달/전체)을 함께 적어 «무엇을 센 수인지» 오해가 없게 한다.
+    var today = 0, review = 0, okM = 0, noM = 0;
+    for (var q = 0; q < all.length; q++) {
+      var rr = all[q], sst = (rr && rr.status) || "접수";
+      if (isToday(rr && rr.created_at)) today += 1;
+      if (sst === "심사중") review += 1;
+      if (isThisMonth(rr && rr.created_at)) {
+        if (sst === "승인") okM += 1;
+        else if (sst === "반려") noM += 1;
+      }
+    }
+    setNum("kpiToday", today); setNum("kpiReview", review);
+    setNum("kpiOk", okM); setNum("kpiNo", noM);
 
     // 이번 달 접수만 상태별로 센다
     var cnt = { "승인": 0, "심사중": 0, "접수": 0, "반려": 0 };
@@ -61,13 +97,19 @@
       total += 1;
     }
 
-    // 이번 달 접수가 없으면 «0건짜리 도넛»을 보여 주지 않고 통째로 숨긴다
-    if (!total) { fig.hidden = true; return; }
-    fig.hidden = false;
+    // 접수가 한 건도 없으면 요약 전체를 숨긴다(0건짜리 도넛은 오히려 헷갈린다)
+    if (!all.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    // 이번 달 접수만 없을 때는 지표는 두고 도넛만 감춘다
+    fig.hidden = !total;
+    if (!total) return;
 
+    /* 가운데 합계 — SVG <text> 는 role="img"(title/desc) 안이라 따로 낭독되지 않는다.
+       그래서 여기서는 «보이는 숫자»만 세어 올려도 낭독 정보가 어긋나지 않는다.
+       도넛 조각은 style.css 의 transition(.8s)이 시계방향으로 채워 준다. */
     var numEl = $("aStatsNum"), totEl = $("aStatsTotal");
-    if (numEl) numEl.textContent = String(total);
     if (totEl) totEl.textContent = String(total);
+    if (numEl) countText(numEl, total);
 
     // 조각 그리기 — stroke-dasharray 로 «칠할 길이 / 남길 길이», dashoffset 으로 시작 위치
     var svg = fig.querySelector(".donut");
@@ -100,13 +142,40 @@
     if (d) d.textContent = descParts.join(", ") + ".";
   }
 
+  // 도넛 가운데 숫자만 0 → 총계로 흐르게 한다(.9s). 저감 모션이면 곧바로 최종값.
+  var _numRaf = null, _numShown = null;
+  function countText(el, target) {
+    if (_numShown === target) return;                  // 같은 값 → 조용히 둔다
+    var reduce = false;
+    try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+    // 보이지 않는 탭에서는 rAF 가 돌지 않으므로 곧바로 최종값을 넣는다(0 으로 남지 않게)
+    if (reduce || !window.requestAnimationFrame || document.visibilityState !== "visible") {
+      el.textContent = String(target); _numShown = target; return;
+    }
+    var from = Number(el.textContent) || 0, t0 = null, DUR = 900;
+    if (_numRaf) cancelAnimationFrame(_numRaf);
+    var step = function (t) {
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / DUR);
+      var e2 = 1 - Math.pow(1 - k, 3);
+      el.textContent = String(Math.round(from + (target - from) * e2));
+      if (k < 1) _numRaf = requestAnimationFrame(step);
+      else { _numRaf = null; el.textContent = String(target); }
+    };
+    _numShown = target;
+    _numRaf = requestAnimationFrame(step);
+  }
+
   // 목록 카드가 한 장씩 추가될 때마다 알림이 오므로, 한 프레임에 한 번만 다시 그린다.
   var queued = false;
   function schedule() {
     if (queued) return;
     queued = true;
     var run = function () { queued = false; draw(); };
-    if (window.requestAnimationFrame) requestAnimationFrame(run); else setTimeout(run, 16);
+    // ⚠ 보이지 않는 탭에서는 requestAnimationFrame 이 멈춘다 — 그러면 요약·도넛이 영영
+    //   갱신되지 않으므로(0 건으로 보임) 그때는 타이머로 돌린다.
+    if (window.requestAnimationFrame && document.visibilityState === "visible") requestAnimationFrame(run);
+    else setTimeout(run, 16);
   }
 
   // app.js 가 목록을 다시 그릴 때마다(불러오기·검색·실시간 반영) 도넛도 따라 갱신한다.

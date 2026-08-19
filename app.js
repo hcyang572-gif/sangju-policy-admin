@@ -53,10 +53,29 @@ function announce(msg) {
 const FOCUS_SEL = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 let _lastFocus = null;          // 모달 열기 전 포커스 복귀용
 let _activeModal = null;        // 현재 열린 모달 엘리먼트
+// 확인 창(#askModal)이 열려 있는 동안의 resolve. 닫힐 때 반드시 비운다(askDone).
+// ⚠ _trapKeydown 보다 «먼저» 선언한다 — 뒤에 두면 첫 키 입력에서 TDZ 오류가 난다.
+let ASK_RESOLVE = null;
+let ASK_LASTFOCUS = null;       // 확인 창 열기 전 초점(닫으면 여기로 되돌린다)
 
 function _trapKeydown(e) {
+  // ⓪ 확인 창(#askModal)이 떠 있으면 «그것이» 키보드의 주인이다 — 뒤 모달은 건드리지 않는다.
+  //    Esc = «취소»(안전한 쪽). 창만 닫히고 뒤 모달은 그대로 남는다.
+  //    ⚠ 여기서 requestCloseModal 로 흘려보내면 창은 닫히는데 기다리던 약속이 안 풀려 «먹통»이 된다.
+  if (ASK_RESOLVE) {
+    const ask = document.getElementById("askModal");
+    if (e.key === "Escape") { e.preventDefault(); askDone(false); return; }
+    if (e.key !== "Tab" || !ask) return;
+    const af = [...ask.querySelectorAll(FOCUS_SEL)].filter((n) => n.offsetParent !== null);
+    if (!af.length) { e.preventDefault(); return; }
+    const af0 = af[0], afN = af[af.length - 1];
+    if (e.shiftKey && document.activeElement === af0) { e.preventDefault(); afN.focus(); }
+    else if (!e.shiftKey && document.activeElement === afN) { e.preventDefault(); af0.focus(); }
+    else if (!ask.contains(document.activeElement)) { e.preventDefault(); af0.focus(); }
+    return;
+  }
   if (!_activeModal) return;
-  if (e.key === "Escape") { closeModal(_activeModal); return; }
+  if (e.key === "Escape") { requestCloseModal(_activeModal); return; }
   if (e.key !== "Tab") return;
   const f = [..._activeModal.querySelectorAll(FOCUS_SEL)].filter((n) => n.offsetParent !== null);
   if (!f.length) { e.preventDefault(); return; }
@@ -72,14 +91,25 @@ function openModal(modal) {
   _lastFocus = document.activeElement;
   _activeModal = modal;
   modal.classList.remove("hidden");
+  // ✍ 작성 중 이탈 보호 — 연 «그 순간»의 입력값을 기억해 두고, 닫을 때 달라졌으면 한 번 묻는다.
+  //   (수정 모달은 기존 값이 미리 채워져 있으므로 «값이 있음»이 아니라 «값이 달라짐»으로 판정한다)
+  modal._sjSnap = formSnapshot(modal);
+  // ⬅ 브라우저·안드로이드 뒤로가기 = 모달만 닫기. 모달 열기를 히스토리 «한 칸»으로 만든다.
+  navPush({ type: "modal", id: modal.id, tab: pCurrentTab });
+  modal._sjNav = true;
   // 첫 포커스: 닫기 버튼이 아닌 첫 입력요소 우선, 없으면 첫 포커스 대상
   const focusables = [...modal.querySelectorAll(FOCUS_SEL)].filter((n) => n.offsetParent !== null);
   const target = focusables.find((n) => !n.classList.contains("modal-close")) || focusables[0];
   if (target) setTimeout(() => target.focus(), 30);
 }
-function closeModal(modal) {
+// closeModal(modal) — «실제로 닫는다». 저장·삭제 성공 뒤처럼 «물을 필요가 없는» 경로가 부른다.
+//   (호출 계약 유지: 인자 하나로 부르던 기존 코드는 그대로 동작한다)
+//   opts.fromHistory=true 면 이미 히스토리가 한 칸 물러난 상태라 history.back()을 부르지 않는다.
+function closeModal(modal, opts) {
   if (!modal) return;
+  const fromHistory = !!(opts && opts.fromHistory);
   modal.classList.add("hidden");
+  modal._sjSnap = null;
   // 🔑 닫을 때 비밀번호 칸은 반드시 비운다. (Esc·바깥클릭·✕ 어느 경로로 닫아도 동일하게 동작하도록
   //    닫기 «한 곳»에서 처리한다. 현재 type="password" 입력칸은 비밀번호 변경 모달에만 있다)
   try { modal.querySelectorAll('input[type="password"]').forEach((n) => { n.value = ""; }); } catch (e) {}
@@ -89,7 +119,313 @@ function closeModal(modal) {
   // ★ 모달이 열려 있는 동안 도착한 알림은 rtBusy() 때문에 띠가 «숨겨진 채» 카운트만 쌓인다.
   //   닫을 때 다시 계산해 주지 않으면 다음 실시간 이벤트가 올 때까지 알림이 영영 안 뜬다.
   try { syncRtBanners(); } catch (e) { /* 초기화 전이면 무시 */ }
+  // ⬅ ✕·바깥클릭·Esc·저장완료 로 닫았으면 히스토리도 한 칸 되돌린다.
+  //   (안 그러면 «죽은 뒤로가기» 한 번이 남아 사용자가 눌러도 아무 일도 안 일어난다)
+  if (modal._sjNav && !fromHistory) { modal._sjNav = false; navBack(); }
+  else { modal._sjNav = false; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ✍ 작성 중 이탈 보호 (2026-08-19)
+   ────────────────────────────────────────────────────────────────────
+   사업 추가·수정 폼, 접수 처리메모·시민 안내문, 정책제안 답변을 쓰다가
+   ✕·바깥클릭·Esc·탭 이동·뒤로가기로 나가면 «확인 없이» 사라지던 문제를 막는다.
+   판정은 «연 순간의 값과 달라졌는가» — 아무것도 손대지 않았으면 묻지 않는다.
+   ⚠ 저장·삭제가 «성공한 뒤»의 closeModal 은 묻지 않는다(이미 반영됐으므로).
+   ══════════════════════════════════════════════════════════════════════ */
+const DIRTY_GUARD_IDS = new Set(["modal", "aModal", "pModal"]);   // 읽기 전용 모달(방침·버전)은 제외
+// 🔑 비밀번호 모달은 제외 — 닫을 때 비밀번호 칸을 «반드시» 비우는 보안 규약이 있어 되물을 게 없다.
+
+function formSnapshot(modal) {
+  if (!modal || !DIRTY_GUARD_IDS.has(modal.id)) return null;
+  const out = [];
+  modal.querySelectorAll("input, textarea, select").forEach((n) => {
+    if (n.type === "password") { out.push(""); return; }
+    if (n.type === "checkbox" || n.type === "radio") out.push(n.checked ? "1" : "0");
+    else out.push(String(n.value == null ? "" : n.value));
+  });
+  return JSON.stringify(out);   // 칸 경계가 섞이지 않도록 배열 그대로 직렬화
+}
+
+function isModalDirty(modal) {
+  if (!modal || modal._sjSnap == null) return false;
+  return formSnapshot(modal) !== modal._sjSnap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ❓ askConfirm — 브라우저 confirm() 을 대신하는 «앱 안» 확인 창 (2026-08-19)
+   ────────────────────────────────────────────────────────────────────
+   왜 바꿨나 — 기본 confirm() 은 제목에 «…의 메시지»와 주소가 뜬다. 공무원에게는
+     낯선 문구이고, 앱 디자인과도 따로 논다. Esc 동작도 앱 규약(= «취소»)과 어긋났다.
+   계약 — askConfirm(opts) 는 «Promise<boolean>» 을 돌려준다.
+     · true  = 위험한 쪽(«확인»/«삭제»/«공개») 을 눌렀다
+     · false = 안전한 쪽(«취소»)·Esc·바깥클릭
+   ★ 초점은 열릴 때 «취소» 에 둔다 — 엔터 연타로 삭제되는 사고를 막는 것이 목적이다.
+   ⚠ 다른 모달과 달리 openModal/navPush 를 쓰지 않는다. 이 앱의 모달 관리는
+     «한 번에 하나»(_activeModal) + «열기 = 히스토리 한 칸» 이라, 확인 창을 그 위에
+     겹쳐 열면 뒤 모달의 _activeModal 이 덮이고 히스토리도 어긋난다.
+     대신 초점 트랩은 _trapKeydown 맨 위에서 ASK_RESOLVE 로 가로챈다.
+   ⚠ confirm() 은 동기였고 이것은 «비동기»다 — 부르는 쪽은 반드시 await 해야 한다.
+     await 를 빠뜨리면 Promise 객체가 언제나 참이라 «묻지도 않고 실행»된다.
+   ══════════════════════════════════════════════════════════════════════ */
+function askConfirm(opts) {
+  opts = opts || {};
+  const m = document.getElementById("askModal");
+  // 안전망 — 마크업이 없는(캐시된 구버전 HTML) 화면에서도 «묻기»는 살아 있어야 한다.
+  if (!m) return Promise.resolve(window.confirm((opts.title || "") + "\n\n" + (opts.body || "")));
+  if (ASK_RESOLVE) return Promise.resolve(false);   // 이미 떠 있으면 중복으로 열지 않는다
+  const t = $("#askTitle").querySelector("span") || $("#askTitle");
+  t.textContent = opts.title || "확인";
+  $("#askBody").textContent = opts.body || "";
+  $("#askKeep").textContent = opts.cancelText || "취소";
+  $("#askGo").textContent = opts.okText || "확인";
+  ASK_LASTFOCUS = document.activeElement;
+  m.classList.remove("hidden");
+  return new Promise((resolve) => {
+    ASK_RESOLVE = resolve;
+    setTimeout(() => { const b = $("#askKeep"); if (b) b.focus(); }, 30);   // 초점 = 안전한 쪽
+  });
+}
+// 확인 창을 닫으며 결과를 넘긴다. Esc·바깥클릭·두 단추가 모두 여기로 모인다.
+function askDone(v) {
+  const r = ASK_RESOLVE;
+  ASK_RESOLVE = null;
+  const m = document.getElementById("askModal");
+  if (m) m.classList.add("hidden");
+  const back = ASK_LASTFOCUS; ASK_LASTFOCUS = null;
+  if (back && typeof back.focus === "function") { try { back.focus(); } catch (e) {} }
+  if (r) r(v);
+}
+{
+  const _ask = document.getElementById("askModal");
+  if (_ask) {
+    $("#askKeep").addEventListener("click", () => askDone(false));
+    $("#askGo").addEventListener("click", () => askDone(true));
+    _ask.addEventListener("click", (e) => { if (e.target.id === "askModal") askDone(false); });
+  }
+}
+
+// 사용자가 «나가려고» 할 때 부른다. 나가도 되면 true. ⚠ 비동기 — 반드시 await.
+async function confirmLeaveModal(modal) {
+  if (!isModalDirty(modal)) return true;
+  return await askConfirm({
+    title: "작성 중인 내용이 있습니다",
+    body: "저장하지 않고 닫으면 지금까지 쓴 내용이 사라집니다.",
+    cancelText: "계속 작성",
+    okText: "닫기"
+  });
+}
+
+// requestCloseModal(modal) — «사용자가 닫으려 한다». ✕·바깥클릭·Esc·뒤로가기가 부른다.
+//   작성 중이면 한 번 묻고, 확인했을 때만 실제로 닫는다.
+//   ⚠ 비동기가 됐지만 «반환값을 쓰는 호출부는 한 곳도 없다»(전수 확인 2026-08-19) —
+//     ✕·바깥클릭·Esc 는 모두 결과를 보지 않으므로 흐름이 깨지지 않는다.
+async function requestCloseModal(modal, opts) {
+  if (!modal) return false;
+  if (!(await confirmLeaveModal(modal))) return false;
+  closeModal(modal, opts);
+  return true;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ⬅ 브라우저·OS 뒤로가기 연동 (2026-08-19)
+   ────────────────────────────────────────────────────────────────────
+   공무원앱은 PWA(standalone)로 설치해 쓰므로 주소창이 없다. 히스토리를 쓰지
+   않으면 안드로이드 «물리 뒤로가기» 한 번에 앱이 통째로 종료돼 작성 중이던
+   처리메모가 함께 사라졌다.
+     · 탭 전환  → 히스토리 한 칸 push
+     · 모달 열기 → 히스토리 한 칸 push  (뒤로가기 = «모달만» 닫힘)
+     · 첫 탭(루트)에서 뒤로가기 → 앱 종료(정상)
+   히스토리 state 에 «어느 화면인가»를 통째로 담아 두므로 앞으로가기도 어긋나지 않는다.
+   ⚠ 세션 만료 배너는 히스토리를 쓰지 않으므로 이 구조와 충돌하지 않는다.
+   ══════════════════════════════════════════════════════════════════════ */
+let NAV_READY = false;    // showApp() 이후에만 동작(로그인 화면에서는 히스토리를 건드리지 않는다)
+let NAV_CUR = null;       // 지금 서 있는 히스토리 항목
+let NAV_SEQ = 0;
+
+function navView(view) { return { sj: true, i: NAV_SEQ, view }; }
+
+function navReset(view) {
+  NAV_SEQ = 0;
+  NAV_CUR = navView(view);
+  try { history.replaceState(NAV_CUR, ""); } catch (e) { /* 파일 프로토콜 등 */ }
+  NAV_READY = true;
+}
+
+function navPush(view) {
+  if (!NAV_READY) return;
+  NAV_SEQ++;
+  NAV_CUR = navView(view);
+  try { history.pushState(NAV_CUR, ""); } catch (e) {}
+}
+
+// 화면 전환 슬라이드 방향 — NAV_SEQ(i)는 «단조 증가»라, 목적지 i 가 작으면 뒤로 간 것이다.
+//   (규격서 §14: 앞으로 = 왼쪽으로 밀림, 뒤로 = 오른쪽으로 — «히스토리 방향과 일치»)
+function navDir(prev, next) {
+  const a = prev && typeof prev.i === "number" ? prev.i : 0;
+  const b = next && typeof next.i === "number" ? next.i : 0;
+  return b < a ? "back" : "fwd";
+}
+
+function navBack() {
+  if (!NAV_READY) return;
+  try { history.back(); } catch (e) {}
+}
+
+window.addEventListener("popstate", (e) => {
+  if (!NAV_READY) return;
+  const prev = NAV_CUR;
+  const st = (e.state && e.state.sj) ? e.state : null;
+  // 우리 항목이 아니면(맨 처음 진입 지점) 루트 탭으로 본다
+  const view = st ? st.view : { type: "tab", tab: "applications" };
+
+  // ⓪ 확인 창이 떠 있는 동안의 뒤로가기 = «취소»로 본다.
+  //    확인 창은 히스토리를 쌓지 않으므로, 물러난 한 칸을 되돌려 놓고 끝낸다.
+  if (ASK_RESOLVE) {
+    askDone(false);
+    NAV_CUR = prev;
+    try { history.pushState(prev, ""); } catch (err) {}
+    return;
+  }
+
+  // ① 모달이 열려 있으면 «모달만» 닫는다 — 앱 밖으로 나가지 않는다
+  if (_activeModal) {
+    const sameModal = view.type === "modal" && view.id === _activeModal.id;
+    if (!sameModal) {
+      // ✍ 작성 중이면 «먼저» 히스토리를 원위치로 되돌린 뒤 확인 창으로 묻는다.
+      //    확인 창은 비동기라, 되돌리기를 나중으로 미루면 그 사이 다른 popstate 가 끼어들어
+      //    히스토리가 어긋난다. «확인»을 누르면 그때 closeModal 이 스스로 한 칸 물러난다(navBack).
+      if (isModalDirty(_activeModal)) {
+        const m = _activeModal;
+        NAV_CUR = prev;
+        try { history.pushState(prev, ""); } catch (err) {}
+        confirmLeaveModal(m).then((ok) => { if (ok) closeModal(m); });
+        return;
+      }
+      closeModal(_activeModal, { fromHistory: true });
+      NAV_CUR = st;
+      if (view.type === "tab" && view.tab && view.tab !== pCurrentTab) switchTab(view.tab, { fromHistory: true, dir: navDir(prev, st) });
+      return;
+    }
+    NAV_CUR = st;
+    return;
+  }
+
+  // ② 탭 되돌리기 (앞으로가기로 «모달» 항목에 닿아도 내용은 되살릴 수 없으므로 탭만 맞춘다)
+  NAV_CUR = st;
+  if (view.tab && view.tab !== pCurrentTab) switchTab(view.tab, { fromHistory: true, dir: navDir(prev, st) });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   🎞 움직임(애니메이션) 공용 헬퍼 — 규격서 §14 (2026-08-19)
+   ────────────────────────────────────────────────────────────────────
+   시간·이징 값은 style.css 의 --dur-* / --ease-move 한 곳에서만 정한다.
+   ⚠ 공통 규칙: 저감 모션이면 «전부» 끈다 · 정보를 움직임에만 담지 않는다 ·
+      자동 반복·깜빡임 없다 · 일하는 화면(접수 처리 중)은 조용하게.
+   ══════════════════════════════════════════════════════════════════════ */
+function prefersReducedMotion() {
+  try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; }
+}
+
+/* 숫자 카운트업 — 0 에서 실제값까지 .9s.
+   ★ 최종값은 «먼저» .kpi-sr(보조기기 전용)에 넣는다. 눈에 보이는 .kpi-vis 는 aria-hidden 이라
+     올라가는 도중 값이 낭독되지 않는다(규격서 §14: 스크린리더가 최종값을 읽게 할 것).
+   ★ 값이 그대로면 애니메이션하지 않는다(캐시로 즉시 표시될 때 굳이 움직이지 않는다). */
+function countUp(box, value) {
+  if (!box) return;
+  const target = Number(value) || 0;
+  const sr = box.querySelector(".kpi-sr");
+  const vis = box.querySelector(".kpi-vis");
+  if (!sr || !vis) { box.textContent = String(target); return; }   // 옛 마크업 대비
+  if (Number(sr.textContent) === target) return;                   // 같은 값 → 조용히 둔다
+  sr.textContent = String(target);                                 // ① 최종값을 DOM 에 먼저
+  // ⚠ 화면이 «보이지 않는» 탭에서는 requestAnimationFrame 이 아예 돌지 않는다.
+  //   그대로 두면 다시 켰을 때 숫자가 0 인 채로 남는다 → 곧바로 최종값을 넣는다.
+  if (prefersReducedMotion() || document.visibilityState !== "visible") {
+    vis.textContent = String(target); return;
+  }
+  const from = Number(vis.textContent) || 0;
+  const t0 = performance.now(), DUR = 900;
+  if (box._cntRaf) cancelAnimationFrame(box._cntRaf);
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / DUR);
+    const e = 1 - Math.pow(1 - k, 3);                              // ease-out (이징 곡선과 같은 결)
+    vis.textContent = String(Math.round(from + (target - from) * e));
+    if (k < 1) box._cntRaf = requestAnimationFrame(step);
+    else { box._cntRaf = null; vis.textContent = String(target); }
+  };
+  box._cntRaf = requestAnimationFrame(step);
+}
+window.sjCountUp = countUp;      // stats.js(도넛·지표)도 같은 함수를 쓴다
+
+/* 스켈레톤 — «불러오는 중»을 회색 블록으로. 반짝임 없이 1.2s 순환(style.css).
+   ★ 이미 자료가 있으면 넣지 않는다(다시 불러올 때 화면이 껌뻑이지 않게).
+   ★ 움직임만으로 알리지 않도록 «불러오는 중» 글자를 보조기기용으로 함께 둔다. */
+function showSkeleton(sel, rows) {
+  const box = $(sel);
+  if (!box || box.children.length) return;                          // 이미 내용이 있으면 그대로
+  const n = rows || 4;
+  let html = '<div class="skel-wrap" role="status" aria-live="polite"><span class="sr-only">불러오는 중입니다.</span>';
+  for (let i = 0; i < n; i++) {
+    html += '<div class="skel-row" aria-hidden="true">' +
+            '<div class="skel-bar w30"></div><div class="skel-bar w80"></div><div class="skel-bar w55"></div></div>';
+  }
+  box.innerHTML = html + "</div>";
+}
+
+/* 카드 순차 등장 — 위에서부터 40ms 간격. 최대 8장까지만 지연(긴 목록에서 답답해지지 않게). */
+function staggerCards(listEl) {
+  if (!listEl || prefersReducedMotion()) return;
+  const kids = listEl.children;
+  for (let i = 0; i < kids.length; i++) {
+    kids[i].classList.add("card-in");
+    kids[i].style.setProperty("--i", String(Math.min(i, 8)));
+  }
+}
+
+/* 방금 처리한 행 강조 — 상태를 바꾼 «그 줄»이 1.2s 은은히 밝아졌다 돌아온다.
+   ★ 색만으로 알리지 않는다 — 같은 카드 안에 «방금 변경» 글자 배지를 함께 붙인다.
+     (배지는 저감 모션에서도 그대로 보인다 — 정보가 움직임에만 담기지 않게) */
+let JUST_CHANGED_ID = null;
+function markJustChanged(id) { JUST_CHANGED_ID = id == null ? null : String(id); }
+function applyJustChanged(card, id) {
+  if (JUST_CHANGED_ID == null || String(id) !== JUST_CHANGED_ID) return;
+  card.classList.add("just-changed");
+  const top = card.querySelector(".pcard-top");
+  if (top) {
+    const tag = el("span", "just-tag");
+    tag.textContent = "방금 변경";
+    top.appendChild(tag);
+  }
+  JUST_CHANGED_ID = null;                       // 한 번만
+}
+
+/* 완료 체크 — 저장·상태변경이 «성공했을 때만» 1회. 원(.4s) → 체크(.25s).
+   ★ 같은 내용을 announce() 가 글로도 알리므로, 못 본 사람도 결과를 안다.
+   ★ 저감 모션이면 아예 띄우지 않는다(글 안내만 남는다). */
+function showDoneCheck(text) {
+  if (prefersReducedMotion()) return;
+  const old = document.getElementById("doneCheck");
+  if (old) old.remove();
+  const box = el("div", "done-check");
+  box.id = "doneCheck";
+  box.setAttribute("aria-hidden", "true");      // 낭독은 announce() 가 담당(중복 방지)
+  box.innerHTML =
+    '<svg viewBox="0 0 56 56" focusable="false"><circle class="dc-ring" cx="28" cy="28" r="24"/>' +
+    '<path class="dc-tick" d="M17 29l7.5 7.5L39 22"/></svg>' +
+    '<span class="dc-text"></span>';
+  box.querySelector(".dc-text").textContent = text || "저장했습니다";
+  document.body.appendChild(box);
+  setTimeout(() => { if (box.parentNode) box.remove(); }, 1500);
+}
+
+// 🔄 새로고침·창 닫기 — 앱 «밖»으로 나가는 경로도 똑같이 막는다(브라우저 기본 확인창).
+window.addEventListener("beforeunload", (e) => {
+  if (LOGGING_OUT) return;              // 로그아웃·«로그인 화면으로»는 사용자가 스스로 고른 이탈
+  if (!isModalDirty(_activeModal)) return;
+  e.preventDefault();
+  e.returnValue = "";                   // 크롬 등 구형 규약 호환(문구는 브라우저가 정한다)
+});
 
 // ---------- 버전 정보 + 버전별 개선사항(체인지로그) ----------
 // 데이터 단일 소스: version.js의 window.APP_VERSION / window.APP_CHANGELOG.
@@ -376,6 +712,9 @@ async function login() {
 async function showApp() {
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
+  // ⬅ 히스토리 루트를 «첫 탭»으로 잡는다. 여기서 뒤로가기를 누르면 앱이 종료되는 것이 정상.
+  //    (로그인 화면에서는 NAV_READY 가 거짓이라 히스토리를 전혀 건드리지 않는다)
+  navReset({ type: "tab", tab: pCurrentTab });
   bindUI();
   bindProposalsUI();
   bindApplicationsUI();
@@ -585,15 +924,15 @@ function bindUI() {
     location.reload();                  // 초기 상태(로그인 화면)로 — 열람하던 데이터도 사라짐
   };
   // C2: 닫기/바깥클릭은 closeModal로 통일(포커스 복귀). Esc는 _trapKeydown이 일괄 처리.
-  $("#mClose").onclick = () => closeModal($("#modal"));
-  $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal($("#modal")); });
+  $("#mClose").onclick = () => requestCloseModal($("#modal"));
+  $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal") requestCloseModal($("#modal")); });
 
   // 🔑 비밀번호 변경 모달 (열기/닫기/바깥클릭) — Esc는 공통 트랩에서 처리
   const pwm = $("#pwModal");
   if (pwm) {
     $("#btnChangePw").onclick = openChangePw;
-    $("#pwClose").onclick = () => closeModal(pwm);
-    pwm.addEventListener("click", (e) => { if (e.target.id === "pwModal") closeModal(pwm); });
+    $("#pwClose").onclick = () => requestCloseModal(pwm);
+    pwm.addEventListener("click", (e) => { if (e.target.id === "pwModal") requestCloseModal(pwm); });
     $("#pwSave").onclick = submitChangePw;
     // 입력 중 규칙 미리 확인 — 「변경하기」를 눌러야 알 수 있던 것을 미리 알려 준다(300ms 디바운스).
     // 안내는 role="status"(polite) 라 타이핑을 방해하지 않는다.
@@ -607,12 +946,38 @@ function bindUI() {
     }, 300));
   }
 
+  /* 계정 메뉴 — 비밀번호 변경·로그아웃을 하나로 접었다(규격서 0절 «버튼 총량 3개»).
+     ⚠ 안에 든 버튼의 id 는 그대로라, 위쪽 btnChangePw·btnLogout 연결이 그대로 동작한다.
+     ⚠ 모달이 아니라 «메뉴»다 — 바깥을 누르거나 Esc 면 닫히고, 초점은 여는 버튼으로 돌아간다. */
+  const acctBtn = $("#btnAcct"), acctPop = $("#acctPop");
+  if (acctBtn && acctPop) {
+    const setAcct = (open) => {
+      acctPop.hidden = !open;
+      acctBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) { const f = acctPop.querySelector("button"); if (f) f.focus(); }
+    };
+    acctBtn.onclick = (e) => { e.stopPropagation(); setAcct(acctPop.hidden); };
+    document.addEventListener("click", (e) => {
+      if (acctPop.hidden) return;
+      if (acctPop.contains(e.target) || acctBtn.contains(e.target)) return;
+      setAcct(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      // 모달이 열려 있으면 Esc 는 모달 몫이다(_trapKeydown) — 메뉴는 건드리지 않는다.
+      if (e.key !== "Escape" || acctPop.hidden || _activeModal) return;
+      setAcct(false);
+      acctBtn.focus();
+    });
+    // 메뉴 안에서 무엇을 고르면 메뉴는 닫는다(그 뒤 동작은 각 버튼이 한다)
+    acctPop.addEventListener("click", (e) => { if (e.target.closest("button")) setAcct(false); });
+  }
+
   // 개인정보 처리방침 모달 (열기/닫기/바깥클릭) — Esc는 공통 트랩에서 처리
   const pp = $("#ppModal");
   if (pp) {
     $("#btnPrivacy").onclick = () => openModal(pp);
-    $("#ppClose").onclick = () => closeModal(pp);
-    pp.addEventListener("click", (e) => { if (e.target.id === "ppModal") closeModal(pp); });
+    $("#ppClose").onclick = () => requestCloseModal(pp);
+    pp.addEventListener("click", (e) => { if (e.target.id === "ppModal") requestCloseModal(pp); });
   }
 
   // 버전 라벨 + 버전별 개선사항(체인지로그) 모달 — Esc는 공통 트랩에서 처리
@@ -627,8 +992,8 @@ function bindUI() {
   if (vm && vbtn) {
     renderChangelog();
     vbtn.onclick = () => openModal(vm);
-    $("#vmClose").onclick = () => closeModal(vm);
-    vm.addEventListener("click", (e) => { if (e.target.id === "versionModal") closeModal(vm); });
+    $("#vmClose").onclick = () => requestCloseModal(vm);
+    vm.addEventListener("click", (e) => { if (e.target.id === "versionModal") requestCloseModal(vm); });
   }
 }
 
@@ -672,6 +1037,7 @@ function isMissingNoteColumn(error) {
 }
 
 async function loadBenefits() {
+  showSkeleton("#list", 4);           // 첫 불러오기에만
   const { data, error } = await sb.from("benefits").select("*").order("seq", { nullsFirst: false }).order("id");
   if (error) {
     console.error(error);
@@ -684,6 +1050,7 @@ async function loadBenefits() {
   RT_PENDING = 0; syncRtBanners();     // 새로 불러왔으니 «밀린 알림»도 지운다
   CATS = [...new Set(ALL.flatMap((r) => r.categories || []))].sort();
   $("#dbInfo").textContent = `사업 ${ALL.length}건 · 실시간`;
+  renderBSummary();
   renderCats();
   render();
 }
@@ -756,6 +1123,28 @@ function setRealtimeDot(ok) {
   if (t) t.textContent = msg;      // role="status" → 바뀌는 순간 낭독된다
 }
 
+/* 📊 요약 띠 — 설계안 «통계는 각 탭 상단 요약 띠».
+   ⚠ «실제로 셀 수 있는 수»만 둔다. 없는 항목(임시저장·마감 등)을 지어내지 않는다.
+   ⚠ 수치는 countUp() 이 채운다 — 최종값이 먼저 DOM 에 들어가 낭독기가 최종값을 읽는다. */
+function renderBSummary() {
+  const box = $("#bSummary"); if (!box) return;
+  if (!ALL.length) { box.hidden = true; return; }
+  box.hidden = false;
+  countUp($("#kpiBAll"), ALL.length);
+  countUp($("#kpiBCat"), CATS.length);
+  countUp($("#kpiBNote"), ALL.filter((r) => noteText(r)).length);
+}
+
+function renderPSummary() {
+  const box = $("#pSummary"); if (!box) return;
+  if (!PALL.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const st = (r) => r.status || "접수";
+  countUp($("#kpiPAll"), PALL.length);
+  countUp($("#kpiPNew"), PALL.filter((r) => st(r) === "접수" || st(r) === "검토중").length);
+  countUp($("#kpiPDone"), PALL.filter((r) => (r.admin_reply || "").trim()).length);
+}
+
 function renderCats() {
   const box = $("#catChips"); box.innerHTML = "";
   CATS.forEach((cat) => {
@@ -819,6 +1208,7 @@ function render() {
     });
     list.appendChild(card);
   });
+  staggerCards(list);
   renderPager(rows.length, pages);
 }
 
@@ -1015,11 +1405,19 @@ function openEdit(r) {
       if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
     }
     closeModal($("#modal"));
+    showDoneCheck("저장했습니다");
     announce("저장되었습니다.");
     await loadBenefits();
   };
   if (r) $("#mDel").onclick = async () => {
-    if (!confirm("이 사업을 삭제하시겠습니까?")) return;
+    // 되돌릴 수 없는 삭제 — 초점은 «취소»에 놓인다(askConfirm 규약).
+    const ok = await askConfirm({
+      title: "이 사업을 삭제할까요?",
+      body: "삭제하면 시민 화면에서도 사라집니다.",
+      cancelText: "취소",
+      okText: "삭제"
+    });
+    if (!ok) return;
     const res = await sb.from("benefits").delete().eq("id", r.id);
     if (res.error) { announce(writeErrMsg(res.error, "삭제")); alert(writeErrMsg(res.error, "삭제")); return; }
     closeModal($("#modal"));
@@ -1069,7 +1467,13 @@ async function refreshFormsList(r) {
     const row = byId[li.dataset.id];
     const btn = li.querySelector(".forms-del");
     if (btn) btn.onclick = async () => {
-      if (!confirm(`'${row.file_name}' 서식을 삭제하시겠습니까?`)) return;
+      const ok = await askConfirm({
+        title: "서식을 삭제할까요?",
+        body: `'${row.file_name}' 파일을 저장소에서 지웁니다. 되돌릴 수 없습니다.`,
+        cancelText: "취소",
+        okText: "삭제"
+      });
+      if (!ok) return;
       btn.disabled = true;
       fSetStatus("삭제 중…");
       try {
@@ -1119,7 +1523,9 @@ const REPLY_REQUIRED = new Set(["반영", "불채택"]); // 전환 시 답변/�
 let PALL = [], PCATS = [], P_SELCAT = new Set(), P_STATUS = "전체";
 let pSort = "new", pPage = 0, P_LOADED = false;
 let P_REPORTS = {}; // proposal_id -> 신고 건수
-let pCurrentTab = "benefits";
+// 첫 화면(루트) 탭 = 신청 접수. index.html 의 .tab-btn.on / 보이는 섹션과 «반드시» 같아야
+// 뒤로가기가 엉뚱한 탭으로 가지 않는다.
+let pCurrentTab = "applications";
 
 function bindProposalsUI() {
   // 실시간 알림 띠의 «새로고침» — 목록 갱신은 오직 이 클릭으로만 일어난다
@@ -1148,12 +1554,34 @@ function bindProposalsUI() {
   });
   $("#pSearch").addEventListener("input", debounce(() => { pPage = 0; renderProposals(); }, 300));
   $("#pSortSel").addEventListener("change", () => { pSort = $("#pSortSel").value; renderProposals(); });
-  $("#pmClose").onclick = () => closeModal($("#pModal"));
-  $("#pModal").addEventListener("click", (e) => { if (e.target.id === "pModal") closeModal($("#pModal")); });
+  $("#pmClose").onclick = () => requestCloseModal($("#pModal"));
+  $("#pModal").addEventListener("click", (e) => { if (e.target.id === "pModal") requestCloseModal($("#pModal")); });
   // Esc는 공통 트랩(_trapKeydown)에서 처리 — 중복 등록 제거
 }
 
-function switchTab(which) {
+// switchTab(which) — 호출 계약 유지(인자 하나로 부르던 기존 코드 그대로 동작).
+//   opts.fromHistory=true 면 뒤로/앞으로가기로 «되돌아온» 경우라 히스토리를 새로 쌓지 않는다.
+function switchTab(which, opts) {
+  const fromHistory = !!(opts && opts.fromHistory);
+  // 화면 전환 슬라이드 방향(규격서 §14). 사용자가 «새로» 옮기면 앞으로, 뒤로가기면 뒤로.
+  const dir = (opts && opts.dir) || (fromHistory ? "back" : "fwd");
+  // ✍ 모달이 열린 채로 탭을 옮기려 하면(키보드·프로그램 호출) 작성 중인 내용부터 확인한다.
+  //   모달 닫기가 히스토리를 한 칸 되돌리므로(navBack), 그게 «끝난 뒤»에 탭을 옮긴다.
+  //   ⚠ 확인이 «비동기»가 됐다(askConfirm). switchTab 자체를 async 로 바꾸면 부르는 곳이
+  //     20곳 넘어 흐름이 흔들리므로, 여기서만 then 으로 이어 붙이고 즉시 되돌아간다
+  //     (원래도 이 갈래는 곧바로 return 했으므로 호출부가 보는 동작은 그대로다).
+  if (!fromHistory && _activeModal) {
+    const m = _activeModal;
+    confirmLeaveModal(m).then((ok) => {
+      if (!ok) return;
+      closeModal(m);
+      setTimeout(() => switchTab(which), 0);
+    });
+    return;
+  }
+  // ⬅ 탭 전환을 히스토리 한 칸으로 — 뒤로가기를 누르면 «직전 탭»으로 돌아온다.
+  //   같은 탭을 다시 누르면 쌓지 않는다(눌러도 아무 일 없는 «죽은 뒤로가기» 방지).
+  if (!fromHistory && which !== pCurrentTab) navPush({ type: "tab", tab: which });
   pCurrentTab = which;
   // 탭 3종: 신청 접수 · 사업 관리 · 정책제안 관리. 선택된 하나만 보이고 나머지는 숨긴다.
   const MAP = {
@@ -1171,7 +1599,17 @@ function switchTab(which) {
       t.tabIndex = on ? 0 : -1;
     }
     // class(스타일) + hidden 속성(보조기기·검사기) 둘 다 맞춰 준다.
-    if (s) { s.classList.toggle("hidden", !on); s.hidden = !on; }
+    if (s) {
+      s.classList.toggle("hidden", !on);
+      s.hidden = !on;
+      // 화면 전환 슬라이드 — 보이게 되는 패널에만, 방향에 맞는 클래스를 «다시» 건다.
+      //   (같은 클래스를 그대로 두면 애니메이션이 재생되지 않으므로 한 번 지우고 붙인다)
+      s.classList.remove("slide-fwd", "slide-back");
+      if (on && !prefersReducedMotion()) {
+        void s.offsetWidth;                       // 리플로우 강제 → 애니메이션 재시작
+        s.classList.add(dir === "back" ? "slide-back" : "slide-fwd");
+      }
+    }
   });
   // 건너뛰기 링크는 유일한 <main id="main"> 으로 고정 — 탭이 바뀌어도 목적지가 항상 유효하다.
   if (which === "proposals" && !P_LOADED) loadProposals();
@@ -1179,6 +1617,7 @@ function switchTab(which) {
 }
 
 async function loadProposals() {
+  showSkeleton("#pList", 4);          // 첫 불러오기에만(이미 목록이 있으면 그대로 둔다)
   // 공무원은 숨김(is_hidden) 글도 모두 본다 → 필터 없이 전체 조회
   const { data, error } = await sb.from("proposals").select("*").order("created_at", { ascending: false });
   if (error) {
@@ -1191,6 +1630,7 @@ async function loadProposals() {
   PCATS = [...new Set(PALL.map((r) => r.category).filter(Boolean))].sort();
   P_LOADED = true;
   await loadReportCounts();
+  renderPSummary();
   renderPStatusChips();
   renderPCatChips();
   renderProposals();
@@ -1300,8 +1740,10 @@ function renderProposals() {
     card.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openIt(); }
     });
+    applyJustChanged(card, r.id);      // 방금 답변·상태를 바꾼 줄 강조(+ «방금 변경» 글자 배지)
     list.appendChild(card);
   });
+  staggerCards(list);
   renderPPager(rows.length, pages);
 }
 
@@ -1380,6 +1822,8 @@ async function openProposal(r) {
     const { error } = await sb.from("proposals").update(patch).eq("id", r.id);
     if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
     closeModal($("#pModal"));
+    markJustChanged(r.id);
+    showDoneCheck("저장했습니다");
     announce("정책제안이 저장되었습니다.");
     await loadProposals();
   };
@@ -1407,18 +1851,23 @@ async function loadReportDetail(proposalId) {
    ============================================================ */
 // ⚠ 상태값은 «접수/심사중/승인/반려» 4값(PC config.APPLICATION_STATUSES·SQL CHECK 와 동일)
 const A_STATUSES = (window.SangjuApply && SangjuApply.STATUSES) || ["접수", "심사중", "승인", "반려"];
-let AALL = [], A_STATUS = "전체", aPage = 0, A_LOADED = false;
+// 📥 접수 탭 «기본 필터 = 처리 대기»(설계안 확정) — 들어오자마자 손볼 것만 보인다.
+//    (예전엔 «전체»가 기본이라 처리할 건을 고르는 데 클릭이 두 번 더 들었다)
+const A_WAIT = "처리 대기";                 // 접수 + 심사중 을 한 칩으로 묶은 «가상» 상태
+const A_WAIT_SET = new Set(["접수", "심사중"]);
+let AALL = [], A_STATUS = A_WAIT, aPage = 0, A_LOADED = false;
 
 function bindApplicationsUI() {
   const s = $("#aSearch");
   if (s) s.addEventListener("input", debounce(() => { aPage = 0; renderApplications(); }, 300));
-  const c = $("#amClose"); if (c) c.onclick = () => closeModal($("#aModal"));
+  const c = $("#amClose"); if (c) c.onclick = () => requestCloseModal($("#aModal"));
   const m = $("#aModal");
-  if (m) m.addEventListener("click", (e) => { if (e.target.id === "aModal") closeModal($("#aModal")); });
+  if (m) m.addEventListener("click", (e) => { if (e.target.id === "aModal") requestCloseModal($("#aModal")); });
   // Esc·포커스 트랩은 공통 _trapKeydown 이 처리(중복 등록 없음)
 }
 
 async function loadApplications() {
+  showSkeleton("#aList", 4);          // 첫 불러오기에만
   let data;
   try {
     data = await SangjuApply.listApplications();
@@ -1448,7 +1897,8 @@ function subscribeApplicationsRealtime() {
 function renderAStatusChips() {
   const box = $("#aStatusChips"); if (!box) return;
   box.innerHTML = "";
-  ["전체", ...A_STATUSES].forEach((st) => {
+  // «처리 대기»를 맨 앞에 — 자주 쓰는 것을 손 가까이(규격서 0절)
+  [A_WAIT, "전체", ...A_STATUSES].forEach((st) => {
     const c = el("button", "chip" + (A_STATUS === st ? " on" : ""));
     c.type = "button";
     c.textContent = st;
@@ -1471,7 +1921,9 @@ function renderApplications() {
   const list = $("#aList"); if (!list) return;
   const q = ($("#aSearch") ? $("#aSearch").value : "").trim().toLowerCase();
   let rows = AALL.filter((r) => {
-    if (A_STATUS !== "전체" && (r.status || "접수") !== A_STATUS) return false;
+    const rst = r.status || "접수";
+    if (A_STATUS === A_WAIT) { if (!A_WAIT_SET.has(rst)) return false; }
+    else if (A_STATUS !== "전체" && rst !== A_STATUS) return false;
     if (q) {
       const blob = `${r.benefit_name || ""} ${r.applicant_name || ""} ${r.phone || ""} ${r.receipt_no || ""} ${r.team || ""}`.toLowerCase();
       if (!blob.includes(q)) return false;
@@ -1483,7 +1935,10 @@ function renderApplications() {
 
   $("#aCount").textContent = `총 ${rows.length}건`;
   if (!rows.length) {
-    list.innerHTML = '<div class="empty">조건에 맞는 신청이 없습니다.</div>';
+    // 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절) — 기본이 «처리 대기»라 0건일 수 있다.
+    list.innerHTML = A_STATUS === A_WAIT
+      ? '<div class="empty">처리할 신청이 없습니다. 위 «전체»를 눌러 지난 접수를 볼 수 있습니다.</div>'
+      : '<div class="empty">조건에 맞는 신청이 없습니다.</div>';
     $("#aPager").innerHTML = "";
     return;
   }
@@ -1527,8 +1982,10 @@ function renderApplications() {
     card.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openIt(); }
     });
+    applyJustChanged(card, r.id);      // 방금 상태를 바꾼 줄이면 «방금 변경» 배지 + 은은한 강조
     list.appendChild(card);
   });
+  staggerCards(list);                  // 카드 순차 등장(최대 8장 지연)
   renderAPager(rows.length, pages);
 }
 
@@ -1619,20 +2076,25 @@ async function openApplication(r) {
       const RE_PHONE = /01\d[- ]?\d{3,4}[- ]?\d{4}/;
       const RE_ACCT  = /(?:^|[^0-9])\d{2,6}-\d{2,6}-\d{2,6}(?!\d)/;
       if (RE_JUMIN.test(reply) || RE_PHONE.test(reply) || RE_ACCT.test(reply)) {
-        if (!confirm("시민 안내문에 연락처 또는 주민등록번호로 보이는 숫자가 들어 있습니다.\n"
-                   + "이 글은 신청자에게 그대로 공개됩니다. 그래도 저장할까요?")) {
-          $("#amReply").focus();
-          return;
-        }
+        const okPii = await askConfirm({
+          title: "개인정보로 보이는 숫자가 있습니다",
+          body: "시민 안내문에 연락처 또는 주민등록번호로 보이는 숫자가 들어 있습니다.\n"
+              + "이 글은 신청자에게 그대로 공개됩니다. 그래도 저장할까요?",
+          cancelText: "다시 보기",
+          okText: "그대로 저장"
+        });
+        if (!okPii) { $("#amReply").focus(); return; }
       }
-      if (!confirm("아래 글이 신청자 화면에 「그대로」 보입니다.\n\n"
-                 + "────────────────\n" + reply + "\n────────────────\n\n"
-                 + "신청자 본인 외 다른 사람의 이름·연락처가 들어 있지는 않은지, 내부 판단이 섞이지는 않았는지 확인해 주세요.\n"
-                 + "한 번 공개하면 신청자가 이미 읽었을 수 있어 되돌릴 수 없습니다.\n\n"
-                 + "이대로 공개할까요?")) {
-        $("#amReply").focus();
-        return;
-      }
+      const okOpen = await askConfirm({
+        title: "이 글을 신청자에게 공개할까요?",
+        body: "아래 글이 신청자 화면에 「그대로」 보입니다.\n\n"
+            + "────────────────\n" + reply + "\n────────────────\n\n"
+            + "신청자 본인 외 다른 사람의 이름·연락처가 들어 있지는 않은지, 내부 판단이 섞이지는 않았는지 확인해 주세요.\n"
+            + "한 번 공개하면 신청자가 이미 읽었을 수 있어 되돌릴 수 없습니다.",
+        cancelText: "다시 보기",
+        okText: "공개"
+      });
+      if (!okOpen) { $("#amReply").focus(); return; }
     }
     // 💬 시민 안내문은 «달라졌을 때만» 보낸다.
     //    같은 값을 다시 보내면 서버 쪽 감사기록(admin_audit)이 «직전 값»을 읽느라
@@ -1647,6 +2109,8 @@ async function openApplication(r) {
       announce(m); alert(m); return;
     }
     closeModal($("#aModal"));
+    markJustChanged(r.id);              // 다시 그릴 때 그 줄이 «방금 변경»으로 보이게
+    showDoneCheck("저장했습니다");
     announce(reply
       ? "신청 접수가 저장되었습니다. 시민 안내문은 신청자 화면에 그대로 공개됩니다."
       : "신청 접수가 저장되었습니다.");
@@ -1654,7 +2118,13 @@ async function openApplication(r) {
   };
 
   $("#amDelete").onclick = async () => {
-    if (!confirm(`이 신청(접수번호 ${r.receipt_no || "-"})을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+    const ok = await askConfirm({
+      title: "이 신청을 삭제할까요?",
+      body: `접수번호 ${r.receipt_no || "-"} 신청을 지웁니다.\n되돌릴 수 없습니다.`,
+      cancelText: "취소",
+      okText: "삭제"
+    });
+    if (!ok) return;
     try {
       await SangjuApply.deleteApplication(r.id);
     } catch (err) {

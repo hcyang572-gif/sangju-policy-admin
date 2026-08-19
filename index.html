@@ -33,7 +33,7 @@
 <meta name="apple-mobile-web-app-title" content="상주정책(공무원용)">
 <meta name="application-name" content="상주정책(공무원용)">
 
-<link rel="stylesheet" href="style.css?v=0.4.2">
+<link rel="stylesheet" href="style.css?v=0.4.3">
 <link rel="icon" href="assets/icon-admin-192.png">
 </head>
 <body>
@@ -47,7 +47,7 @@
 <!-- 인앱 브라우저(카톡·네이버 등) 안내: 진짜 브라우저로 열어야 PWA 설치·정상 사용 가능 -->
 <!-- 로그인·앱 화면 위 어디서나 보이도록 body 최상단에 1개만 배치 -->
 <div id="inappBanner" class="inapp-banner hidden" role="region" aria-label="브라우저 안내">
-  <span class="inapp-emoji" aria-hidden="true">📲</span>
+  <span class="inapp-emoji" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.4h3"/></svg></span>
   <div class="inapp-body">
     <div id="inappText" class="inapp-text"></div>
     <div class="inapp-actions">
@@ -55,48 +55,95 @@
       <button id="inappCopy" class="inapp-btn ghost" type="button" aria-label="현재 주소 복사" hidden>주소 복사</button>
     </div>
   </div>
-  <button id="inappClose" class="inapp-close" type="button" aria-label="안내 닫기">✕</button>
+  <button id="inappClose" class="inapp-close" type="button" aria-label="안내 닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
 </div>
 
 <!-- 「홈 화면에 추가」 안내 — 설치가 실제로 가능할 때만(a2hs.js 가 beforeinstallprompt 를 받았을 때) 뜬다.
      설치하면 주소창 없이 «일반 앱처럼» 전체화면으로 열린다. 한 번 닫으면 다시 나오지 않는다. -->
 <div id="a2hsBanner" class="a2hs" role="region" aria-label="앱 설치 안내" hidden>
-  <span class="a2hs-emoji" aria-hidden="true">📲</span>
+  <span class="a2hs-emoji" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.4h3"/></svg></span>
   <p class="a2hs-text">홈 화면에 추가하면 주소창 없이 <b>일반 앱처럼</b> 쓸 수 있습니다.</p>
   <button id="a2hsInstall" class="a2hs-btn" type="button">홈 화면에 추가</button>
-  <button id="a2hsClose" class="a2hs-close" type="button" aria-label="설치 안내 닫기 — 다시 표시하지 않음">✕</button>
+  <button id="a2hsClose" class="a2hs-close" type="button" aria-label="설치 안내 닫기 — 다시 표시하지 않음"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
 </div>
 
 <!-- 로그인 -->
+<!-- ═══════════════════════════════════════════════════════════════
+     로그인 화면 — 확정 「1안 분할 화면」 (2026-08-19 양호창님 결정)
+     왼쪽 = 브랜드 면(감빛 그라데이션 · 상상주도 · 시정구호) 46%
+     오른쪽 = 폼 면(브랜드 한 덩어리 · 입력2+버튼1 · 도움 한 줄) 54%
+     ⚠ 구호는 «브랜드 면에만» 둔다 — 폼 면에 또 넣으면 덩어리 상한(규격서 §15)을 넘는다.
+     ⚠ PC앱(webui)도 «같은 시안·같은 수치»를 쓴다. 배지 색만 다르다
+        (공무원앱 #0E7C86 · 공무원 PC용 #2F6B3A). 한쪽만 고치지 말 것.
+     ⛔ 「로그인 없이 입장」(게스트) 버튼은 2026-08-04 «영구 제거»했습니다.
+        이 화면은 시민 신청자의 성명·연락처·문의내용(개인정보)에 접근하는 입구입니다.
+        우회 입장을 두면 주소를 아는 누구나 그 개인정보를 열람할 수 있어
+        개인정보 보호법 §29(안전조치 의무) 위반 소지가 됩니다. 되살리지 마세요.
+     ═══════════════════════════════════════════════════════════════ -->
 <div id="login" class="login-screen">
-  <div class="login-card">
-    <img src="assets/sangsang1.png" class="login-logo" alt="상상주도 로고">
-    <!-- 브랜드 제목 표기(3개 앱 공통 규약) — 「시민 참여형」(작게) + 「상주시 정책플랫폼」(크게) + 배지 「공무원용」.
-         배지는 제목 «뒤»에 두며, h1 안에 두어 낭독기에도 «어느 앱인지»가 제목과 함께 읽히게 한다. -->
-    <span class="login-eyebrow">시민 참여형</span>
-    <h1 class="login-title">상주시 정책플랫폼<span class="brand-tag">공무원용</span></h1>
-    <p class="login-sub"><img src="assets/gotgam.png" class="login-gotgam" alt="상주 곶감">공무원 관리자 로그인 (클라우드)</p>
-    <!-- 2026 시정구호 — 이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수).
-         로그인 카드는 폭이 좁으므로 2줄형만 쓴다(1줄형은 글자가 너무 작아진다). -->
-    <img src="assets/slogan-stack.png" class="login-slogan" width="901" height="183"
-         alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
+  <div class="login-split">
 
-    <label for="email" class="sr-only">이메일</label>
-    <input id="email" type="email" class="login-input" placeholder="이메일" autocomplete="username" aria-label="이메일">
-    <label for="pw" class="sr-only">비밀번호</label>
-    <input id="pw" type="password" class="login-input" placeholder="비밀번호" autocomplete="current-password" aria-label="비밀번호">
-    <button id="loginBtn" class="login-btn">🔐 로그인</button>
-    <p id="loginErr" class="login-err" role="alert" aria-live="assertive"></p>
-    <!-- ⛔ 「로그인 없이 입장」(게스트) 버튼은 2026-08-04 «영구 제거»했습니다.
-         이 화면은 시민 신청자의 성명·연락처·문의내용(개인정보)에 접근하는 입구입니다.
-         우회 입장을 두면 주소를 아는 누구나 그 개인정보를 열람할 수 있어
-         개인정보 보호법 §29(안전조치 의무) 위반 소지가 됩니다. 되살리지 마세요.
-         시연·테스트가 필요하면 계정을 하나 더 만들어 쓰십시오. -->
-    <p class="login-help">계정이 없거나 비밀번호를 잊으셨다면 시스템 담당자(<strong>hcyang572@korea.kr</strong>)에게 요청해 주세요.</p>
+    <!-- ── 브랜드 면(46%) — 덩어리 «하나»: 제목뿐 ────────────────────────
+         ⚠ 2026-08-19 양호창님 지시로 «상상주도 로고 칩»을 뺐다. 되살리지 말 것.
+            로고는 로그인 뒤 헤더에 그대로 있고, 로그인 화면은 «가장 단순해야 할 화면»이다(규격서 §15).
+         ⚠ 2026-08-19 양호창님 지시로 «시정구호»도 여기서 뺐다. 되살리지 말 것.
+            구호는 상주시 «공식 상징물»이라 색을 바꿔 쓸 수 없다(규격서 §18).
+            감빛 면 위에 원색으로 얹으면 1.4:1 로 묻히므로, 구호는 흰 폼 면 아래에 «원색 그대로» 둔다.
+            (폐기된 흰 단색본 assets/slogan-white.png · make_slogan_white.py 는 파일만 남아 있고 화면에서 쓰지 않는다.)
+         ⚠ 허전하다고 설명 문구를 채우지 않는다(규격서 §0 «글은 짧게»). 배치로 푼다 —
+            제목을 세로 가운데에 두고, 배경 그라데이션·장식 원의 균형으로 면을 채운다.
+         ⚠ 제목에 <br> 을 박지 않는다 — 폭이 바뀌면 어색하게 갈라진다.
+            word-break:keep-all + max-width 로 «단어 단위»로 저절로 접히게 둔다(§16). -->
+    <div class="login-brandside">
+      <div class="lb-txt">
+        <span class="lb-eyebrow">시민 참여형</span>
+        <h1 class="lb-title">상주시 정책플랫폼</h1>
+      </div>
+    </div>
+
+    <!-- ── 폼 면(54%) — 제목+배지 · 입력 2 · 버튼 · 계정 문의 · 시정구호 ──
+         ⚠ 「담당자 계정으로 들어갑니다」 같은 설명은 두지 않는다.
+            «로그인» 이라는 제목과 «공무원용» 배지가 이미 말하고 있다. -->
+    <div class="login-formside">
+      <div class="login-card">
+        <!-- 2026 시정구호 — 상주시 «공식 상징물»이라 원본(assets/slogan-wide.png)을 «원색 그대로» 쓴다.
+             ⚠ 색을 바꾸거나(단색화) 판·테두리·그림자·투명도를 덧대지 않는다(규격서 §18).
+             흰 폼 면(#fff) 위 실측 대비 — 먹색 #2B2829 14.60:1 · 빨강 #D92D3A 4.79:1 · 청록 #00ABBD 2.78:1.
+             청록만 3:1 아래지만 «로고·상징물의 글자»는 대비 예외(WCAG 1.4.3 logotype)이고,
+             글의 내용은 alt 로 100% 전달된다. 예외를 근거로 «색을 고치지 않는 것»이 §18 의 결론이다.
+             ⚠ 제목보다 «위»에 있어도 제목이 화면의 중심이다 — 구호는 세로 33px 로 가볍게 둔다.
+             이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수). -->
+        <div class="login-slogan">
+          <img src="assets/slogan-wide.png" width="1201" height="122"
+               alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
+        </div>
+
+        <h2 class="login-title">로그인<span class="brand-tag">공무원용</span></h2>
+
+        <div class="login-form">
+          <div class="login-field">
+            <label for="email" class="login-lab">이메일</label>
+            <input id="email" type="email" class="login-input" placeholder="hong@korea.kr" autocomplete="username">
+          </div>
+          <div class="login-field">
+            <label for="pw" class="login-lab">비밀번호</label>
+            <input id="pw" type="password" class="login-input" autocomplete="current-password">
+          </div>
+        </div>
+
+        <button id="loginBtn" class="login-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>로그인</span></button>
+
+        <!-- ★ 오류는 «버튼 아래»에 둔다. 위에 두면 오류가 뜰 때 버튼이 내려가
+             누르려던 자리가 어긋난다(오조작). 자리는 비어 있어도 잡아 둔다. -->
+        <p id="loginErr" class="login-err" role="alert" aria-live="assertive"></p>
+
+        <p class="login-help">계정 문의 <strong>hcyang572@korea.kr</strong></p>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- 앱 -->
 <div id="app" class="app hidden">
   <!-- 로그인 만료 안내 띠 — 작성 중인 내용을 지키기 위한 장치(KWCAG 6.2.1 «시간 제한»).
        ① 만료 2분 전: «로그인 연장» 으로 계속 작업 가능
@@ -116,11 +163,12 @@
       <span class="brand-eyebrow">시민 참여형</span>
       <h1 class="brand-title">상주시 정책플랫폼<span class="brand-tag">공무원용</span></h1>
       <div class="brand-sub" id="dbInfo">사업 관리 (실시간)</div>
+      <!-- 2026 시정구호 — 공통 규격서 §6: 로고 → 아이브로 → 제목(+배지) → 구호 순서.
+           «잘 보이되 제목보다 작게»(제목 블록보다 확실히 작은 폭). 좁은 화면에서는 CSS 가 감춘다.
+           이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수). -->
+      <img src="assets/slogan-wide.png" class="top-slogan" width="1201" height="122"
+           alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
     </div>
-    <!-- 2026 시정구호 — 대표 제목 바로 옆에 «크게»(넓은 화면 320px 이상). 좁은 화면에서는 CSS 가 감춘다.
-         이미지에 담긴 «글»이 곧 내용이라 장식이 아니다(alt 필수). -->
-    <img src="assets/slogan-wide.png" class="top-slogan" width="1201" height="122"
-         alt="이상을 꿈꾸고, 현실로 만드는, 대한민국의 중심 상주입니다.">
     <div class="top-actions">
       <!-- 실시간 연결 표시 — 상태가 바뀌면 app.js setRealtimeDot() 이 «글자»(rt-dot-text)와
            title 을 함께 갱신한다. 색(●)만으로 상태를 전하지 않기 위함(KWCAG 5.4.1)이며,
@@ -129,21 +177,29 @@
         <span class="rt-dot-mark" aria-hidden="true">●</span>
         <span class="rt-dot-text">실시간 연결됨</span>
       </span>
-      <button class="top-btn solid" id="btnAdd" type="button" aria-label="새 사업 추가">➕ 새 사업</button>
-      <!-- 🔑 담당자가 «스스로» 비밀번호를 바꾸는 입구.
-           계정은 시스템 담당자가 만들어 임시 비밀번호를 알려 주므로, 그 값을 계속 쓰면
-           «본인만 아는 비밀번호»가 되지 못한다(개인정보의 안전성 확보조치 기준). -->
-      <button class="top-btn ghost" id="btnChangePw" type="button">🔑 비밀번호 변경</button>
-      <button class="top-btn ghost" id="btnLogout" type="button">로그아웃</button>
+      <!-- 계정 메뉴 — 비밀번호 변경·로그아웃을 «하나»로 접었다(규격서 0절: 한 화면 버튼 3개 상한).
+           ⚠ 버튼 id(btnChangePw·btnLogout)는 그대로 둔다 — app.js bindUI() 가 그 id 로 연결한다.
+           «새 사업»은 사업 탭 안으로 옮겼다(설계안: 목록에서 바로 올리기). -->
+      <div class="acct">
+        <button class="top-btn ghost" id="btnAcct" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="acctPop"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>계정</span></button>
+        <div class="acct-pop" id="acctPop" role="menu" aria-labelledby="btnAcct" hidden>
+          <!-- 🔑 담당자가 «스스로» 비밀번호를 바꾸는 입구.
+               계정은 시스템 담당자가 만들어 임시 비밀번호를 알려 주므로, 그 값을 계속 쓰면
+               «본인만 아는 비밀번호»가 되지 못한다(개인정보의 안전성 확보조치 기준). -->
+          <button class="top-btn ghost" id="btnChangePw" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="14" r="4"/><path d="m11.2 10.8 8.8-8.8M17 5l2.4 2.4M14.2 7.8l2.4 2.4"/></svg><span>비밀번호 변경</span></button>
+          <button class="top-btn ghost" id="btnLogout" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 17l5-5-5-5"/><path d="M20 12H9"/><path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6"/></svg><span>로그아웃</span></button>
+        </div>
+      </div>
     </div>
   </header>
   <div class="topline"></div>
 
-  <!-- 상단 탭: 신청 접수 ↔ 사업 관리 ↔ 정책제안 관리 (신청 접수 = 공무원 1순위 → 기본 탭) -->
+  <!-- 상단 탭 3개(설계안 확정): 접수 처리 ↔ 사업 ↔ 시민 제안.
+       접수 처리 = 공무원 1순위 업무 → 첫 탭(= 히스토리 루트). -->
   <nav class="tabbar" role="tablist" aria-label="관리 화면 전환">
-    <button id="tabApplications" class="tab-btn on" type="button" role="tab" aria-selected="true" aria-controls="secApplications" tabindex="0">📥 신청 접수</button>
-    <button id="tabBenefits" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secBenefits" tabindex="-1">📂 사업 관리</button>
-    <button id="tabProposals" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secProposals" tabindex="-1">🗳 정책제안 관리</button>
+    <button id="tabApplications" class="tab-btn on" type="button" role="tab" aria-selected="true" aria-controls="secApplications" tabindex="0"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>접수 처리</span></button>
+    <button id="tabBenefits" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secBenefits" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>사업</span></button>
+    <button id="tabProposals" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secProposals" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>시민 제안</span></button>
   </nav>
 
   <!-- ⚠ main 은 문서에 하나만 둘 수 있다(보이는 main 중복 금지, main 에 tabpanel 역할 부여 불가)
@@ -153,14 +209,28 @@
   <!-- 섹션 0: 신청 접수 (신규·공무원 1순위) — 시민앱 신청이 Supabase 로 실시간 도착 -->
   <section id="secApplications" class="content" role="tabpanel" aria-labelledby="tabApplications">
     <h2 class="sr-only">신청 접수</h2>
-    <div class="search-hint">📥 시민 신청을 실시간으로 접수·처리하세요. 상태 변경·처리메모는 모든 접속자에게 즉시 반영됩니다.</div>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>시민 신청을 실시간으로 처리합니다. 바꾼 내용은 곧바로 반영됩니다.</span></p>
 
     <!-- 📊 이달의 접수 현황(도넛) — 확정 시안 A 의 도넛을 그대로 옮긴 «현황» 자리.
          수치·조각 길이는 stats.js 가 실제 접수 목록에서 «이번 달»만 골라 채운다(app.js 는 손대지 않는다).
          접수가 한 건도 없는 달에는 통째로 숨긴다(hidden).
          ⚠ 색만으로 알리지 않는다 — 범례에 건수·비율과 «모양»(원/둥근사각/각사각/마름모)을 함께 두고,
             <title>/<desc> 에 같은 수치를 글로 적어 낭독기에도 동일한 정보를 준다. -->
-    <figure id="aStats" class="stats-card" hidden>
+    <!-- ── 요약 지표 + 이달의 접수 도넛 (확정 시안 A 목업의 «상단 요약» 그대로) ──────────
+         왼쪽 지표 4개는 2×2, 오른쪽은 도넛. 수치는 stats.js 가 실제 접수 목록에서 계산한다.
+         자료를 아직 못 불러왔거나 이번 달 접수가 0건이면 통째로 숨긴다(hidden). -->
+    <div id="aSummary" class="sum-row" hidden>
+      <!-- 요약 지표 4개 — 규격서 §14 «숫자 카운트업».
+           ⚠ 최종값은 .kpi-sr 에 «먼저» 들어간다(낭독기는 이 값만 읽는다).
+              눈에 보이는 .kpi-vis 는 aria-hidden 이라, 0 에서 올라가는 도중이 낭독되지 않는다. -->
+      <section class="kpis" aria-label="접수 현황 요약">
+        <div class="kpi k-now"><b id="kpiToday"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>오늘 접수</span></div>
+        <div class="kpi k-rev"><b id="kpiReview"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>심사중</span></div>
+        <div class="kpi k-ok"><b id="kpiOk"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 승인</span></div>
+        <div class="kpi k-no"><b id="kpiNo"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 반려</span></div>
+      </section>
+
+      <figure id="aStats" class="stats-card">
       <figcaption class="stats-cap">이달의 접수 <b id="aStatsTotal">0</b>건 · 상태별</figcaption>
       <div class="donut-wrap">
         <svg class="donut" viewBox="0 0 140 140" role="img" aria-labelledby="aStatsT aStatsD">
@@ -181,23 +251,29 @@
           <li><span class="dn-mk m2" aria-hidden="true"></span>심사중<b id="aLgN2">0</b><em id="aLgP2">0%</em></li>
           <li><span class="dn-mk m3" aria-hidden="true"></span>접수<b id="aLgN3">0</b><em id="aLgP3">0%</em></li>
           <li><span class="dn-mk m4" aria-hidden="true"></span>반려<b id="aLgN4">0</b><em id="aLgP4">0%</em></li>
-        </ul>
-      </div>
-    </figure>
+          </ul>
+        </div>
+      </figure>
+    </div>
 
     <div id="aStatusChips" class="chips wrap" role="group" aria-label="상태 필터"></div>
     <div class="toolbar">
       <label for="aSearch" class="sr-only">사업명 · 신청자 · 연락처 · 접수번호 검색</label>
-      <input id="aSearch" class="search-input wide" type="search" placeholder="🔎 사업명 · 신청자 · 연락처 · 접수번호 검색" aria-label="사업명 · 신청자 · 연락처 · 접수번호 검색">
+      <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="aSearch" class="search-input wide" type="search" placeholder="사업명 · 신청자 · 연락처 · 접수번호 검색" aria-label="사업명 · 신청자 · 연락처 · 접수번호 검색"></span>
       <span id="aCount" class="count" role="status" aria-live="polite"></span>
     </div>
     <!-- 실시간 알림 띠: 새 접수가 와도 화면을 저절로 바꾸지 않고 여기서 알린다(정지 기능 불필요) -->
     <div id="aRtBanner" class="rt-banner" role="status" aria-live="polite" hidden>
-      <span aria-hidden="true">🔔</span>
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
       <span id="aRtText" class="rt-banner-text"></span>
       <button id="aRtBtn" class="rt-banner-btn" type="button">새로고침</button>
     </div>
-    <div id="aList" class="cardlist"></div>
+    <!-- 카드형 표의 «머리행» — 넓은 화면에서만 보인다(좁으면 카드가 세로로 쌓여 의미가 없다).
+         카드마다 aria-label 로 상태·사업명·신청자가 이미 낭독되므로 여기서는 aria-hidden 으로 중복을 막는다. -->
+    <div class="list-head" aria-hidden="true">
+      <span>상태 · 담당팀 · 접수번호</span><span>사업명</span><span>신청자 · 연락처 · 접수일시</span>
+    </div>
+    <div id="aList" class="cardlist rows"></div>
     <div id="aPager" class="pager-wrap"></div>
   </section>
 
@@ -205,19 +281,28 @@
   <section id="secBenefits" class="content hidden" role="tabpanel" aria-labelledby="tabBenefits" hidden>
     <!-- 화면에는 탭 버튼이 제목 역할을 하므로 heading 은 보조기기 전용으로만 둔다 -->
     <h2 class="sr-only">사업 관리</h2>
-    <div class="search-hint">🔎 사업을 검색하거나 분야를 선택해 조회·관리하세요. (변경은 모든 접속자에게 실시간 반영)</div>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>사업을 찾아 고치거나 새로 올립니다.</span></p>
+    <!-- 요약 띠 — 값은 app.js renderBSummary() 가 채운다(실제로 세는 수만 둔다). -->
+    <div id="bSummary" class="sum-mini" hidden>
+      <div class="kpi k-now"><b id="kpiBAll"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>전체 사업</span></div>
+      <div class="kpi k-rev"><b id="kpiBCat"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>분야</span></div>
+      <div class="kpi k-ok"><b id="kpiBNote"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>접수 안내 있음</span></div>
+    </div>
     <div id="catChips" class="chips wrap" role="group" aria-label="분야 필터"></div>
     <div class="toolbar">
       <label for="search" class="sr-only">사업명 · 내용 · 담당팀 검색</label>
-      <input id="search" class="search-input wide" type="search" placeholder="🔎 사업명 · 내용 · 담당팀 검색" aria-label="사업명 · 내용 · 담당팀 검색">
+      <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="search" class="search-input wide" type="search" placeholder="사업명 · 내용 · 담당팀 검색" aria-label="사업명 · 내용 · 담당팀 검색"></span>
       <label for="sortSel" class="sr-only">정렬 기준</label>
       <select id="sortSel" class="sort-select" aria-label="정렬 기준"><option value="seq">기본순</option><option value="name">사업명순</option></select>
       <span id="count" class="count" role="status" aria-live="polite"></span>
+      <!-- 설계안: «새 사업 올리기»는 상단이 아니라 사업 목록 바로 위에 둔다.
+           ⚠ id(btnAdd)는 그대로 — app.js bindUI() 가 이 id 로 연결한다. -->
+      <button class="top-btn solid" id="btnAdd" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg><span>새 사업 올리기</span></button>
     </div>
     <!-- 실시간 알림 띠: 새 데이터가 와도 화면을 저절로 바꾸지 않고 여기서 알린다.
          (자동 변경이 없으므로 «정지 기능»이 따로 필요 없다) -->
     <div id="rtBanner" class="rt-banner" role="status" aria-live="polite" hidden>
-      <span aria-hidden="true">🔔</span>
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
       <span id="rtText" class="rt-banner-text"></span>
       <button id="rtBtn" class="rt-banner-btn" type="button">새로고침</button>
     </div>
@@ -228,12 +313,19 @@
   <!-- 섹션 2: 정책제안 관리 (신규) — 비활성 패널은 class 와 hidden 속성을 함께 걸어 보조기기에도 확실히 숨긴다 -->
   <section id="secProposals" class="content hidden" role="tabpanel" aria-labelledby="tabProposals" hidden>
     <h2 class="sr-only">정책제안 관리</h2>
-    <div class="search-hint">🗳 시민 정책제안을 검토·답변·관리하세요. 숨김(블라인드) 글도 공무원에게는 보입니다. (변경은 실시간 반영)</div>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>시민 제안을 검토하고 답변합니다. 블라인드 글도 여기서는 보입니다.</span></p>
+    <!-- 요약 띠 — 설계안 «통계는 각 탭 상단 요약 띠». 값은 app.js renderPSummary() 가 채운다.
+         ⚠ 최종값은 .kpi-sr 에 먼저 넣고 .kpi-vis 만 카운트업한다(규격서 §14). -->
+    <div id="pSummary" class="sum-mini" hidden>
+      <div class="kpi k-now"><b id="kpiPAll"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>전체 제안</span></div>
+      <div class="kpi k-rev"><b id="kpiPNew"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>검토 대기</span></div>
+      <div class="kpi k-ok"><b id="kpiPDone"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>답변 완료</span></div>
+    </div>
     <div id="pStatusChips" class="chips wrap" role="group" aria-label="상태 필터"></div>
     <div id="pCatChips" class="chips wrap mt-8" role="group" aria-label="분야 필터"></div>
     <div class="toolbar">
       <label for="pSearch" class="sr-only">제목 · 내용 · 닉네임 검색</label>
-      <input id="pSearch" class="search-input wide" type="search" placeholder="🔎 제목 · 내용 · 닉네임 검색" aria-label="제목 · 내용 · 닉네임 검색">
+      <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="pSearch" class="search-input wide" type="search" placeholder="제목 · 내용 · 닉네임 검색" aria-label="제목 · 내용 · 닉네임 검색"></span>
       <label for="pSortSel" class="sr-only">정렬 기준</label>
       <select id="pSortSel" class="sort-select" aria-label="정렬 기준">
         <option value="new">최신순</option>
@@ -244,7 +336,7 @@
     <!-- 실시간 알림 띠: 새 데이터가 와도 화면을 저절로 바꾸지 않고 여기서 알린다.
          (자동 변경이 없으므로 «정지 기능»이 따로 필요 없다) -->
     <div id="pRtBanner" class="rt-banner" role="status" aria-live="polite" hidden>
-      <span aria-hidden="true">🔔</span>
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
       <span id="pRtText" class="rt-banner-text"></span>
       <button id="pRtBtn" class="rt-banner-btn" type="button">새로고침</button>
     </div>
@@ -257,7 +349,9 @@
     <img src="assets/gotgam.png" class="foot-gotgam" alt="상주 곶감">
     <span>상주시 정책 플랫폼</span>
     <!-- 도움 정보(문의 창구)를 시민앱 푸터와 같은 위치·순서로 둔다 -->
-    <span class="foot-inquiry">오류 문의 <a class="foot-mail" href="mailto:hcyang572@korea.kr">hcyang572@korea.kr</a></span>
+    <!-- ⚠ 화면 문구는 「불편신고」로 통일했다(2026-08-19). 메일 «제목 태그» [오류문의] 는
+         발송 판별용이라 건드리지 않는다 — 문구와 태그는 별개다. -->
+    <span class="foot-inquiry">불편신고 <a class="foot-mail" href="mailto:hcyang572@korea.kr">hcyang572@korea.kr</a></span>
     <button id="btnPrivacy" class="foot-link" type="button">개인정보 처리방침</button>
     <button id="btnVersion" class="foot-link" type="button" aria-label="v0.0.2 — 버전별 개선사항 보기">v0.0.2</button>
   </footer>
@@ -268,7 +362,7 @@
   <div class="modal">
     <div class="modal-head">
       <span id="mTitle" class="modal-title">사업</span>
-      <button id="mClose" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <button id="mClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="mBody" class="modal-body"></div>
   </div>
@@ -278,8 +372,8 @@
 <div id="aModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="amTitle">
   <div class="modal">
     <div class="modal-head admin">
-      <span id="amTitle" class="modal-title">📥 신청 접수</span>
-      <button id="amClose" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <span id="amTitle" class="modal-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>신청 접수</span></span>
+      <button id="amClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="amBody" class="modal-body"></div>
   </div>
@@ -289,8 +383,8 @@
 <div id="pModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
   <div class="modal">
     <div class="modal-head admin">
-      <span id="pmTitle" class="modal-title">🗳 정책제안</span>
-      <button id="pmClose" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <span id="pmTitle" class="modal-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>정책제안</span></span>
+      <button id="pmClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="pmBody" class="modal-body"></div>
   </div>
@@ -305,8 +399,8 @@
 <div id="pwModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pwTitle">
   <div class="modal">
     <div class="modal-head">
-      <span id="pwTitle" class="modal-title">🔑 비밀번호 변경</span>
-      <button id="pwClose" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <span id="pwTitle" class="modal-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="14" r="4"/><path d="m11.2 10.8 8.8-8.8M17 5l2.4 2.4M14.2 7.8l2.4 2.4"/></svg><span>비밀번호 변경</span></span>
+      <button id="pwClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="modal-body">
       <p class="pw-intro">처음 받으신 임시 비밀번호는 <strong>본인만 아는 값</strong>으로 바꿔 주세요. 바꾼 뒤에도 지금 로그인은 그대로 유지됩니다.</p>
@@ -333,7 +427,7 @@
 
       <!-- 변경 결과·실패 사유(한글). 즉시 알려야 하므로 alert/assertive. -->
       <p id="pwErr" class="pw-msg" role="alert" aria-live="assertive"></p>
-      <div class="modal-actions"><button id="pwSave" class="top-btn solid" type="button">🔑 변경하기</button></div>
+      <div class="modal-actions"><button id="pwSave" class="top-btn solid" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="14" r="4"/><path d="m11.2 10.8 8.8-8.8M17 5l2.4 2.4M14.2 7.8l2.4 2.4"/></svg><span>변경하기</span></button></div>
     </div>
   </div>
 </div>
@@ -342,8 +436,8 @@
 <div id="ppModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="ppTitle">
   <div class="modal">
     <div class="modal-head">
-      <span id="ppTitle" class="modal-title">🔒 개인정보 처리방침</span>
-      <button id="ppClose" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <span id="ppTitle" class="modal-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5.8c0 4.2-2.9 7.9-7 9.2-4.1-1.3-7-5-7-9.2V6z"/><path d="m9 12 2 2 4-4"/></svg><span>개인정보 처리방침</span></span>
+      <button id="ppClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="pp-notice" role="note" aria-label="처리방침 안내">
@@ -355,9 +449,9 @@
       <ul class="pp-list">
         <li><strong>관리자(공무원) 계정</strong>: 로그인 이메일, 비밀번호(암호화 저장)</li>
         <li><strong>사업 정보</strong>: 사업명, 담당팀, 담당 연락처, 담당자 이메일, 지원대상·내용 등(업무용 연락처)</li>
-        <li><strong>시민 지원사업 신청</strong>: 신청자 성명, 연락처(휴대전화), 문의사항, 신청 사업명, 접수번호, 처리상태·처리메모, 시민 안내문, 조회코드
+        <li><strong>시민 지원사업 신청</strong>: 신청자 성명, 연락처(휴대전화), 문의사항, 신청 사업명, 접수번호, 처리상태·처리메모, 시민 안내문, 확인 번호
           <br><span class="pp-sub">※ <strong>처리메모</strong>는 부서 내부 기록으로 신청자에게 보이지 않으며, <strong>시민 안내문</strong>은 신청자가 「내 신청 현황」에서 그대로 읽습니다.
-          <strong>조회코드</strong>는 신청자 휴대폰에서 만들어진 무작위 값(개인정보 아님)으로, 본인 신청의 상태 확인에만 쓰입니다.</span></li>
+          <strong>확인 번호</strong>는 신청자 휴대폰에서 만들어진 무작위 값(개인정보 아님)으로, 본인 신청의 상태 확인에만 쓰입니다.</span></li>
         <li><strong>시민 정책제안</strong>: 제목·내용, 닉네임(익명), 지역, 공감/신고 내역(작성 시 실명·전화·주민번호 등 민감정보 미수집 원칙)</li>
       </ul>
 
@@ -394,10 +488,33 @@
 <div id="versionModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="vmTitle">
   <div class="modal">
     <div class="modal-head">
-      <span id="vmTitle" class="modal-title">📋 버전별 개선사항</span>
-      <button id="vmClose" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <span id="vmTitle" class="modal-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8.5 6H21M8.5 12H21M8.5 18H21M3.6 6h.01M3.6 12h.01M3.6 18h.01"/></svg><span>버전별 개선사항</span></span>
+      <button id="vmClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="changelogBody" class="modal-body changelog-body"></div>
+  </div>
+</div>
+
+<!-- ══ 공용 확인 모달 (#askModal) — 2026-08-19 ═══════════════════════════════
+     브라우저 기본 confirm() 을 대신한다. 기본 창은 제목에 «…의 메시지» 와 주소가 뜨고,
+     앱 디자인·Esc 규약(커스텀 = «취소»)과도 따로 논다.
+     ★ 문서 «맨 마지막» 모달로 둔다 — z-index 가 같아도 늦게 나온 것이 위에 그려진다.
+     ★ role="alertdialog" — 사용자의 답을 반드시 받아야 하는 창이다(닫기 ✕ 를 두지 않는다).
+     ★ 초점은 열릴 때 «안전한 쪽(취소)» 에 둔다. 실수로 삭제하는 것을 막는 것이 목적이다.
+     ⚠ 다른 모달과 달리 히스토리를 쌓지 않는다(app.js askConfirm 주석 참조). ══════ -->
+<div id="askModal" class="modal-backdrop hidden" role="alertdialog" aria-modal="true"
+     aria-labelledby="askTitle" aria-describedby="askBody">
+  <div class="modal ask">
+    <div class="modal-head">
+      <h2 id="askTitle" class="modal-title"><span>확인</span></h2>
+    </div>
+    <div class="modal-body">
+      <p id="askBody" class="ask-body"></p>
+      <div class="ask-actions">
+        <button type="button" id="askKeep" class="top-btn solid">취소</button>
+        <button type="button" id="askGo" class="top-btn danger">확인</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -408,24 +525,28 @@
         integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- 공통 버전·개선사항 단일 소스(앱 스크립트보다 먼저 로드) -->
-<script src="version.js?v=0.4.2"></script>
-<script src="config.js?v=0.4.2"></script>
+<script src="version.js?v=0.4.3"></script>
+<script src="config.js?v=0.4.3"></script>
 <!-- 서식 스토리지 공용 헬퍼(세 앱 공통). app.js 보다 먼저 로드 -->
-<script src="forms.js?v=0.4.2"></script>
+<script src="forms.js?v=0.4.3"></script>
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
-<script src="apply_client.js?v=0.4.2"></script>
-<script src="app.js?v=0.4.2"></script>
+<script src="apply_client.js?v=0.4.3"></script>
+<script src="app.js?v=0.4.3"></script>
 <!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
      CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.
        · tap.js   — 버튼 눌림 파동 + 햅틱(진동). 화면에 무엇을 그리지는 않는다.
        · stats.js — 「이달의 접수」 도넛 채우기. app.js 가 만든 목록을 «읽기만» 한다.
-       · a2hs.js  — 「홈 화면에 추가」 안내. 닫으면 다시 뜨지 않는다. -->
-<script src="tap.js?v=0.4.2"></script>
-<script src="stats.js?v=0.4.2"></script>
-<script src="a2hs.js?v=0.4.2"></script>
+       · a2hs.js  — 「홈 화면에 추가」 안내. 닫으면 다시 뜨지 않는다.
+       · icons.js — app.js 가 «만들어 내는» 화면의 이모지를 인라인 SVG 로 바꿔 끼운다.
+         (app.js 를 고치지 않고 «그려진 뒤의 글자»만 바꾼다 — 세 앱이 글자 단위로 같아야 하는
+          문자열까지 원본을 건드리지 않고 다룰 수 있다) -->
+<script src="tap.js?v=0.4.3"></script>
+<script src="icons.js?v=0.4.3"></script>
+<script src="stats.js?v=0.4.3"></script>
+<script src="a2hs.js?v=0.4.3"></script>
 
 <!-- PWA 서비스워커 등록 (상대경로 → /admin/ 하위에서만 동작, 시민앱과 분리) -->
 <!-- 서비스워커 등록 — CSP 적용을 위해 인라인 대신 별도 파일(sw-register.js)로 둔다 -->
-<script src="sw-register.js?v=0.4.2"></script>
+<script src="sw-register.js?v=0.4.3"></script>
 </body>
 </html>

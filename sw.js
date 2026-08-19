@@ -25,9 +25,27 @@
 // 배포 버전 — 버전정보.json 의 "version" 및 version.js 의 APP_VERSION 과 항상 같은 값.
 // ⚠ 손으로 고치지 말고 루트의 `py -3 자원버전_동기화.py` 를 돌리면
 //    이 값과 index.html 의 ?v= 쿼리가 한 번에 맞춰진다.
-const ASSET_V = "0.4.2";
+const ASSET_V = "0.4.3";
 
-const CACHE = "sangju-admin-v25";   // v25: 0.4.2 - 하위 경로 문서가 앱 홈 캐시를 덮어쓰던 결함 수정
+// v26 사유 (2026-08-19, 🔵손길) — index.html·style.css·app.js 를 «셋 다» 고쳤다.
+//   ① 폰(≤599px) «가로 띠» 로그인 배경을 낮춰 아이브로 대비를 4.45 → 5.90:1 로 올림 (style.css)
+//   ② 브라우저 기본 confirm() 6곳을 앱 안 확인 창(#askModal)으로 통일 (index.html + app.js)
+//   ★ ②는 «마크업(#askModal) 이 있어야만» 새 app.js 가 제대로 동작한다. 캐시 이름을 올리지 않으면
+//     설치된 공무원앱이 옛 index.html + 새 app.js 로 짝이 어긋나 확인 창이 기본 confirm() 으로 떨어진다.
+// v27 사유 (2026-08-19, 🔵손길) — 로그인 폼 카드의 «그리드 열» 결함 수정 (style.css 만 변경).
+//   .login-card / .login-form / .login-field 는 열을 적지 않은 display:grid 라 암시적 열이 auto 였다.
+//   auto 열의 최솟값은 «가장 넓은 항목의 내용 폭»이라, 시정구호 <img>(원본 1201px)의 폭이
+//   CSS 로 눌리지 않는 순간 열이 1201px 로 벌어지고 width:100% 인 입력칸·로그인 버튼만
+//   화면 밖으로 잘려 나갔다(라벨·안내문은 글자가 왼쪽에 남아 멀쩡해 보임).
+//   → 세 곳 모두 grid-template-columns:minmax(0,1fr) 로 열을 못 박아 구조적으로 막았다.
+//   함께 고친 것 — ESSENTIAL 프리캐시에 icons.js 추가(v0.4.0 부터 빠져 있던 결함),
+//   푸터 문구 「오류 문의」→「불편신고」(index.html), version.js 문구를 시민앱 기준으로 통일.
+//   ★ 캐시 이름을 반드시 올려야 하는 이유 — 이 결함이 «보이던» 상태가 곧 옛 캐시 상태였다.
+//     설치된 공무원앱이 v26 캐시의 옛 style.css 를 계속 쓰면 잘림이 그대로 남는다.
+const CACHE = "sangju-admin-v27";   // v27: 0.4.2 - 로그인 카드 그리드 열 고정(입력칸·버튼 잘림 해소)
+// 🟣나루에게 — 상향 요청 (2026-08-19, 🔵손길)
+//   배포 시 `py -3 자원버전_동기화.py` 로 ASSET_V·index.html 의 ?v= 도 함께 올려 주세요.
+//   (CACHE 이름만 올리면 캐시는 새로 받지만, 브라우저 HTTP 캐시에 남은 ?v=0.4.2 자원이 걸릴 수 있습니다)
 //      [0.4.2 예정] documentFirst 가 하위 경로 문서까지 «앱 홈 캐시 키»에 덮어쓰던
 //      결함을 시민앱과 대칭으로 수정(루트 문서일 때만 루트 키에 저장). 지금은 하위 페이지가
 //      없지만 나중에 생기면 그대로 터지는 잠재 결함이라 미리 막는다.
@@ -51,6 +69,8 @@ const ESSENTIAL = [
   vq("apply_client.js"),
   vq("sw-register.js"),        // CSP 때문에 인라인에서 분리한 서비스워커 등록 코드
   vq("tap.js"),                // 눌림 파동 + 햅틱(시각 레이어)
+  vq("icons.js"),              // ★ v27 추가 — v0.4.0 부터 빠져 있던 결함. index.html 이 필수로 부르는데
+                               //   목록에 없어, 설치 후 오프라인·불안정망에서 아이콘이 이모지·빈자리로 남았다.
   vq("stats.js"),              // 「이달의 접수」 도넛 채우기(시각 레이어)
   vq("a2hs.js"),               // 「홈 화면에 추가」 안내(시각 레이어)
   "manifest.json",
@@ -62,8 +82,11 @@ const OPTIONAL = [
   "assets/icon-admin-maskable-512.png",  // 안드로이드 «잘리는» 아이콘용(안전영역 안쪽에만 그림)
   "assets/sangsang1.png",
   "assets/gotgam.png",
-  "assets/slogan-stack.png",   // 2026 시정구호(로그인 화면 · 2줄형)
-  "assets/slogan-wide.png",    // 2026 시정구호(앱 헤더 · 1줄형)
+  "assets/slogan-stack.png",   // 2026 시정구호(2줄형 원본)
+  "assets/slogan-wide.png",    // 2026 시정구호(1줄형 · 앱 헤더 + 로그인 폼 면, 둘 다 원색 그대로)
+  // ⚠ assets/slogan-white.png(흰 단색본)은 2026-08-19 화면에서 폐기됐다 — 안 쓰는 파일은 캐시하지 않는다.
+  //   공식 상징물의 색을 바꾼 것이라 되살리지 말 것(규격서 §18). 파일·생성기는 남아 있다.
+  // 🟣나루 — 이 목록이 바뀌었으니 배포 때 CACHE 이름(버전)을 한 칸 올려 주세요.
 ];
 
 /* 자원 하나를 «HTTP 캐시를 확실히 우회해» 받아 캐시에 담는다.
