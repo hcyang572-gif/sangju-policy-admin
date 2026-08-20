@@ -91,8 +91,25 @@ window.SangjuApply = (function () {
     return out;
   }
 
-  // ── 시민 신청 INSERT (anon) — 성공 시 저장된 행(receipt_no 포함) 반환 ──
-  //   실패는 throw → 호출부(시민앱)가 안내. «메일 전송과 독립» 으로 처리한다.
+  // ── (미사용) 신청 INSERT — 이 앱에서는 «아무도 부르지 않는다» ────────────
+  //   공무원앱/PC앱은 신청을 «접수»할 뿐 «제출»하지 않는다. 시민앱과 파일을 맞춰
+  //   두려고 남겨 둔 함수다. 실패는 throw → 호출부가 안내.
+  //
+  //  ⛔⛔ 이 함수를 시민앱(모바일웹/apply_client.js)으로 «그대로» 옮기지 마세요.
+  //     아래 .select().single() 은 서버에서 `INSERT … RETURNING` 이 된다.
+  //     PostgreSQL 은 RETURNING 이 붙는 순간 INSERT 권한뿐 아니라 그 행의
+  //     «SELECT 정책»까지 함께 요구한다. applications 는 이름·연락처가 든
+  //     개인정보 표라 익명(anon)에게 SELECT 정책이 «없는 것이 정상»이므로,
+  //     시민앱에서 이 모양으로 부르면 저장이 통째로 거부된다.
+  //     (2026-08-18 실제 장애. 2026-08-20 재실측: RETURNING 없이 201 / 붙이면 401 42501)
+  //     ⚠ 그때 나오는 문구가 하필 "new row violates row-level security policy" 라
+  //       «INSERT 정책이 없다»로 오인하기 쉽다 — 그 함정에 빠지지 말 것.
+  //     ⛔ 해결책으로 «익명 SELECT 정책을 여는» 방법은 금지다(🩷 자물쇠 확정).
+  //       RETURNING 을 통과시키는 SELECT 정책은 보통의 조회도 함께 통과시켜,
+  //       다른 시민의 이름·연락처·문의내용이 누구에게나 열린다.
+  //     → 시민앱 쪽 올바른 모양: 모바일웹/apply_client.js 의 submitApplication 참조.
+  //   ※ 이 앱은 공무원이 로그인한 «authenticated» 로 돌기 때문에 RETURNING 이 통한다.
+  //     로그인 «전»에 부르면 익명이 되어 똑같이 401 이 난다.
   async function submitApplication(payload) {
     var sb = client();
     if (!sb) throw new Error("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
@@ -173,17 +190,20 @@ window.SangjuApply = (function () {
 
   // ── 실시간 구독(공무원앱) — proposals-rt 와 동일 방식 ──
   //   새 접수·변경이 오면 cb() 호출(화면 자동 교체가 아니라 «알림» 목적). 실패는 무시.
-  function subscribeApplications(cb) {
+  //   onStatus(status) 를 주면 구독 상태(SUBSCRIBED/CHANNEL_ERROR/TIMED_OUT/CLOSED)를
+  //   그대로 넘긴다 — 호출측이 «끊김»을 알고 폴백 조회로 물러날 수 있게 하기 위함이다.
+  function subscribeApplications(cb, onStatus) {
     var sb = client();
-    if (!sb) return null;
+    if (!sb) { try { if (onStatus) onStatus("CHANNEL_ERROR"); } catch (e) {} return null; }
     try {
       return sb.channel("applications-rt")
         .on("postgres_changes",
             { event: "*", schema: "public", table: TABLE },
             function () { try { if (cb) cb(); } catch (e) {} })
-        .subscribe();
+        .subscribe(function (status) { try { if (onStatus) onStatus(status); } catch (e) {} });
     } catch (e) {
       console.warn("[신청접수] 실시간 구독 실패(무시):", e);
+      try { if (onStatus) onStatus("CHANNEL_ERROR"); } catch (e2) {}
       return null;
     }
   }

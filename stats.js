@@ -62,6 +62,28 @@
            d.getDate() === now.getDate();
   }
 
+  /* ── 📌 「오늘 처리」 의 뜻 — 숫자가 틀리면 신뢰를 잃으므로 기준을 못 박는다 ──────────
+     오늘  = 기기 현지 시각(대한민국 = KST) «자정 0시 00분부터 지금까지». 24시간 전이 아니다.
+             created_at·updated_at 은 UTC 로 오지만 new Date() 가 현지 시각으로 바꿔 주므로,
+             위 isToday() 의 연·월·일 비교가 곧 «오늘 자정~지금» 이 된다.
+     처리   = 접수된 뒤 담당자가 «실제로 저장을 눌러» 바뀐 건.
+             applications.updated_at 은 서버 트리거(set_updated_at)가 UPDATE 마다 갱신한다
+             (supabase/applications.sql (가)). 지어낸 수가 아니다.
+     ⚠ 새로 들어온 신청은 INSERT 순간 updated_at 이 created_at 과 «같은 값»이다.
+        그것까지 세면 「접수만 됐는데 처리했다」고 거짓말을 하게 된다 →
+        두 시각의 차이가 1초를 넘을 때만 «손댄 것»으로 센다.
+     ⚠ 이 수는 «부서 전체»가 오늘 처리한 건수다(누가 했는지는 세지 않는다 · 개인정보 아님).
+        완료 체크의 「오늘 N번째」는 «이 브라우저»가 센 값이라 둘은 다를 수 있고, 그것이 정상이다. */
+  function isHandledToday(r) {
+    if (!r || !r.updated_at) return false;
+    if (!isToday(r.updated_at)) return false;
+    var u = new Date(r.updated_at);
+    if (isNaN(u)) return false;
+    var c = new Date(r.created_at || 0);
+    if (!isNaN(c) && (u.getTime() - c.getTime()) < 1000) return false;   // 접수 직후 값 = 아직 안 손댐
+    return true;
+  }
+
   /* ── 🔎 요약 카드 «네 칸»의 뜻 — 세는 곳도, 목록을 좁히는 곳도 여기 하나뿐 ──────────
      양호창님 지시(2026-08-19): 「오늘 접수 / 심사중 / 이달 승인 / 이달 반려」를 누르면
      그 건만 목록에 남는다. 그러려면 «카드가 센 기준»과 «목록이 거르는 기준»이 같아야 한다.
@@ -172,6 +194,10 @@
       var nm = document.createElement("span");
       nm.className = "rank-nm";
       nm.textContent = it.name;
+      /* 이름은 좁은 칸에서 «두 줄»에서 말줄임된다(style.css .rank-nm · 규격서 §16).
+         전체 이름을 잃지 않도록 툴팁으로 남긴다 — 아래 접수 목록에도 온전히 있다.
+         ⚠ title 은 «같은 글자»라 낭독기에 중복으로 읽히지 않는다(내용 = 접근명). */
+      nm.title = it.name;
       var b = document.createElement("b");
       b.className = "rank-n";
       b.textContent = it.n + "건";
@@ -192,18 +218,123 @@
     }
   }
 
-  // 이달 ↔ 지난달 견주기 한 줄(도넛 아래). 늘고 줆을 «글자»로 적는다.
-  function renderNote(thisM, prevM) {
+  /* ── 📍 읍·면·동별 신청 현황 (2026-08-20) ─────────────────────────────────────
+     위 「담당팀별 접수」와 «같은 모양»(이름 + 건수 + 비율 + 막대), «같은 한 가지 색».
+     ⚠ 세는 규칙을 여기서 «새로 짜지 않는다» — app.js 의 window.sjRegions.countBy() 를 그대로 쓴다.
+        그 함수가 파이썬 config.count_by_region() 과 «같은 규칙»을 지키고 있고, 엑셀·한글보고서는
+        그 파이썬 함수를 쓴다. 규칙을 이쪽에 베껴 두면 언젠가 화면과 보고서의 숫자가 달라진다.
+     ⚠ 순서는 countBy 가 돌려준 «그대로» 그린다. 건수 순으로 다시 정렬하지 말 것 —
+        가로축이 달마다 달라지면 지난달과 견줄 수 없다(그것이 이 차트의 목적이다).
+     ⚠ 0건인 지역도 그대로 그린다. 다만 막대는 «정말 0» 으로 둔다(4%짜리 가짜 막대를 그리지 않는다).
+     ⚠ 25개를 색으로 구분하려 하지 않는다 — 뜻은 «이름과 숫자»가 전한다.
+        막대는 곁들이는 그림이라 aria-hidden(담당팀 막대와 같은 규약).
+     ═══════════════════════════════════════════════════════════════════════════ */
+  function renderRegions(all) {
+    var ul = $("aRegionList"), sub = $("aRegionSub");
+    var card = (ul && ul.closest) ? ul.closest(".region-card") : null;
+    if (!ul) return;
+    while (ul.firstChild) ul.removeChild(ul.firstChild);
+
+    var api = window.sjRegions;
+    if (!api || !api.ready || typeof api.countBy !== "function") {
+      // 목록(data.json)을 못 받았을 때 — 이 카드만 조용히 접는다. 업무 화면은 그대로 돈다.
+      if (sub) sub.textContent = "";
+      if (card) card.hidden = true;
+      return;
+    }
+
+    var items = api.countBy(all);
+    if (!items.length) { if (sub) sub.textContent = ""; if (card) card.hidden = true; return; }
+    if (card) card.hidden = false;
+
+    var total = all.length;
+    /* max  = 막대 길이의 기준(가장 많은 지역).  ⚠ 「미기재」는 지역이 아니므로 기준에서 뺀다 —
+              미기재가 가장 많은 달에 실제 지역 막대가 통째로 짧아져 견주기가 어려워진다.
+       hit  = «실제 읍·면·동» 가운데 접수가 있는 곳의 수. 미기재를 여기 세면
+              「25곳 중 1곳에서 접수」처럼 사실과 다른 말이 된다(2026-08-20 실측에서 그랬다). */
+    var max = 0, hit = 0, unknownN = 0, i;
+    for (i = 0; i < items.length; i++) {
+      if (items[i].name === api.unknown) { unknownN = items[i].n; continue; }
+      if (items[i].n > max) max = items[i].n;
+      if (items[i].n > 0) hit += 1;
+    }
+    if (sub) {
+      // «무엇을 센 수인지» 를 글로 밝힌다 — 도넛(이달)과 달리 이 카드는 «전체 접수» 기준이다.
+      var regionN = items.length - (unknownN ? 1 : 0);
+      var parts = ["전체 접수 " + total + "건",
+                   "읍·면·동 " + regionN + "곳 중 " + hit + "곳에서 접수"];
+      if (unknownN) parts.push("미기재 " + unknownN + "건");
+      sub.textContent = parts.join(" · ");
+    }
+
+    for (var k = 0; k < items.length; k++) {
+      var it = items[k];
+      var pct = total ? Math.round((it.n / total) * 100) : 0;
+      var li = document.createElement("li");
+      // 0건인 줄과 「미기재」 줄은 «글자»로 이미 구분된다. 클래스는 막대·여백 손질에만 쓴다.
+      li.className = (it.n ? "" : "rank-zero") + (it.name === api.unknown ? " rank-unknown" : "");
+
+      var nm = document.createElement("span");
+      nm.className = "rank-nm";
+      nm.textContent = it.name;
+      nm.title = it.name;
+
+      var b = document.createElement("b");
+      b.className = "rank-n";
+      b.textContent = it.n + "건";
+
+      var em = document.createElement("em");
+      em.className = "rank-p";
+      em.textContent = pct + "%";
+
+      var bar = document.createElement("span");
+      bar.className = "rank-bar";
+      bar.setAttribute("aria-hidden", "true");
+      var fill = document.createElement("i");
+      // CSP(style-src 'self')가 style 속성을 막는다 -> 반드시 CSSOM 으로 넣는다.
+      // 0건은 «0%» 로 둔다 — 없는 것을 있는 것처럼 보이게 하지 않는다.
+      // ⚠ 「미기재」가 가장 많은 달에는 it.n 이 max 를 넘을 수 있다 → 100% 로 묶는다(칸 밖으로 나가지 않게)
+      fill.style.width = (it.n && max)
+        ? (Math.min(100, Math.max(3, Math.round((it.n / max) * 100))) + "%")
+        : (it.n ? "100%" : "0%");
+      bar.appendChild(fill);
+
+      li.appendChild(nm); li.appendChild(b); li.appendChild(em); li.appendChild(bar);
+      ul.appendChild(li);
+    }
+  }
+
+  /* 도넛 아래 두 줄.
+     ① 이달 ↔ 지난달 견주기 — 늘고 줆을 «글자»로 적는다.
+     ② 「오늘 처리 N건」 — ⚠ 0건이어도 «숨기지 않는다».
+        숨기면 담당자가 「고장인가?」 하고 되묻게 된다. 0 은 0 이라고 정직하게 적는다. */
+  function renderNote(thisM, prevM, todayDone) {
     var el = $("aStatsNote");
     if (!el) return;
     while (el.firstChild) el.removeChild(el.firstChild);
+
     var d = thisM - prevM;
     var tail = d > 0 ? (d + "건 늘었습니다") : (d < 0 ? (-d + "건 줄었습니다") : "지난달과 같습니다");
-    el.appendChild(document.createTextNode("지난달 " + prevM + "건 · 이달 "));
+    var line1 = document.createElement("span");
+    line1.className = "note-line";
+    line1.appendChild(document.createTextNode("지난달 " + prevM + "건 · 이달 "));
     var b = document.createElement("b");
     b.textContent = thisM + "건";
-    el.appendChild(b);
-    el.appendChild(document.createTextNode(" — " + tail));
+    line1.appendChild(b);
+    line1.appendChild(document.createTextNode(" — " + tail));
+    el.appendChild(line1);
+
+    // ② 오늘 처리 — 기준은 위 isHandledToday() 주석에 못 박아 두었다(자정~지금 · 실제로 손댄 건).
+    var line2 = document.createElement("span");
+    line2.className = "note-line note-today";
+    line2.appendChild(document.createTextNode("오늘 처리 "));
+    var b2 = document.createElement("b");
+    b2.textContent = todayDone + "건";
+    line2.appendChild(b2);
+    // 0 건일 때는 «아직»이라는 말을 붙여 «고장»이 아니라 «아직 없음»임을 분명히 한다.
+    line2.appendChild(document.createTextNode(todayDone > 0 ? " (오늘 자정부터 지금까지)"
+                                                            : " — 오늘은 아직 처리한 접수가 없습니다"));
+    el.appendChild(line2);
   }
 
   function draw() {
@@ -245,14 +376,26 @@
        (도넛만 감추고 옆자리가 비면 예전 결함으로 되돌아간다). */
     renderRank("aTopBizList", "aTopBizSub", tally(all, "benefit_name", "(사업명 없음)"), all.length, "사업", "개");
     renderRank("aTopTeamList", "aTopTeamSub", tally(all, "team", "담당팀 미지정"), all.length, "담당팀", "곳");
+    renderRegions(all);          // 📍 읍·면·동별 신청 현황(같은 자리·같은 모양)
 
-    // 이달 ↔ 지난달 견주기
-    var prevM = 0;
-    for (var p = 0; p < all.length; p++) if (isPrevMonth(all[p] && all[p].created_at)) prevM += 1;
-    renderNote(total, prevM);
+    // 이달 ↔ 지난달 견주기 + 오늘 처리 건수
+    var prevM = 0, todayDone = 0;
+    for (var p = 0; p < all.length; p++) {
+      if (isPrevMonth(all[p] && all[p].created_at)) prevM += 1;
+      if (isHandledToday(all[p])) todayDone += 1;
+    }
+    renderNote(total, prevM, todayDone);
 
-    // 이번 달 접수만 없을 때는 지표는 두고 도넛만 감춘다
-    fig.hidden = !total;
+    /* 이번 달 접수가 0건이면 «그림(도넛)만» 감추고 카드는 남긴다.
+       ★ 2026-08-20 교정 — 예전에는 fig(카드 전체)를 감춰서, 이달 접수가 없는 날에는
+         바로 아래 「오늘 처리 N건」 줄까지 통째로 사라졌다. 지난달 접수를 오늘 처리하는 일은
+         늘 있으므로, 그 날 「오늘 처리」가 안 보이면 «고장»으로 읽힌다.
+         (이 파일 위쪽 주석의 «지표는 두고 도넛만 감춘다» 가 원래 뜻이었다) */
+    var wrapEl = fig.querySelector(".donut-wrap");
+    fig.hidden = false;
+    if (wrapEl) wrapEl.hidden = !total;
+    var capEl = fig.querySelector(".stats-cap");
+    if (capEl) capEl.hidden = !total;
     if (!total) return;
 
     /* 가운데 합계 — SVG <text> 는 role="img"(title/desc) 안이라 따로 낭독되지 않는다.

@@ -338,6 +338,21 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   line-height:1.8;padding:52px 24px;background:var(--card);border:1.5px dashed var(--line);
   border-radius:var(--r-card);}   /* 흰 6.58:1 */
 
+/* 🎉 「다 비웠습니다」 빈 화면 — 규격서 §14② «빈 화면 상상주도 캐릭터» (2026-08-20 구현)
+   ────────────────────────────────────────────────────────────────────
+   「심사중」이 0건이 되는 순간은 «허탕»이 아니라 «다 처리한 것»이다. 그때만 나온다.
+   ⚠ 캐릭터는 상주시 상징이라 원색 그대로 쓴다 — 색조·투명도·테두리·그림자를 얹지 않는다(규격서 §18).
+   ⚠ 장식이므로 alt="" — 뜻은 뒤따르는 «글자»가 온전히 전한다.
+   ⚠ 아래에서 살짝 떠오르며 «한 번만». 반복하지 않는다(§14 «자동 반복·깜빡임 금지»).
+      동작 줄이기를 켠 이용자에게는 아래 prefers-reduced-motion 블록이 끈다 — 글은 그대로 남는다. */
+.empty-cheer{border-style:solid;border-color:var(--gotgam-l);background:var(--gotgam-ll);
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:40px 24px;}
+.empty-mascot{width:112px;height:112px;object-fit:contain;
+  animation:mascotRise .4s var(--ease-move,cubic-bezier(.2,.7,.3,1)) both;}
+@keyframes mascotRise{from{transform:translateY(14px);opacity:0;} to{transform:none;opacity:1;}}
+.cheer-title{font-size:1.0625rem;font-weight:800;color:var(--gotgam-t);line-height:1.5;}  /* 연한 감빛 위 6.67:1 */
+.cheer-sub{font-size:0.875rem;font-weight:700;color:var(--sub);line-height:1.7;max-width:34em;}  /* 6.03:1 */
+
 /* 오류 안내 — 원인(연결/권한/미설정)에 따라 문구가 달라지고 «다시 시도»를 제공 */
 .err-box{grid-column:1/-1;padding:40px 24px;text-align:center;background:var(--card);
   border:1.5px solid #F0C9C4;border-radius:var(--r-card);box-shadow:var(--shadow);}
@@ -408,6 +423,16 @@ body.modal-open{overflow:hidden;}
 .citizen-field .field-label.citizen-label{color:#00595A;}
 .citizen-field .form-textarea{background:#fff;border-color:#00747F;}
 .citizen-warn{font-size:0.75rem;font-weight:700;color:#00474D;line-height:1.6;margin:-1px 0 8px;}
+/* 💬 자주 쓰는 문장(상용구) — 문구는 app.js CITIZEN_REPLY_PRESETS 한 곳에만 있다.
+   ⚠ «저장 단추»가 아니라 «글을 넣는» 단추라, 모양을 칩(작은 알약)으로 두어 저장과 헷갈리지 않게 한다.
+      (규격서 §0 «한 화면 버튼 3개 상한»의 «버튼»은 삭제·인쇄·저장 세 개다 — 이 칩은 그 셈에 들지 않는다)
+   대비 — 글자 #00595A on #FFFFFF = 8.9:1 · 테두리 #00747F 는 비텍스트 3:1 통과. */
+.reply-presets{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;}
+.reply-presets-cap{font-size:0.75rem;font-weight:800;color:#00474D;}   /* #E6F5F4 위 8.6:1 */
+.reply-preset{min-height:36px;padding:0 12px;border:1.5px solid #00747F;border-radius:var(--r-pill);
+  background:#fff;color:#00595A;font-family:inherit;font-size:0.8125rem;font-weight:800;
+  cursor:pointer;white-space:nowrap;}
+.reply-preset:hover{background:#E0F2F1;}
 /* 입력칸 도움말 — 라벨 아래 설명(aria-describedby 로 연결). #FDF0E4 위 6.03:1 / 흰 6.58:1 */
 .field-hint{font-size:0.75rem;font-weight:400;color:var(--sub);line-height:1.6;margin:-1px 0 6px;}
 .form-input{width:100%;min-height:48px;border:1.5px solid var(--field);border-radius:var(--r-ctl);padding:0 14px;
@@ -625,6 +650,34 @@ body.modal-open{overflow:hidden;}
   padding:0 12px;border-radius:var(--r-pill);background:#E0F2F1;color:#00595A;}  /* #E0F2F1 위 6.4:1 */
 .pcard-memo{margin-top:6px;font-size:0.8125rem;color:var(--sub);line-height:1.5;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+
+/* ⏳ 처리 기한 경과 배지 (2026-08-20) — 접수된 지 7일이 지나도록 «접수·심사중» 인 건.
+   ⚠ 색만으로 알리지 않는다: 「7일 경과」 라는 «글자»가 곧 정보이고, 카드 접근명에도 들어간다.
+   ⚠ 상태 배지 4종과 «모양»부터 다르게 둔다 — 그것들은 «면을 칠한» 알약, 이것은 «테두리만» 두른 알약.
+      색이 안 보이는 사람도 «윤곽선 = 밀린 건» 으로 구분할 수 있다.
+   대비 — 글자 #A52714 on #FFFFFF = 7.24:1 (AA 충족) · 테두리는 장식이 아니라 구분선이라 같은 색. */
+.od-tag{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 11px;
+  border:1.5px solid var(--danger);border-radius:var(--r-pill);background:var(--card);
+  color:var(--danger);font-size:0.8125rem;font-weight:800;white-space:nowrap;}
+
+/* ☑ 줄 맨 앞 «고르기» 칸 (여러 건 한꺼번에 상태 바꾸기)
+   ⚠ 손가락 영역 44px 를 확보한다 — 옆줄 체크상자와 겹치지 않게 카드 안에서만 넓힌다.
+   ⚠ 이 칸을 누르는 것은 «줄 열기»가 아니다(app.js 가 클릭·키 이벤트를 여기서 멈춘다). */
+.pick-wrap{flex:none;display:inline-flex;align-items:center;justify-content:center;
+  width:26px;min-height:44px;margin:-6px 0;}
+.row-pick{width:20px;height:20px;margin:0;cursor:pointer;accent-color:var(--gotgam-d);}
+.cardlist.rows .pcard .pick-wrap{align-self:center;}
+
+/* ☑ 「N건 선택됨」 일괄 처리 띠 — 하나라도 고르면 목록 위에 나타난다.
+   좁혀보기 띠(.scope-bar)와 «같은 결»이되 색을 청록(=관리 동작)으로 두어 역할이 갈린다.
+   대비 — 글자 #00474D on #E6F5F4 = 8.6:1 (시민 안내문 칸과 같은 검증된 짝) */
+.bulk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 14px;
+  background:#E6F5F4;border:1.5px solid #9CD2CE;border-radius:var(--r-card);
+  color:#00474D;font-size:0.875rem;font-weight:800;}
+.bulk-bar .ico{width:18px;height:18px;flex:none;}
+.bulk-count{flex:none;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.bulk-bar .sort-select{flex:0 1 auto;min-height:44px;}
+.bulk-bar .top-btn{min-height:44px;}
 /* 신청 삭제 버튼(모달) — 정책제안 저장 버튼과 같은 규격, 위험 색만 다르게 */
 /* 위험(삭제) — 규격서 3종 중 «위험»: 흰 면 + 오류색 글자·테두리 */
 .modal-actions .nav-btn.danger{flex:0 0 110px;background:var(--card);color:var(--danger);
@@ -713,11 +766,16 @@ body.modal-open{overflow:hidden;}
 .dn-mk.m4{background:#6E594A;border-radius:2px;transform:rotate(45deg);}  /* 반려 · 마름모 */
 .donut-legend b{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums;}
 .donut-legend em{font-style:normal;width:44px;text-align:right;color:var(--sub);font-size:0.78125rem;}  /* 흰 6.58:1 */
-/* 이달 ↔ 지난달 견주기 한 줄 — 도넛 아래. 글자만 쓴다(색·화살표에 기대지 않는다). */
+/* 도넛 아래 두 줄 — ① 이달↔지난달 견주기 ② 「오늘 처리 N건」.
+   글자만 쓴다(색·화살표에 기대지 않는다). */
 .stats-note{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
   font-size:0.8125rem;font-weight:700;color:var(--sub);}   /* 흰 6.55:1 */
 .stats-note b{color:var(--gotgam-t);font-variant-numeric:tabular-nums;}  /* 흰 7.37:1 */
 .stats-note:empty{display:none;}
+/* ⚠ 두 줄은 «반드시» 따로 떨어져야 한다 — 없으면 「…늘었습니다오늘 처리 7건」 으로 붙어 버린다
+   (2026-08-20 실측에서 실제로 그랬다). span 이라 기본이 인라인이므로 block 으로 못 박는다. */
+.stats-note .note-line{display:block;}
+.stats-note .note-today{margin-top:4px;}
 
 /* ── 📈 도넛 옆 요약 카드 — 「접수 많은 사업」·「담당팀별 접수」 ─────────────────
    ★ 2026-08-19 신설. 넓은 화면에서 도넛 카드 오른쪽 60% 가 비던 결함을 메운다.
@@ -736,7 +794,17 @@ body.modal-open{overflow:hidden;}
 .rank-list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;
   align-items:baseline;column-gap:10px;row-gap:5px;
   font-size:0.84375rem;font-weight:700;color:var(--ink);}
-.rank-nm{min-width:0;word-break:keep-all;overflow-wrap:anywhere;line-height:1.4;}
+/* ★ 2026-08-20 «줄이 부풀던» 결함 수정 (🔵손길 실측).
+   증상 — 1024px(노트북)에서 이름 칸이 141px 로 좁아지는데 실제 사업명은
+          「2026년 상주시 청년 농업인 영농정착 지원사업 및 스마트팜 …(2차 추가 공고분)」처럼 길다.
+          말줄임이 없어 한 줄이 «4~5줄»로 늘어나며 한 항목의 높이가 126px 이 됐고(정상 32~51px),
+          그 바람에 옆의 도넛 카드까지 455px 로 함께 늘어났다(1024 실측).
+   처방 — 표(카드형 행)의 사업명과 «같은 규칙»을 그대로 쓴다: 두 줄에서 말줄임(규격서 §16).
+          전체 이름은 stats.js 가 달아 두는 title 툴팁으로 확인할 수 있고,
+          같은 정보가 아래 접수 목록에 온전히 있으므로 사라지는 정보는 없다.
+   실측(수정 뒤) — 1024px 51px · 1280px 51px · 1920px 38px, 도넛 카드 455 → 284px. */
+.rank-nm{min-width:0;word-break:keep-all;overflow-wrap:anywhere;line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .rank-n{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;}
 .rank-p{font-style:normal;width:44px;text-align:right;color:var(--sub);font-size:0.78125rem;white-space:nowrap;}
 /* max-width — 900~1000px 처럼 카드 한 장이 아래로 밀려 «혼자 가로로 늘어나는» 폭에서
@@ -747,20 +815,53 @@ body.modal-open{overflow:hidden;}
 /* ⚠ .rank-list li 보다 «약하면» 격자 규칙에 눌린다 — 반드시 li 를 붙여 쓸 것 */
 .rank-list li.rank-empty{display:block;color:var(--dim);font-size:0.84375rem;font-weight:700;}  /* 흰 6.19:1 */
 
+/* ── 📍 읍·면·동별 신청 현황 (2026-08-20) ────────────────────────────────────
+   위 두 카드(접수 많은 사업·담당팀별)는 «상위 3~5줄»만 보이지만, 여기는 25개 지역을
+   «0건까지 모두, 늘 같은 순서로» 보여야 한다(그래야 지난달과 견줄 수 있다).
+   그래서 이 카드만 요약 패널에서 «가로 한 줄»을 통째로 쓰고, 폭이 넓어질수록 2·3·4단으로 접는다.
+   ⛔ 「자리를 많이 먹는다」고 상위 N개만 남기지 마세요 — 가로축이 매번 달라져 차트의 뜻이 사라집니다.
+   ⚠ 25개를 색으로 구분하지 않는다. 막대는 담당팀 막대와 «같은 한 가지 색»(--gotgam)이고,
+      뜻은 «이름과 숫자»가 전한다(규격서 §5 «색만으로 정보 전달 금지»와도 맞는다). */
+.region-card{flex:1 1 100%;}
+.region-list{display:grid;grid-template-columns:1fr;gap:11px 24px;}
+/* 지역 이름이 3~5자로 짧아 좁은 폰에서도 2단이 들어간다.
+   ★ 왜 폰에서 2단까지 가는가 — 25개를 «0건까지 모두» 보여 주는 것이 이 차트의 규칙인데,
+     1단으로 두면 폰에서 카드 하나가 1200px(화면 세 장)을 먹어 그 아래 접수 목록이 너무 멀어진다.
+     줄을 빼는 대신 «접어 담아» 규칙과 높이를 둘 다 지킨다. */
+@media (min-width:340px){  .region-list{grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media (min-width:1100px){ .region-list{grid-template-columns:repeat(3,minmax(0,1fr));} }
+@media (min-width:1500px){ .region-list{grid-template-columns:repeat(4,minmax(0,1fr));} }
+/* 폰(≤699px) — 막대는 «곁들이는 그림»(aria-hidden)이라 여기서만 얇게 줄인다.
+   ⛔ 줄(지역)을 빼서 높이를 줄이지 마세요 — 0건 포함이 이 차트의 규칙입니다.
+   뜻을 전하는 «이름·건수·비율» 글자는 그대로 둔다(크기·대비 손대지 않음). */
+@media (max-width:699px){
+  .region-list{gap:7px 14px;}
+  .region-list .rank-bar{height:5px;}
+  .region-list li{row-gap:3px;}
+}
+/* 단으로 접히면 한 칸이 좁아진다 — 막대의 최대폭 제한(520px)은 여기서 풀어 칸을 꽉 채운다 */
+.region-list .rank-bar{max-width:none;}
+/* 0건인 지역 — ⚠ «글자»는 흐리게 하지 않는다(저시력 이용자에게 0 도 정보다 · AA 유지).
+   비어 있음은 «0건 / 0%» 라는 글자와 «빈 막대»가 이미 말한다. 막대 바탕만 한 톤 낮춘다. */
+.region-list li.rank-zero .rank-bar{background:#F1EDE8;}
+/* 「미기재」 — 맨 뒤에 오되 눈에 띄게(고쳐야 할 값이라는 뜻이다). 글자로만 구분한다. */
+.region-list li.rank-unknown .rank-nm{font-weight:800;color:var(--gotgam-t);}  /* 흰 7.37:1 */
+
 /* 좁은 화면에서 표·넓은 내용이 넘칠 때의 가로 스크롤 상자(본문 자체는 절대 가로로 밀리지 않게) */
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .table-scroll>table{min-width:560px;}
 
 /* ════════════════════════════════════════════════════════════
-   👆 눌림 반응(파동) — 동작은 tap.js 가 클래스만 붙였다 뗀다.
-   CSP 가 인라인 style 을 막으므로 좌표 없는 «가운데서 퍼지는» 파동으로 만든다.
+   👆 눌림 반응 — «살짝 눌리는» 축소 하나만 쓴다.
+   ⛔ 2026-08-20 양호창님 지시로 «물방울처럼 퍼지는 파동(.tap-ripple)» 을 세 앱에서 «영구 제거»했다.
+      되살리지 마세요. 함께 걷어낸 것 — .tap-ripple{position:relative;overflow:hidden},
+      .tap-ripple::after, @keyframes tapWave, 그리고 tap.js 의 ripple() · animationend 처리.
+      ★ overflow:hidden 이 사라진 것이 중요하다 — 파동을 담으려고 잠깐 걸던 그 속성이
+        누르는 «순간»에 초점 링(outline-offset:2px)을 잘라 먹던 부작용도 함께 없어졌다.
+   ⚠ 남긴 것 — ① 여기의 :active 축소 ② tap.js 의 햅틱(navigator.vibrate).
+      둘 다 「눌렀다」는 되먹임이라, 없으면 «반응이 없는 앱»이 된다. 지우지 마세요.
    ════════════════════════════════════════════════════════════ */
 button:active,[role="button"]:active,.foot-link:active{transform:scale(.97);}
-.tap-ripple{position:relative;overflow:hidden;}
-.tap-ripple::after{content:"";position:absolute;left:50%;top:50%;width:12px;height:12px;
-  margin:-6px 0 0 -6px;border-radius:50%;background:currentColor;opacity:.28;pointer-events:none;
-  animation:tapWave .42s ease-out forwards;}
-@keyframes tapWave{from{transform:scale(1);opacity:.28;} to{transform:scale(22);opacity:0;}}
 
 /* ════════════════════════════════════════════════════════════
    📱 「홈 화면에 추가」 안내 — a2hs.js 가 설치 가능할 때만 띄운다.
@@ -866,9 +967,17 @@ button.kpi[aria-pressed="true"] > span::before{content:"✓ ";font-weight:800;}
      예전에는 머리행만 4번째 열(52px)을 따로 두어 글자 시작선이 행보다 32px 안쪽으로 밀렸다. */
   .list-head{display:grid;grid-template-columns:minmax(210px,240px) minmax(0,1.5fr) minmax(280px,1fr);
     align-items:center;column-gap:16px;
-    min-height:52px;margin:0 0 12px;padding:0 56px 0 20px;
+    min-height:52px;margin:0 0 12px;padding:0 56px 0 62px;
     background:var(--cream);border:1px solid var(--line);border-radius:var(--r-ctl);
-    font-size:0.8125rem;font-weight:700;color:var(--sub);}   /* 바탕 6.03:1 */
+    font-size:0.8125rem;font-weight:700;color:var(--sub);   /* 바탕 6.03:1 */
+    /* ★ 2026-08-20 — 스크롤해도 «위에 붙어» 있다. 한 쪽 12건을 내려보는 동안
+       어느 칸이 무엇인지 사라지지 않게 하기 위함이다.
+       ⚠ 바탕이 반드시 «불투명»해야 한다(--cream). 투명하면 카드가 글자 뒤로 비쳐 지나간다.
+       ⚠ z-index 는 «낮게». 이 앱의 층은 계정메뉴 60 · 인앱안내 90 · 설치안내 95 ·
+          모달 100 · 완료체크 120 · 확인창 400 · 건너뛰기 999 다. 5 면 그 무엇도 가리지 않는다.
+       ⚠ padding-left 62px = 줄의 왼쪽 여백 20px + 고르기 칸 26px + 사이 16px.
+          이 셋 중 하나를 바꾸면 여기도 함께 바꿔야 머리글자와 줄의 시작선이 맞는다. */
+    position:sticky;top:0;z-index:5;}
   /* 목록을 «한 줄에 한 건» 으로 — 넓은 화면에서도 2·3단으로 쪼개지 않는다(표처럼 읽히게) */
   .cardlist.rows{display:flex;flex-direction:column;gap:12px;}
   .cardlist.rows .pcard{position:relative;min-height:52px;padding:16px 20px;padding-right:56px;}
@@ -953,9 +1062,12 @@ button.kpi[aria-pressed="true"] > span::before{content:"✓ ";font-weight:800;}
   }
   .card:hover,.pcard:hover{transform:none;}
   .inapp-btn:active{transform:none;}
-  /* 눌림 축소·파동(tap.js)도 끈다 — tap.js 는 vibrate 만 남긴다 */
+  /* 🎉 「다 비웠습니다」 캐릭터 — 떠오름만 끄고 «그림과 글»은 그대로 남긴다
+     (정보가 움직임에만 담기지 않게 · 규격서 §14 공통 규칙) */
+  .empty-mascot{animation:none !important;transform:none !important;opacity:1 !important;}
+  /* 눌림 축소도 끈다 — tap.js 는 vibrate 만 남긴다
+     (파동 .tap-ripple 은 2026-08-20 에 제거됐다. 여기에 그 줄을 되살리지 마세요) */
   button:active,[role="button"]:active,.foot-link:active{transform:none;}
-  .tap-ripple::after{display:none;}
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -980,7 +1092,17 @@ button.kpi[aria-pressed="true"] > span::before{content:"✓ ";font-weight:800;}
       ⚠ translateX(18px) 가 «잠깐» 화면 밖으로 나가 전환 0.28초 동안 가로 스크롤바가
         번쩍 나타났다(2026-08-19 폭 점검에서 발견). 패널을 감싼 main 에서 가로를 잘라 막는다.
         세로는 그대로 둔다(잘리면 목록을 못 본다). */
-main#main{ overflow-x:hidden; }
+/* ★★ 2026-08-20 — 여기를 «overflow-x:hidden» 으로 되돌리지 마세요. ★★
+   왜 clip 인가 — CSS 규칙상 한 축이 visible 이 아니면 «다른 축의 visible 이 auto 로 바뀐다».
+   즉 overflow-x:hidden 한 줄이 overflow-y 까지 auto 로 만들어 #main 을 «스크롤 상자»로 바꾼다.
+   그 순간 안쪽의 position:sticky 는 «#main 을 기준»으로 삼는데, #main 은 내용만큼 키가 늘어
+   스스로 스크롤될 일이 없다 → 머리행이 붙지 않고 그냥 위로 흘러가 버린다
+   (2026-08-20 실측: 1200px 굴린 뒤 머리행 top = -301px, 즉 화면 밖).
+   overflow-x:clip 은 «자르기만» 하고 스크롤 상자를 만들지 않아 overflow-y 가 visible 로 남는다
+   → 탭 전환 때 가로 스크롤바가 번쩍이는 것도 그대로 막고, 머리행 고정도 살아난다.
+   (clip 을 모르는 아주 오래된 브라우저는 이 줄을 무시할 뿐이다 — 가로 번쩍임만 되살아나고
+    머리행 고정은 오히려 정상 동작한다. 어느 쪽으로 떨어져도 «깨지지» 않는다) */
+main#main{ overflow-x:clip; }
 @keyframes secInFwd { from{ transform:translateX(18px); opacity:0; } to{ transform:none; opacity:1; } }
 @keyframes secInBack{ from{ transform:translateX(-18px); opacity:0; } to{ transform:none; opacity:1; } }
 .content.slide-fwd { animation:secInFwd  var(--dur-move) var(--ease-move) both; }
@@ -1100,6 +1222,22 @@ a[href^="mailto:"],a[href^="http"],.login-help strong,.forms-item-name,
 .top-btn,.nav-btn,.login-btn,.tab-btn,.rt-banner-btn,.sb-btn,.page-btn{ white-space:nowrap; }
 /* ③ 숫자와 단위 — 「총 14건」이 「총 14 / 건」으로 갈라지지 않게 */
 .count,.kpi b,.donut-legend b,.donut-legend em,.pager-info{ white-space:nowrap; }
+/* ④ 숫자 폭 고정 — 행마다 숫자 폭이 달라 «총 9건 / 총 14건» 이 들썩이지 않게(규격서 §16 정렬).
+   ⚠ PC앱 webui/style.css 의 「.pp-table td.num,.ac-table td.num,.lg-ts,.count」 와 같은 규약이다.
+      공무원앱에만 .count 가 빠져 있었다(2026-08-20 세 앱 대조에서 발견). */
+.count{ font-variant-numeric:tabular-nums; }
+
+/* ── 제목 줄바꿈 균형 (규격서 §16) ────────────────────────────
+   두 줄이 되는 제목은 위아래 길이를 고르게 나눈다 — 「… 영농정착 지원사업 및 / 스마트팜」 처럼
+   마지막 줄에 한 어절만 남는 «고아 글자»를 줄인다.
+   ⚠ 세 앱이 같은 규약이다: 시민앱 모바일웹/style.css:1565, PC앱 webui/style.css:1617.
+      공무원앱에만 이 한 줄이 빠져 있었다(2026-08-20 메인 지적 · 세 앱 대조로 확인).
+   대응 관계 — PC앱 .card-title→.card-title · .sy-name→.pcard-title · .page-t→.lb-title
+              (공무원앱의 화면 제목은 탭 버튼이 맡고 h2 는 .sr-only 라 대상이 없다)
+              · .modal-title→.modal-title · .login-title→.login-title
+   ⚠ 미지원 브라우저는 이 속성을 «조용히 무시»할 뿐 레이아웃이 달라지지 않는다.
+   실측(적용 뒤) — 320·360·390px 에서 제목 줄 수·카드 높이 변화 없음, 가로 넘침 없음. */
+.card-title,.pcard-title,.modal-title,.login-title,.lb-title{ text-wrap:balance; }
 
 /* ── 정렬 ────────────────────────────────────────────────────
    아이콘 + 글자는 «세로 가운데». 낱개 span 마다 높이가 달라 글자가 들쑥날쑥하던 것을 잡는다. */
@@ -1118,6 +1256,16 @@ a[href^="mailto:"],a[href^="http"],.login-help strong,.forms-item-name,
   /* 담당팀·접수번호가 길어도 첫 열을 밀어내지 않게 */
   .cardlist.rows .pcard-top .cat-tag,
   .cardlist.rows .pcard-top .rc-tag{ max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+  /* ★ 2026-08-20 — 위 «text-overflow:ellipsis» 가 실제로는 듣지 않던 결함(🔵손길 실측).
+     원인은 .badge 에 이미 적어 둔 것과 «같다» — 위쪽 «줄바꿈 금지» 묶음이 .cat-tag 를
+     display:inline-flex 로 만들기 때문에, 배지 안의 글자가 «익명 flex 항목»이 되어
+     text-overflow 가 적용되지 않는다. 그래서 「인구정책실 인구정책팀 저출생대응추진TF 총괄담당」이
+     «…» 없이 240px 에서 뚝 잘렸다(실측 scrollWidth 325 / clientWidth 240, 1024·1280·1920 모두).
+     → .badge 와 «같은 처방»으로 inline-block + line-height 세로 가운데.
+     ⚠ .rc-tag 는 안에 아이콘(SVG)이 함께 있어 flex 여야 한다 — 여기서 건드리지 않는다
+        (접수번호는 짧아 실측에서도 넘치지 않았다). */
+  .cardlist.rows .pcard-top .cat-tag{
+    display:inline-block; line-height:32px; white-space:nowrap; vertical-align:middle; }
 }
 
 /* 요약 지표 — 같은 줄 카드끼리 높이를 맞추되(align-items), «줄 자체»는 늘리지 않는다(align-content).
@@ -1303,3 +1451,57 @@ a[href^="mailto:"],a[href^="http"],.login-help strong,.forms-item-name,
   .login-card{animation:none !important;transform:none !important;opacity:1 !important;}
   .login-input{transition:none !important;}
 }
+
+/* ════════════════════════════════════════════════════════════
+   📋 작은 보조 단추 — 「복사」처럼 «값 옆에 붙는» 아주 작은 동작.
+   ⚠ 규격서 §0 의 «버튼 3개 상한»에 드는 주요 버튼(.top-btn/.nav-btn)이 아니다.
+      그래서 모양도 확실히 작게 두어 저장·삭제와 헷갈리지 않게 한다.
+   ⚠ 손가락 영역은 그래도 44px 를 확보한다(::after 투명판 — .chip 과 같은 기법).
+   대비 — 글자 #93380F on #FFFFFF = 7.37:1 (AA 충족)
+   ════════════════════════════════════════════════════════════ */
+.mini-btn{position:relative;display:inline-flex;align-items:center;gap:5px;min-height:32px;
+  padding:0 11px;border:1.5px solid var(--gotgam-l);border-radius:var(--r-pill);
+  background:var(--card);color:var(--gotgam-t);
+  font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;white-space:nowrap;}
+.mini-btn:hover{background:var(--gotgam-ll);border-color:var(--gotgam);}
+.mini-btn::after{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%);}
+/* 모달 아래 «인쇄» — 삭제(위험·빨강)와 저장(주요·감빛) 사이의 «보조» 자리.
+   흰 면 + 연한 테두리라 셋의 무게가 저장 > 인쇄 > 삭제 순으로 읽힌다. */
+.modal-actions .nav-btn.ghostish{flex:0 0 110px;background:var(--card);color:var(--gotgam-t);
+  border:1.5px solid var(--line);}                          /* 흰 7.37:1 */
+.modal-actions .nav-btn.ghostish:hover{background:var(--gotgam-ll);border-color:var(--gotgam-l);}
+
+/* ════════════════════════════════════════════════════════════
+   🖨 인쇄 — 접수 «한 건»만 종이로 (2026-08-20)
+   ────────────────────────────────────────────────────────────
+   app.js 가 인쇄 직전에 body 에 .printing-modal 을 붙였다가 끝나면 뗀다.
+   ⚠ 개인정보가 종이로 나가는 순간이다 — .print-note(목적 외 이용 금지)가 «반드시» 함께 찍힌다.
+      그 문단을 지우지 마세요(개인정보보호법 §19).
+   ⚠ 화면에서는 .print-only 가 보이지 않는다. 인쇄에서만 나타난다.
+   ════════════════════════════════════════════════════════════ */
+.print-only{display:none;}
+.print-note{margin:0 0 14px;padding:10px 12px;border:1.5px solid var(--danger);border-radius:12px;
+  color:var(--danger);font-size:0.8125rem;font-weight:700;line-height:1.6;}  /* 흰 7.24:1 */
+@media print{
+  /* 색을 빼고 잉크를 아낀다. 배경은 흰 종이 그대로. */
+  body{background:#fff !important;}
+  .print-only{display:block !important;}
+  /* 인쇄 단추를 누른 «그 접수»만 남기고 나머지는 모두 숨긴다.
+     모달들은 <body> 의 직계 자식이라 이렇게 한 줄로 갈라진다. */
+  body.printing-modal > *{display:none !important;}
+  body.printing-modal > #aModal{display:block !important;position:static !important;
+    background:none !important;padding:0 !important;}
+  body.printing-modal .modal{max-width:none !important;max-height:none !important;
+    box-shadow:none !important;border:1px solid #000 !important;border-radius:0 !important;}
+  body.printing-modal .modal-head{background:#fff !important;color:#000 !important;
+    border-bottom:1px solid #000;}
+  body.printing-modal .modal-body{overflow:visible !important;}
+  /* 종이에서 누를 수 없는 것들 — 닫기·저장·삭제·인쇄·복사·상용구는 찍지 않는다 */
+  .modal-close,.modal-actions,.mini-btn,.reply-presets{display:none !important;}
+  /* 여러 줄 값이 페이지 사이에서 잘리지 않게 */
+  .field{break-inside:avoid;page-break-inside:avoid;}
+}
+
+/* 📍 표준 읍·면·동이 아닌 값이 들어왔을 때의 곁말(접수 상세) — 담당자가 «고쳐야 할 값»임을 알게 한다.
+   목록 카드에는 자리가 없어 넣지 않는다(상세에서만). 글자 #93380F on #FFFFFF = 7.37:1 */
+.rg-warn{font-size:0.8125rem;font-weight:700;color:var(--gotgam-t);}

@@ -417,6 +417,24 @@ function showSkeleton(sel, rows) {
   box.innerHTML = html + "</div>";
 }
 
+/* ── 🔒 연타(중복 제출) 방어 — 2026-08-20, 🔵손길 시연 전 점검 ──────────────────────
+   왜 필요한가 — 저장·삭제는 «await» 하는 사이 화면이 그대로라, 반응이 늦으면 담당자가
+   한 번 더 누른다. 그러면 같은 update 가 두 번 나가고(감사기록도 두 줄),
+   삭제는 두 번째 호출이 «이미 없는 행»에 대해 실패해 모달이 닫힌 뒤 오류 alert 가 뜬다.
+   시민 안내문 공개 확인창(askConfirm)은 «두 번» 열려 담당자가 같은 글을 두 번 확인해야 했다.
+   ⛔ 이미 방어가 있던 곳(#loginBtn·#pwSave·#mSave·서식 업로드/삭제)은 건드리지 않는다.
+   ★ 규약 — 처리 중에는 «눌리지 않게»(disabled) 두고, 끝나면 반드시 되돌린다(finally).
+     모달이 이미 닫혔어도 되돌려 둔다 — 모달 본문은 열 때마다 새로 그려지므로 부작용이 없다. */
+function bindOnce(btn, handler) {
+  if (!btn) return;
+  btn.onclick = async () => {
+    if (btn.disabled) return;          // 이미 처리 중 — 두 번째 누름은 «없던 일»로
+    btn.disabled = true;
+    try { await handler(); }
+    finally { btn.disabled = false; }
+  };
+}
+
 /* 카드 순차 등장 — 위에서부터 40ms 간격. 최대 8장까지만 지연(긴 목록에서 답답해지지 않게). */
 function staggerCards(listEl) {
   if (!listEl || prefersReducedMotion()) return;
@@ -461,6 +479,364 @@ function showDoneCheck(text) {
   box.querySelector(".dc-text").textContent = text || "저장했습니다";
   document.body.appendChild(box);
   setTimeout(() => { if (box.parentNode) box.remove(); }, 1500);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   🎉 «오늘 몇 번째» — 저장이 성공할 때마다 1 씩 오른다 (규격서 §14② 기분 좋은 순간)
+   ────────────────────────────────────────────────────────────────────
+   무엇을 세는가 — «이 브라우저에서 오늘 성공한 저장 횟수». 서버에 묻지 않는다.
+     그래서 부서 전체가 아니라 «지금 이 사람이 오늘 한 일»에 가깝다(동기부여의 목적).
+     날짜가 바뀌면 저절로 0 부터 다시 센다(자정 기준, 기기 현지 시각).
+   ⚠ 개인정보를 담지 않는다 — 날짜와 «횟수» 숫자 하나뿐이다.
+   ⚠ 못 세더라도(사생활 보호 모드·저장소 차단) 저장 자체는 그대로 된다 → 0 을 돌려주고,
+      부르는 쪽은 0 이면 «번째» 문구를 아예 붙이지 않는다.
+   ⚠ 화면이 «늘어나지 않는다» — 이미 있는 완료 체크 문구 뒤에 한 토막만 덧붙인다(규격서 §0).
+   ══════════════════════════════════════════════════════════════════════ */
+const DONE_COUNT_KEY = "sangju_admin_done_count";
+function localDayKey(d) {
+  const t = d || new Date();
+  return t.getFullYear() + "-" + (t.getMonth() + 1) + "-" + t.getDate();
+}
+function bumpDoneCount() {
+  try {
+    const today = localDayKey();
+    let o = null;
+    try { o = JSON.parse(localStorage.getItem(DONE_COUNT_KEY) || "null"); } catch (e) { o = null; }
+    if (!o || o.d !== today || typeof o.n !== "number") o = { d: today, n: 0 };
+    o.n += 1;
+    localStorage.setItem(DONE_COUNT_KEY, JSON.stringify(o));
+    return o.n;
+  } catch (e) { return 0; }
+}
+/* 「저장했습니다」 → 「저장했습니다 · 오늘 3번째」.
+   ★ 완료 체크(움직임)와 announce(글) 가 «같은 문구»를 쓰도록 여기서 한 번만 만든다 —
+     움직임을 끈 이용자도 똑같은 정보를 받는다(규격서 §14 «정보를 움직임에만 담지 않는다»). */
+function doneText(base) {
+  const n = bumpDoneCount();
+  return n > 0 ? `${base} · 오늘 ${n}번째` : base;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   📋 글자 복사 — 접수번호처럼 «눈으로 옮겨 적던» 값을 한 번에 집어 준다.
+   클립보드 API 가 막힌 환경(구형·비보안 컨텍스트)에서는 임시 textarea 로 물러난다.
+   ⚠ 성공·실패를 «글자»로 알린다(announce). 색·아이콘만으로 알리지 않는다.
+   ⚠ style 속성이 아니라 CSSOM 으로 넣는다 — CSP style-src 'self' 가 인라인 style 을 막는다.
+   ══════════════════════════════════════════════════════════════════════ */
+async function copyText(text, okMsg) {
+  const t = String(text == null ? "" : text);
+  if (!t) return false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(t);
+    } else { throw new Error("no clipboard api"); }
+    announce(okMsg || "복사했습니다.");
+    return true;
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = t;
+    ta.style.position = "fixed"; ta.style.opacity = "0"; ta.style.pointerEvents = "none";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    document.body.removeChild(ta);
+    announce(ok ? (okMsg || "복사했습니다.")
+                : "복사하지 못했습니다. 글자를 끌어 선택한 뒤 Ctrl+C 로 복사해 주세요.");
+    return ok;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ⏳ 처리 기한 경과 — 접수된 지 OVERDUE_DAYS 일이 지나도록 아직 «접수·심사중» 인 건.
+   ────────────────────────────────────────────────────────────────────
+   왜 두는가 — 지금까지는 «밀린 건»을 담당자가 목록을 훑어 스스로 찾아야 했다.
+     이미 있는 자료(created_at·status)만으로 셀 수 있으므로 지어낸 값이 없다.
+   ⚠ 승인·반려는 이미 «끝난» 건이라 세지 않는다.
+   ⚠ 색만으로 알리지 않는다 — 「N일 경과」 라는 글자가 곧 정보이고, 카드 접근명에도 넣는다.
+   ★ 기준일을 바꾸려면 이 상수 한 곳만 고치면 된다.
+   ══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   📍 읍·면·동 — 목록·정규화·집계 (2026-08-20)
+   ────────────────────────────────────────────────────────────────────
+   ⛔ 25개 지역 이름을 여기에 «베껴 적지 마세요». 목록은 data.json 한 곳에서만 옵니다
+      (모바일웹/build_data.py 196행 규약: «브라우저는 이 data.json 을 통해서만 그 목록을 받는다»).
+      베끼는 순간 엑셀·시민앱·공무원앱 셋의 지역 목록이 언젠가 조용히 어긋납니다.
+      ⚠ 공무원앱용 data.json 도 build_data.py 가 «같은 내용»으로 함께 씁니다(cloudui/data.json).
+
+   ⚠⚠ 집계 규칙은 «파이썬 config.count_by_region() 과 같아야» 합니다 ⚠⚠
+      엑셀·한글보고서는 그 파이썬 함수를 쓰고, 이 화면은 JS 라 그대로 쓸 수 없습니다.
+      그래서 «규칙»을 맞춥니다 — 이 셋 중 하나라도 어기면 화면과 보고서의 숫자가 달라집니다.
+        ① 차트 축 순서 = regions 배열 순서 그대로 (읍 → 면 → 동 → 기타 → 미기재)
+        ② 0건인 지역도 «반드시» 넣는다 — 빼면 가로축이 매번 달라져 달마다 견줄 수 없다
+        ③ 알아볼 수 없는 값·빈 값은 「미기재」로 «맨 뒤»에 (숨기면 합계가 안 맞아 보인다)
+
+   ⚠ 이름 알아보기(normalize)의 «범위 차이»를 분명히 적어 둡니다.
+      파이썬 normalize_region() 은 별칭표(사벌면→사벌국면)·법정동표(낙양동→남원동)까지 봅니다.
+      그 두 표는 data.json 에 «없어서» 여기서는 볼 수 없습니다. 여기서 하는 것은
+        정식이름 · 앞뒤 공백 · 상위주소 접두어(경북/상주시…) · 뒤에 붙은 하위주소 ·
+        「읍/면/동」 이 빠진 이름 · 「타지역/관외」 류 → 기타·타지역
+      까지입니다. 시민앱이 «고르게» 해서 보내는 새 신청은 늘 정식 이름이라 문제가 없고,
+      옛 자유입력 값 중 별칭·법정동만 「미기재」로 갑니다.
+      → 🟢곳간에게: 별칭·법정동 표도 data.json 에 실어 주시면 여기서 그대로 맞출 수 있습니다.
+   ══════════════════════════════════════════════════════════════════════ */
+const REGION_UNKNOWN = "미기재";                     // 파이썬 config.REGION_UNKNOWN 과 같은 글자
+let SJ_REGIONS = [];          // 표준 순서 25개 (data.json regions)
+let SJ_REGION_GROUPS = [];    // [["읍",[...]], ["면",[...]], ...]
+let SJ_REGION_ETC = "";       // "기타·타지역"
+let SJ_REGION_ETC_WORDS = []; // 「관외」·「타지역」 류 (data.json region_etc_words · 11개)
+let SJ_REGION_ALIASES = {};   // 옛 이름·오타 → 정식  (data.json region_aliases · 4개)
+let SJ_LEGAL_DONG = {};       // 법정동 → 행정동      (data.json region_legal_dong · 36개)
+let REGION_READY = false;     // data.json 을 받았는가(못 받아도 앱은 그대로 돈다)
+
+/* 비교용으로 «군더더기»를 턴다 — 파이썬 _region_fold() 와 «글자 그대로» 같은 정규식.
+   한글·영문·숫자만 남긴다(공백·가운뎃점·괄호 제거). */
+function regionFold(s) {
+  return String(s == null ? "" : s).replace(/[^가-힣A-Za-z0-9]/g, "");
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   사람이 적어 낸 값 → 정식 읍·면·동 이름. 못 알아보면 "" (부르는 쪽이 「미기재」로 센다).
+   ────────────────────────────────────────────────────────────────────
+   ⚠⚠ 이 함수는 파이썬 config.normalize_region() «의 번역»입니다. 엑셀·한글보고서는 그
+      파이썬 함수를 쓰고 이 화면은 이 JS 를 씁니다 — 둘이 갈리면 «보고서와 화면의 숫자»가
+      달라집니다. 고칠 일이 생기면 «양쪽을 함께» 고치고, 아래 순서를 절대 흐트러뜨리지 마세요.
+      (2026-08-20 곳간이 50개 사례로 대조해 15건이 어긋난 것을 잡았습니다 — 그 재발 방지)
+
+   ★ 판정 순서 — 같은 표를 써도 «순서»가 다르면 결과가 갈립니다
+      1. 앞뒤 공백 제거. 비면 → ""
+      2. regions 에 «그대로» 있으면 → 그 값                    ← ⚠ 접기(fold) «전»에 먼저!
+         (이걸 빠뜨리면 「기타·타지역」이 4번 etc_words 에 먼저 걸려 버립니다)
+      3. 접기: 한글·영숫자만 남긴다
+      4. region_etc_words 중 하나라도 «포함»되면 → region_etc
+      5. 앞머리 제거: 경상북도 → 경북 → 상주시 → 상주 (남는 게 있을 때만·break 없이 차례로)
+      6. region_aliases 에 있으면 → 그 값
+      7. regions 에 있으면 → 그 값
+      8. region_legal_dong 에 있으면 → 그 값
+      9. regions / region_legal_dong / region_aliases 로 startsWith → 그 값
+     10. 접미사 보완: 읍·면·동을 각각 붙여 후보를 모아
+         «서로 다른 결과가 정확히 1개일 때만» 채택          ← 2개 이상이면 포기
+     11. 그 밖 → ""   (= 미기재)
+
+   ⚠ 10번에 «이름이 읍/면/동으로 끝나면 건너뛴다» 는 조건을 «다시 넣지 마세요».
+      그 조건이 「낙동·중동·화동·모동」 네 면을 통째로 미기재로 떨어뜨렸습니다
+      (이름 자체가 「동」으로 끝나는 탓). 이 자리까지 왔다는 것은 위 2·6·7·8·9번이
+      «모두 빗나갔다»는 뜻이라, 완성된 이름에 접미사를 덧붙일 위험이 구조적으로 없습니다.
+
+   ⚠ 10번의 «1개일 때만» 도 빼지 마세요. 나중에 행정구역이 바뀌어 「○○면」과 「○○동」이
+      둘 다 생기면, 조용히 한쪽으로 몰아넣는 대신 «모른다»로 두는 편이 낫습니다.
+
+   ⚠ 「중앙동」처럼 폐지된 동은 표(region_aliases)에 적힌 대로만 옮깁니다. 표에 없는 이름을
+      임의로 아무 동에 넣지 않습니다 — 통계가 조용히 틀어집니다. 사람이 고치게 남깁니다.
+   ══════════════════════════════════════════════════════════════════════ */
+function normalizeRegion(value) {
+  // 1. 앞뒤 공백 제거
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return "";
+  if (!SJ_REGIONS.length) return "";              // 목록을 아직 못 받았으면 «판정하지 않는다»
+
+  // 2. 정식 이름 그대로 — ⚠ 반드시 접기 «전»에
+  if (SJ_REGIONS.indexOf(raw) >= 0) return raw;
+
+  // 3. 접기
+  let f = regionFold(raw);
+  if (!f) return "";
+
+  // 4. 「타지역」·「관외」 류 → 기타·타지역 (포함 여부로 본다)
+  for (let i = 0; i < SJ_REGION_ETC_WORDS.length; i++) {
+    if (f.indexOf(SJ_REGION_ETC_WORDS[i]) >= 0) return SJ_REGION_ETC || "";
+  }
+
+  // 5. 앞에 붙은 상위 주소 떼기 — ⚠ break 없이 «차례로»(「경북 상주시 함창읍」)
+  const PRE = ["경상북도", "경북", "상주시", "상주"];
+  for (let i = 0; i < PRE.length; i++) {
+    if (f.indexOf(PRE[i]) === 0 && f.length > PRE[i].length) f = f.slice(PRE[i].length);
+  }
+
+  // 6·7·8. 옛 이름·오타 → 정식 이름 → 법정동
+  if (Object.prototype.hasOwnProperty.call(SJ_REGION_ALIASES, f)) return SJ_REGION_ALIASES[f];
+  if (SJ_REGIONS.indexOf(f) >= 0) return f;
+  if (Object.prototype.hasOwnProperty.call(SJ_LEGAL_DONG, f)) return SJ_LEGAL_DONG[f];
+
+  // 9. 뒤에 하위 주소가 붙은 경우 — 「함창읍 교촌리」 → 「함창읍」
+  for (let i = 0; i < SJ_REGIONS.length; i++) {
+    const name = SJ_REGIONS[i];
+    if (name !== SJ_REGION_ETC && f.indexOf(name) === 0) return name;
+  }
+  const legalKeys = Object.keys(SJ_LEGAL_DONG);
+  for (let i = 0; i < legalKeys.length; i++) {
+    if (f.indexOf(legalKeys[i]) === 0) return SJ_LEGAL_DONG[legalKeys[i]];
+  }
+  const aliasKeys = Object.keys(SJ_REGION_ALIASES);
+  for (let i = 0; i < aliasKeys.length; i++) {
+    if (f.indexOf(aliasKeys[i]) === 0) return SJ_REGION_ALIASES[aliasKeys[i]];
+  }
+
+  // 10. 접미사 보완 — «서로 다른 결과가 정확히 1개일 때만» 채택
+  const found = [];
+  ["읍", "면", "동"].forEach((suf) => {
+    const cand = f + suf;
+    if (SJ_REGIONS.indexOf(cand) >= 0) found.push(cand);
+    else if (Object.prototype.hasOwnProperty.call(SJ_LEGAL_DONG, cand)) found.push(SJ_LEGAL_DONG[cand]);
+    else if (Object.prototype.hasOwnProperty.call(SJ_REGION_ALIASES, cand)) found.push(SJ_REGION_ALIASES[cand]);
+  });
+  const uniq = found.filter((v, i) => found.indexOf(v) === i);   // 같은 결과로 모이면 한 개로 본다
+  if (uniq.length === 1) return uniq[0];
+
+  // 11. 그 밖 → 모른다
+  return "";
+}
+
+/* 읍·면·동별 건수 — 파이썬 count_by_region(include_zero=True, include_unknown=True) 와 같은 규칙.
+   반환: [{name, n}, ...] «순서가 있는 목록». 이 순서가 곧 차트 축 순서다.
+   ⚠ dict 로 바꾸지 말 것 — 순서를 잃으면 ①번 규칙이 깨진다. */
+function countByRegion(rows) {
+  if (!SJ_REGIONS.length) return [];
+  const counts = Object.create(null);
+  SJ_REGIONS.forEach((r) => { counts[r] = 0; });
+  let unknown = 0;
+  (rows || []).forEach((r) => {
+    const name = normalizeRegion(r && r.region);
+    if (name && name in counts) counts[name] += 1; else unknown += 1;
+  });
+  const out = SJ_REGIONS.map((r) => ({ name: r, n: counts[r] }));   // ② 0건도 그대로 넣는다
+  // ③ 「미기재」는 «있을 때만» 맨 뒤에 (0건이면 굳이 칸을 만들지 않는다 — 파이썬과 같다)
+  if (unknown) out.push({ name: REGION_UNKNOWN, n: unknown });
+  return out;
+}
+
+/* 화면에 보여 줄 이름 — 정식 이름으로 바로잡아 보여 준다(목록·상세·차트가 같은 말을 쓰게).
+   알아볼 수 없으면 «원문 그대로» 보여 준다(담당자가 무엇이 잘못 들어왔는지 알아야 고칠 수 있다).
+   값 자체가 비어 있을 때만 「미기재」. */
+function regionLabel(value) {
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return REGION_UNKNOWN;
+  return normalizeRegion(raw) || raw;
+}
+
+/* data.json 에서 지역 목록을 받아 둔다.
+   ⚠ 못 받아도 앱은 그대로 돈다 — 차트만 「목록을 불러오지 못했습니다」로 남고,
+      목록·상세의 읍·면·동은 «원문 그대로» 보인다. 업무가 멈추지 않는 것이 우선이다. */
+async function loadRegionMeta() {
+  try {
+    const v = window.APP_VERSION ? ("?v=" + window.APP_VERSION) : "";
+    const res = await fetch("data.json" + v, { credentials: "same-origin" });
+    if (!res || !res.ok) throw new Error("HTTP " + (res ? res.status : "?"));
+    const d = await res.json();
+    SJ_REGIONS = Array.isArray(d.regions) ? d.regions.slice() : [];
+    SJ_REGION_GROUPS = Array.isArray(d.region_groups) ? d.region_groups : [];
+    SJ_REGION_ETC = String(d.region_etc || "");
+    /* 🟢곳간이 2026-08-20 에 data.json 으로 실어 준 «판정용 표» 세 가지.
+       ⛔ 이 표들을 JS 에 베껴 적지 마세요 — 파이썬 config.py 와 갈리는 순간
+          엑셀·보고서와 화면의 숫자가 달라집니다. 반드시 여기서 받아 씁니다.
+       ⚠ 옛 data.json(표가 없는 판본)을 물어도 앱이 죽지 않게 빈 값으로 떨어뜨린다.
+          그때는 「낙동」·「낙양동」 같은 값만 미기재로 가고 나머지는 그대로 돈다. */
+    SJ_REGION_ETC_WORDS = Array.isArray(d.region_etc_words) ? d.region_etc_words.slice() : [];
+    SJ_REGION_ALIASES = (d.region_aliases && typeof d.region_aliases === "object") ? d.region_aliases : {};
+    SJ_LEGAL_DONG = (d.region_legal_dong && typeof d.region_legal_dong === "object") ? d.region_legal_dong : {};
+    REGION_READY = SJ_REGIONS.length > 0;
+  } catch (e) {
+    console.warn("[읍·면·동] 목록을 불러오지 못했습니다(차트만 생략):", e);
+    // 반쯤 채워진 상태로 남겨 두면 «어떤 값은 알아보고 어떤 값은 못 알아보는» 어정쩡한
+    // 집계가 된다 → 통째로 비워 «판정하지 않는다»를 분명히 한다.
+    SJ_REGIONS = []; SJ_REGION_GROUPS = []; SJ_REGION_ETC = "";
+    SJ_REGION_ETC_WORDS = []; SJ_REGION_ALIASES = {}; SJ_LEGAL_DONG = {};
+    REGION_READY = false;
+  }
+  // stats.js(차트)와 화면이 «같은 규칙»을 쓰도록 한 곳에서만 내보낸다 — window.sjScopes 와 같은 방식.
+  window.sjRegions = {
+    ready: REGION_READY, list: SJ_REGIONS, groups: SJ_REGION_GROUPS,
+    etc: SJ_REGION_ETC, unknown: REGION_UNKNOWN,
+    etcWords: SJ_REGION_ETC_WORDS, aliases: SJ_REGION_ALIASES, legalDong: SJ_LEGAL_DONG,
+    normalize: normalizeRegion, countBy: countByRegion, label: regionLabel,
+  };
+  if (A_LOADED) renderApplications();      // 이미 목록이 떠 있으면 정식 이름으로 다시 그린다
+  return REGION_READY;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   💬 시민 안내문 «자주 쓰는 문장»(상용구)
+   ────────────────────────────────────────────────────────────────────
+   ★★ 문구를 고치는 곳은 «여기 한 곳»뿐입니다. ★★
+      상주시가 공식 문안을 확정하면 아래 label(단추에 보이는 짧은 이름)과
+      text(칸에 들어갈 문장)만 바꿔 주세요. 화면·검증 코드는 손댈 필요가 없습니다.
+   ⚠ 개수는 «3개»가 상한입니다(규격서 §0 — 늘리면 안내문 칸 위가 복잡해집니다).
+   ⚠ 여기 문장은 «시민이 그대로 읽는 글»입니다. 내부 판단·개인정보를 넣지 마세요.
+   ⚠ 상용구를 넣어도 저장 시 «공개 확인 창»은 그대로 뜹니다(검토를 건너뛰지 않습니다).
+   ⚠ 한 문장이 300자를 넘지 않게 하세요(칸의 상한이 300자입니다).
+   ══════════════════════════════════════════════════════════════════════ */
+const CITIZEN_REPLY_PRESETS = [
+  { label: "접수 확인",
+    text: "신청이 정상적으로 접수되었습니다. 담당자가 순서대로 검토한 뒤 결과를 안내드리겠습니다." },
+  { label: "서류 보완",
+    text: "제출하신 서류 가운데 확인이 필요한 부분이 있어 담당자가 연락드릴 예정입니다. 연락을 받으시면 보완 서류를 제출해 주세요." },
+  { label: "심사 진행",
+    text: "서류 확인이 끝나 심사가 진행 중입니다. 결과가 정해지는 대로 이 화면과 남겨 주신 연락처로 안내드리겠습니다." },
+];
+
+const OVERDUE_DAYS = 7;
+function overdueDays(r) {
+  const st = (r && r.status) || "접수";
+  if (st !== "접수" && st !== "심사중") return 0;
+  if (!r || !r.created_at) return 0;
+  const t = new Date(r.created_at);
+  if (isNaN(t)) return 0;
+  const d = Math.floor((Date.now() - t.getTime()) / 86400000);
+  return d >= OVERDUE_DAYS ? d : 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   🔔 새 접수 소리 알림 — ⛔ «기본은 꺼짐». 켜야만 울린다.
+   ────────────────────────────────────────────────────────────────────
+   시연장에서 저절로 울리는 것이 가장 큰 위험이라, 다음 세 겹으로 막는다.
+     ① 저장된 값이 없으면 «꺼짐»(=기본값). 켠 적이 있어야만 켜진 상태로 뜬다.
+     ② 소리를 만드는 장치(AudioContext)는 «켜는 순간»에만 만든다 — 켜지 않으면 아예 없다.
+     ③ 화면이 처음 뜰 때 밀려 있던 알림으로는 울리지 않는다(실시간으로 «새로» 올 때만).
+   ⚠ 소리 파일을 내려받지 않는다 — WebAudio 로 짧은 두 음을 그 자리에서 만든다(CSP 무관).
+   ⚠ 소리만으로 알리지 않는다 — 「새 접수 N건」 띠가 언제나 함께 뜬다(KWCAG 5.4.1).
+   ══════════════════════════════════════════════════════════════════════ */
+const SOUND_KEY = "sangju_admin_new_sound";
+let SOUND_ON = false;      // ★ 기본 꺼짐. 저장된 값이 "1" 일 때만 참이 된다.
+let _audioCtx = null;
+function loadSoundPref() {
+  try { SOUND_ON = localStorage.getItem(SOUND_KEY) === "1"; } catch (e) { SOUND_ON = false; }
+  return SOUND_ON;
+}
+function renderSoundBtn() {
+  const b = $("#btnSound"), lab = $("#btnSoundLab");
+  if (!b) return;
+  b.setAttribute("aria-checked", SOUND_ON ? "true" : "false");
+  if (lab) lab.textContent = SOUND_ON ? "새 접수 소리 켜짐" : "새 접수 소리 꺼짐";
+}
+function toggleSound() {
+  SOUND_ON = !SOUND_ON;
+  try { localStorage.setItem(SOUND_KEY, SOUND_ON ? "1" : "0"); } catch (e) {}
+  renderSoundBtn();
+  if (SOUND_ON) {
+    // «켜는 몸짓» 이 있는 지금만 소리 장치를 만들 수 있다(브라우저 자동재생 정책).
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { _audioCtx = _audioCtx || new AC(); if (_audioCtx.resume) _audioCtx.resume(); }
+    } catch (e) { _audioCtx = null; }
+    playNewBeep();                                   // 「이런 소리가 납니다」 미리듣기 1회
+    announce("새 접수 소리 알림을 켰습니다. 새 신청이 오면 짧은 소리로 알립니다.");
+  } else {
+    announce("새 접수 소리 알림을 껐습니다.");
+  }
+}
+// 짧은 «띵-딩» 두 음(총 0.32초). 저감 모션 설정과 무관하지만 볼륨은 아주 낮게 둔다.
+function playNewBeep() {
+  if (!SOUND_ON || !_audioCtx) return;
+  try {
+    const t0 = _audioCtx.currentTime;
+    [[880, 0], [1174.7, 0.16]].forEach(([hz, at]) => {
+      const osc = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+      osc.type = "sine"; osc.frequency.value = hz;
+      g.gain.setValueAtTime(0.0001, t0 + at);
+      g.gain.exponentialRampToValueAtTime(0.06, t0 + at + 0.02);   // 최대 6% — 사무실에서 거슬리지 않게
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.15);
+      osc.connect(g); g.connect(_audioCtx.destination);
+      osc.start(t0 + at); osc.stop(t0 + at + 0.16);
+    });
+  } catch (e) { /* 소리를 못 내도 업무는 그대로 — 화면 띠가 이미 알리고 있다 */ }
 }
 
 // 🔄 새로고침·창 닫기 — 앱 «밖»으로 나가는 경로도 똑같이 막는다(브라우저 기본 확인창).
@@ -656,22 +1032,9 @@ function buildChromeIntent() {
     "#Intent;scheme=https;package=com.android.chrome;" +
     "S.browser_fallback_url=" + encodeURIComponent(cur) + ";end";
 }
-// 현재 주소 복사(클립보드 API 실패 시 임시 input 폴백)
+// 현재 주소 복사 — 복사 절차는 공용 copyText() 한 곳에 있다(접수번호 복사와 같은 코드).
 async function copyCurrentUrl() {
-  const url = window.location.href;
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(url);
-    } else { throw new Error("no clipboard api"); }
-    announce("주소를 복사했어요. 브라우저에 붙여넣어 열어주세요.");
-  } catch (e) {
-    const ta = document.createElement("textarea");
-    ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
-    document.body.appendChild(ta); ta.focus(); ta.select();
-    try { document.execCommand("copy"); announce("주소를 복사했어요."); }
-    catch (e2) { announce("주소 복사에 실패했어요. 주소창을 길게 눌러 복사해 주세요."); }
-    document.body.removeChild(ta);
-  }
+  await copyText(window.location.href, "주소를 복사했어요. 브라우저에 붙여넣어 열어주세요.");
 }
 function initInApp() {
   const banner = $("#inappBanner");
@@ -772,6 +1135,10 @@ async function showApp() {
   subscribeProposalsRealtime();
   // 📥 신청 접수: 공무원 1순위 업무 → 기본(첫) 탭. 즉시 로드 + 실시간 구독.
   subscribeApplicationsRealtime();
+  bindRtRecovery();          // 끊김 → 복구 시 즉시 다시 확인(폴백)
+  // 📍 읍·면·동 목록(data.json) — 접수 목록과 «나란히» 받는다. 기다리지 않는다:
+  //    못 받아도 목록·상세·저장은 그대로 돌아야 하고, 차트만 조용히 빠진다.
+  loadRegionMeta();
   loadApplications();
 }
 
@@ -982,6 +1349,11 @@ function bindUI() {
   const pwm = $("#pwModal");
   if (pwm) {
     $("#btnChangePw").onclick = openChangePw;
+    // 🔔 새 접수 소리 알림 — ⛔ 기본 꺼짐. 켠 적이 있어야만 켜진 상태로 뜬다.
+    loadSoundPref();
+    renderSoundBtn();
+    const sb2 = $("#btnSound");
+    if (sb2) sb2.onclick = toggleSound;
     $("#pwClose").onclick = () => requestCloseModal(pwm);
     pwm.addEventListener("click", (e) => { if (e.target.id === "pwModal") requestCloseModal(pwm); });
     $("#pwSave").onclick = submitChangePw;
@@ -1169,7 +1541,53 @@ function subscribeRealtime() {
   sb.channel("benefits-rt")
     .on("postgres_changes", { event: "*", schema: "public", table: "benefits" },
         () => { RT_PENDING += 1; syncRtBanners(); rtAutoApply("benefits", loadBenefits); })
-    .subscribe((status) => setRealtimeDot(status === "SUBSCRIBED"));
+    .subscribe((status) => rtChannelStatus("benefits", status));
+}
+
+/* ── 실시간이 끊겼을 때의 «폴백 조회» (2026-08-20) ───────────────────────
+   왜 필요한가 — 지금까지는 연결이 끊기면 헤더 글자만 「실시간 연결 끊김」으로 바뀌고
+   «그 뒤로는 아무 일도 일어나지 않았다». 시연장 와이파이가 한 번 흔들리면 그 뒤
+   들어온 시민 신청이 화면에 영영 나타나지 않는다(공무원은 알 길이 없다).
+   → 끊겨 있는 «동안만», «보고 있는 탭만» 20초마다 직접 다시 불러온다.
+     연결이 살아 있으면 폴백은 한 번도 돌지 않으므로 평소 조회량은 그대로다.
+   ⚠ 편집·상세 모달이 열려 있으면(rtBusy) 건너뛴다 — 작성 중인 내용을 지우면 안 된다. */
+const RT_POLL_MS = 20000;
+let _rtPollTimer = null;
+// null = 아직 소식 없음(«끊김»으로 치지 않는다). 세 채널이 차례로 붙는 동안
+// 잠깐 false 로 보여 「연결 끊김」을 헛되이 낭독하는 일을 막는다.
+const _rtChanOk = { benefits: null, proposals: null, applications: null };
+
+function rtChannelStatus(kind, status) {
+  _rtChanOk[kind] = (status === "SUBSCRIBED");
+  // «실제로 끊겼다고 알려온» 채널이 하나라도 있으면 끊김으로 본다(같은 소켓이라 대개 함께 움직인다).
+  const bad = Object.keys(_rtChanOk).some((k) => _rtChanOk[k] === false);
+  setRealtimeDot(!bad);
+  if (RT_OK) rtStopPoll(); else rtStartPoll();
+}
+
+function rtPollTick() {
+  if (RT_OK || document.hidden || rtBusy()) return;
+  if (pCurrentTab === "applications" && A_LOADED) loadApplications();
+  else if (pCurrentTab === "benefits") loadBenefits();
+  else if (pCurrentTab === "proposals" && P_LOADED) loadProposals();
+}
+function rtStartPoll() {
+  if (_rtPollTimer !== null) return;      // ⚠ !_rtPollTimer 로 쓰면 타이머 id 0 을 «없음»으로 오인한다
+  _rtPollTimer = setInterval(rtPollTick, RT_POLL_MS);
+}
+function rtStopPoll() {
+  if (_rtPollTimer === null) return;
+  clearInterval(_rtPollTimer);
+  _rtPollTimer = null;
+}
+
+// 네트워크가 돌아오거나 화면이 다시 보이면 기다리지 않고 즉시 한 번 확인한다.
+let _rtRecoveryBound = false;
+function bindRtRecovery() {
+  if (_rtRecoveryBound) return;      // showApp() 이 두 번 불려도 리스너가 겹치지 않게
+  _rtRecoveryBound = true;
+  window.addEventListener("online", () => setTimeout(rtPollTick, 500));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) rtPollTick(); });
 }
 
 // 실시간 연결 표시 갱신
@@ -1793,11 +2211,14 @@ function openEdit(r) {
       await uploadPendingForms(saved);
     }
     closeModal($("#modal"));
-    showDoneCheck("저장했습니다");
-    announce("저장되었습니다.");
+    // 🎉 「저장했습니다 · 오늘 3번째」 — 움직임과 낭독이 «같은 문구»를 쓴다(§14).
+    const dt = doneText("저장했습니다");
+    showDoneCheck(dt);
+    announce(dt.replace("저장했습니다", "저장되었습니다") + ".");
     await loadBenefits();
   }
-  if (r) $("#mDel").onclick = async () => {
+  // 🔒 연타 방어(bindOnce) — 확인창을 두 번 띄우거나 delete 를 두 번 보내지 않는다.
+  if (r) bindOnce($("#mDel"), async () => {
     // 되돌릴 수 없는 삭제 — 초점은 «취소»에 놓인다(askConfirm 규약).
     const ok = await askConfirm({
       title: "이 사업을 삭제할까요?",
@@ -1811,7 +2232,7 @@ function openEdit(r) {
     closeModal($("#modal"));
     announce("삭제되었습니다.");
     await loadBenefits();
-  };
+  });
   PENDING_FORMS = [];                       // 「저장 시 함께 올림」 목록은 모달을 열 때마다 비운다
   if (window.SangjuForms) initFormsSection(r);
   openModal($("#modal"));
@@ -1841,11 +2262,15 @@ async function refreshFormsList(r) {
     const size = SangjuForms.formatSize(row.size);
     const meta = (ext ? ext + " 파일" : "파일") + (size ? " · " + size : "");
     const url = safeHref(row.public_url);      // http(s)·상대경로만 링크로 만든다
+    // ⚠ KWCAG 2.2 6.4.2(사용자 요구에 따른 실행)·5.1.1(적절한 대체 텍스트) —
+    //    새 탭으로 열리는 사실과 파일형식·용량을 링크의 접근명(aria-label)에 포함한다.
+    //    시민앱(app.js renderFormsDownload)과 같은 원칙(2026-08-20 잣대 수정).
+    const ariaLabel = esc(nm) + " (" + esc(meta) + ", 새 창에서 열림)";
     const nameHtml = url
-      ? `<a class="forms-item-name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">📄 ${esc(nm)}</a>`
+      ? `<a class="forms-item-name" href="${esc(url)}" target="_blank" rel="noopener noreferrer" aria-label="${ariaLabel}">📄 ${esc(nm)}</a>`
       : `<span class="forms-item-name">📄 ${esc(nm)}</span>`;
     return `<li class="forms-item" data-id="${esc(String(row.id))}">
-        <span class="forms-item-main">${nameHtml}<span class="forms-item-meta">${esc(meta)}</span></span>
+        <span class="forms-item-main">${nameHtml}<span class="forms-item-meta" aria-hidden="true">${esc(meta)}</span></span>
         <button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제">🗑 삭제</button>
       </li>`;
   }).join("");
@@ -2115,7 +2540,7 @@ function subscribeProposalsRealtime() {
   sb.channel("proposals-rt")
     .on("postgres_changes", { event: "*", schema: "public", table: "proposals" },
         () => { if (P_LOADED) { PRT_PENDING += 1; syncRtBanners(); rtAutoApply("proposals", loadProposals); } })
-    .subscribe();
+    .subscribe((status) => rtChannelStatus("proposals", status));
 }
 
 function renderPStatusChips() {
@@ -2198,7 +2623,7 @@ function renderProposals() {
         <div class="pcard-title">${esc(r.title)}</div>
         <div class="pcard-meta">
           <span class="like-tag"><span aria-hidden="true">👍</span> 공감 ${r.like_count || 0}</span>
-          <span><span aria-hidden="true">🙍</span> ${esc(r.author_nick || "익명")}${r.region ? " · " + esc(r.region) : ""}</span>
+          <span><span aria-hidden="true">🙍</span> ${esc(r.author_nick || "익명")}${r.region ? " · " + esc(regionLabel(r.region)) : ""}</span>
           <span><span aria-hidden="true">🗓</span> ${esc(fmtDate(r.created_at))}</span>
         </div>
       </div>`;
@@ -2249,7 +2674,7 @@ async function openProposal(r) {
       ${r.is_hidden ? `<span class="hide-tag"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
     </div>
     <div class="field"><div class="field-label">제목</div><div class="field-value">${esc(r.title)}</div></div>
-    <div class="field"><div class="field-label">작성</div><div class="field-value"><span aria-hidden="true">🙍</span> ${esc(r.author_nick || "익명")}${r.region ? " · " + esc(r.region) : ""} · <span aria-hidden="true">🗓</span> ${esc(fmtDate(r.created_at))} · <span aria-hidden="true">👍</span> 공감 ${r.like_count || 0}</div></div>
+    <div class="field"><div class="field-label">작성</div><div class="field-value"><span aria-hidden="true">🙍</span> ${esc(r.author_nick || "익명")}${r.region ? " · " + esc(regionLabel(r.region)) : ""} · <span aria-hidden="true">🗓</span> ${esc(fmtDate(r.created_at))} · <span aria-hidden="true">👍</span> 공감 ${r.like_count || 0}</div></div>
     <div class="field"><div class="field-label">내용</div><div class="pm-body-text">${esc(r.body || "")}</div></div>
     ${reps ? `<div class="field"><div class="field-label"><span aria-hidden="true">🚩</span> 신고 ${reps}건</div><div id="pmReports" class="pm-reports" role="status" aria-live="polite">불러오는 중…</div></div>` : ""}
     <div class="field">
@@ -2269,7 +2694,8 @@ async function openProposal(r) {
 
   if (reps) loadReportDetail(r.id);
 
-  $("#pmSave").onclick = async () => {
+  // 🔒 연타 방어(bindOnce) — 같은 제안에 update 가 두 번 나가지 않게.
+  bindOnce($("#pmSave"), async () => {
     const newStatus = $("#pmStatus").value;
     const reply = ($("#pmReply").value || "").trim();
     const isHidden = $("#pmHidden").checked;
@@ -2290,10 +2716,11 @@ async function openProposal(r) {
     if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
     closeModal($("#pModal"));
     markJustChanged(r.id);
-    showDoneCheck("저장했습니다");
-    announce("정책제안이 저장되었습니다.");
+    const dt = doneText("저장했습니다");            // 🎉 「… · 오늘 N번째」
+    showDoneCheck(dt);
+    announce("정책제안이 저장되었습니다." + dt.replace("저장했습니다", ""));
     await loadProposals();
-  };
+  });
 
   openModal($("#pModal"));
 }
@@ -2340,6 +2767,51 @@ function aScopeDef() {
   const t = window.sjScopes;
   return (t && A_SCOPE && t[A_SCOPE]) ? t[A_SCOPE] : null;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   🏢 담당팀 «기억되는» 필터 (2026-08-20)
+   ────────────────────────────────────────────────────────────────────
+   담당자는 늘 자기 팀 것만 본다. 매번 고르지 않게 이 브라우저에 기억해 둔다.
+   ⚠⚠ 기억되는 필터의 «단 하나의 위험» — 다음 날 들어와서 목록이 비어 있으면
+      「접수가 0건이네」 로 오해한다. 그래서 팀이 걸려 있는 동안에는 목록 위 띠(#aScopeBar)가
+      «항상» 「담당팀 ○○ 으로 보는 중」 + 「전체 보기」 를 보여 준다(renderAScopeUI).
+      ⛔ 그 띠를 조건부로 감추지 마세요. 감추는 순간 이 기능은 «버그»가 됩니다.
+   ⚠ 팀 목록은 지어내지 않는다 — 실제로 들어와 있는 접수의 team 값만 모은다.
+   ⚠ 기억한 팀이 오늘 자료에 하나도 없으면(부서 개편 등) 조용히 «전체»로 되돌린다.
+   ══════════════════════════════════════════════════════════════════════ */
+const A_TEAM_KEY = "sangju_admin_team_filter";
+let A_TEAM = "";
+function loadTeamPref() {
+  try { A_TEAM = localStorage.getItem(A_TEAM_KEY) || ""; } catch (e) { A_TEAM = ""; }
+  return A_TEAM;
+}
+function saveTeamPref() {
+  try { A_TEAM ? localStorage.setItem(A_TEAM_KEY, A_TEAM) : localStorage.removeItem(A_TEAM_KEY); } catch (e) {}
+}
+// 접수 목록에 실제로 있는 담당팀만 모아 <select> 를 채운다(가나다순).
+function renderTeamOptions() {
+  const sel = $("#aTeam"); if (!sel) return;
+  const names = [];
+  AALL.forEach((r) => {
+    const t = (r && r.team ? String(r.team) : "").trim();
+    if (t && names.indexOf(t) < 0) names.push(t);
+  });
+  names.sort((a, b) => a.localeCompare(b, "ko"));
+  // 기억해 둔 팀이 오늘 자료에 없으면 «전체»로 되돌린다(빈 화면 오해 방지).
+  if (A_TEAM && names.indexOf(A_TEAM) < 0) { A_TEAM = ""; saveTeamPref(); }
+  sel.innerHTML = '<option value="">담당팀 전체</option>' +
+    names.map((n) => `<option value="${esc(n)}"${n === A_TEAM ? " selected" : ""}>${esc(n)}</option>`).join("");
+  sel.value = A_TEAM;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ☑ 여러 건 고르기 — 일괄 상태 변경(H)의 «선택 상태» 한 곳
+   ⚠ 목록이 달라지면(검색·칩·팀·페이지) 선택은 «반드시» 지운다.
+      화면에 보이지 않는 건이 몰래 선택된 채 남아 있으면 «20건인 줄 알았는데 35건이
+      바뀌는» 사고가 난다. clearASel() 을 거치지 않는 경로를 만들지 말 것.
+   ══════════════════════════════════════════════════════════════════════ */
+let A_SEL = new Set();
+function clearASel() { A_SEL.clear(); }
 // 카드 누름 — 같은 카드를 다시 누르면 «전체»로 되돌아온다(요건 ②)
 function toggleAScope(key) {
   const t = window.sjScopes;
@@ -2347,6 +2819,7 @@ function toggleAScope(key) {
   A_SCOPE = (A_SCOPE === key) ? "" : key;
   if (A_SCOPE) A_STATUS = "전체";
   aPage = 0;
+  clearASel();
   renderAStatusChips();
   renderApplications();
 }
@@ -2359,23 +2832,165 @@ function renderAScopeUI() {
   });
   const bar = $("#aScopeBar"), txt = $("#aScopeText");
   if (!bar) return;
-  if (txt) txt.textContent = def ? def.note : "";
-  bar.hidden = !def;
+  /* 무엇으로 좁혀 보는 중인지 «한 줄»로 모아 알린다.
+     ⚠ 담당팀은 이 브라우저에 «기억»되는 필터라, 걸려 있는 동안에는 이 띠가 반드시 떠야 한다
+        (안 그러면 다음 날 「접수가 0건이네」 하고 오해한다 — A_TEAM 주석 참조). */
+  const parts = [];
+  if (A_TEAM) parts.push(`담당팀 «${A_TEAM}» 으로 보는 중입니다`);
+  if (def) parts.push(def.note);
+  if (txt) txt.textContent = parts.join(" · ");
+  bar.hidden = !parts.length;
+}
+
+/* 「☑ N건 선택됨」 띠 — 하나라도 고르면 나타나고, 다 풀면 사라진다. */
+function renderBulkBar() {
+  const bar = $("#aBulkBar"), cnt = $("#aBulkCount");
+  if (!bar) return;
+  const n = A_SEL.size;
+  bar.hidden = !n;
+  if (cnt && n) cnt.textContent = `${n}건 선택됨`;
 }
 
 function bindApplicationsUI() {
+  // 🏢 기억해 둔 담당팀을 «목록을 채우기 전에» 읽어 둔다
+  //    (loadApplications → renderTeamOptions 가 이 값으로 선택 상태를 맞춘다)
+  loadTeamPref();
   const s = $("#aSearch");
-  if (s) s.addEventListener("input", debounce(() => { aPage = 0; renderApplications(); }, 300));
+  if (s) s.addEventListener("input", debounce(() => { aPage = 0; clearASel(); renderApplications(); }, 300));
   // 요약 카드 네 장 — 진짜 <button> 이라 Enter·Space·Tab 은 브라우저가 알아서 해 준다
   document.querySelectorAll("#aSummary button.kpi[data-scope]").forEach((b) => {
     b.addEventListener("click", () => toggleAScope(b.getAttribute("data-scope")));
   });
   const sc = $("#aScopeClear");
-  if (sc) sc.onclick = () => { A_SCOPE = ""; aPage = 0; renderAStatusChips(); renderApplications(); };
+  if (sc) sc.onclick = () => {
+    // 「전체 보기」 — 요약 카드 좁힘과 «기억된 담당팀»을 함께 푼다(띠에 적힌 그대로).
+    A_SCOPE = ""; A_TEAM = ""; saveTeamPref(); renderTeamOptions();
+    aPage = 0; clearASel(); renderAStatusChips(); renderApplications();
+  };
   const c = $("#amClose"); if (c) c.onclick = () => requestCloseModal($("#aModal"));
   const m = $("#aModal");
   if (m) m.addEventListener("click", (e) => { if (e.target.id === "aModal") requestCloseModal($("#aModal")); });
   // Esc·포커스 트랩은 공통 _trapKeydown 이 처리(중복 등록 없음)
+
+  // 🏢 담당팀 — 고른 값을 이 브라우저에 기억한다(다음 로그인에도 그대로 걸린다).
+  const tm = $("#aTeam");
+  if (tm) tm.onchange = () => {
+    A_TEAM = tm.value || "";
+    saveTeamPref();
+    aPage = 0; clearASel();
+    renderApplications();          // 띠(#aScopeBar)는 renderApplications → renderAScopeUI 가 갱신
+    announce(A_TEAM ? `담당팀 ${A_TEAM} 으로 좁혀 봅니다.` : "담당팀 전체를 봅니다.");
+  };
+
+  // ☑ 일괄 상태 변경 — 상태 목록은 A_STATUSES 한 곳에서만 온다(칩·모달과 같은 값)
+  const bs = $("#aBulkStatus");
+  if (bs && !bs.options.length) {
+    bs.innerHTML = A_STATUSES.map((s2) => `<option value="${esc(s2)}">${esc(s2)}</option>`).join("");
+  }
+  const bc = $("#aBulkClear");
+  if (bc) bc.onclick = () => {
+    clearASel(); renderApplications();
+    announce("선택을 모두 해제했습니다.");
+  };
+  bindOnce($("#aBulkApply"), applyBulkStatus);   // 🔒 연타 방어 — 20건이 두 번 나가지 않게
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ☑ 여러 건 한꺼번에 상태 바꾸기 (2026-08-20)
+   ────────────────────────────────────────────────────────────────────
+   이 화면에서 «가장 위험한» 기능이다. 되돌리기가 없고, 한 번에 수십 건이 바뀐다.
+   그래서 다음 네 가지를 반드시 지킨다.
+     ① 누르기 전 — 「몇 건을 무엇으로」 를 적은 확인 창을 띄운다(초점은 «취소»에).
+     ② 한 건씩 차례로 — 동시에 보내지 않는다. 서버 쪽 순서가 뒤엉키지 않게.
+     ③ 부분 실패를 숨기지 않는다 — 「20건 중 18건 성공, 2건 실패(접수번호·사유)」 를 그대로 알린다.
+     ④ 감사기록 — 상태 변경도 개인정보 처분이므로 건마다 admin_audit 에 남긴다.
+        ⛔ 신청자 이름·연락처·문의내용은 절대 넣지 않는다. «접수번호 + 상태 변화» 뿐이다.
+        ⛔ 기록에 실패해도 업무(상태 변경)를 멈추지 않는다 — PC앱 access_log.py 와 같은 원칙.
+   ⚠ 처리메모·시민 안내문은 건드리지 않는다. 시민에게 나가는 글을 여러 건에 한꺼번에
+      뿌리는 길은 «일부러» 만들지 않았다(한 건씩 확인하고 공개해야 한다).
+   ══════════════════════════════════════════════════════════════════════ */
+async function applyBulkStatus() {
+  const ids = Array.from(A_SEL);
+  if (!ids.length) return;
+  const newStatus = ($("#aBulkStatus") || {}).value || A_STATUSES[0];
+  const cnt = $("#aBulkCount");
+
+  // 고른 id 에 해당하는 «지금 화면의» 행을 찾아 둔다(접수번호·이전 상태를 기록에 쓴다)
+  const chosen = ids.map((id) => AALL.find((r) => String(r.id) === id)).filter(Boolean);
+  /* 이미 그 상태인 건은 «보내지 않는다».
+     보내 봐야 바뀌는 것이 없는데도 서버 왕복이 늘고, 감사기록에 「승인 → 승인」 같은
+     뜻 없는 줄이 쌓인다(2026-08-20 실측에서 실제로 그랬다). 건너뛴 건수는 확인 창에 밝힌다. */
+  const picked = chosen.filter((r) => ((r.status || "접수") !== newStatus));
+  const skipped = chosen.length - picked.length;
+  if (!picked.length) {
+    announce(`고르신 ${chosen.length}건은 이미 «${newStatus}» 상태입니다. 바꿀 것이 없습니다.`);
+    alert(`고르신 ${chosen.length}건은 이미 «${newStatus}» 상태입니다.\n바꿀 것이 없어 그대로 두었습니다.`);
+    return;
+  }
+
+  // ① 확인 — 되돌릴 수 없다는 것을 분명히 말한다
+  const ok = await askConfirm({
+    title: `${picked.length}건의 상태를 «${newStatus}» 로 바꿉니다`,
+    body: `고르신 ${chosen.length}건 가운데 ${picked.length}건을 «${newStatus}» 상태로 바꿉니다.\n`
+        + (skipped ? `(${skipped}건은 이미 «${newStatus}» 이라 그대로 둡니다)\n` : "")
+        + "\n· 처리메모와 시민 안내문은 그대로 둡니다(상태만 바뀝니다).\n"
+        + "· 한꺼번에 바꾼 것을 되돌리는 기능은 없습니다.\n"
+        + "· 건수와 상태를 다시 한 번 확인해 주세요.",
+    cancelText: "취소",
+    okText: `${picked.length}건 바꾸기`,
+  });
+  if (!ok) return;
+
+  // ② 한 건씩 차례로. 진행 상황을 띠에 적어 «멈춘 것»으로 보이지 않게 한다.
+  const fails = [];
+  let done = 0;
+  for (const r of picked) {
+    if (cnt) cnt.textContent = `${done + 1}/${picked.length} 바꾸는 중…`;
+    const prev = r.status || "접수";
+    try {
+      await SangjuApply.updateApplication(r.id, { status: newStatus });
+      done += 1;
+      await auditBulkStatus(r.receipt_no, prev, newStatus);   // ④ 건마다 감사기록(실패해도 계속)
+    } catch (err) {
+      fails.push({ rc: r.receipt_no || `내부번호 ${r.id}`, why: writeErrMsg(err, "상태 변경") });
+    }
+  }
+
+  clearASel();
+  await loadApplications();
+
+  // ③ 결과를 «숨김 없이» 알린다
+  if (!fails.length) {
+    const tail = skipped ? `(이미 «${newStatus}» 이던 ${skipped}건은 그대로 두었습니다)` : "";
+    const dt = doneText(`${done}건을 «${newStatus}» 로 바꿨습니다`);
+    showDoneCheck(dt);
+    announce(dt + ". " + tail);
+  } else {
+    const lines = fails.slice(0, 8).map((f) => `· ${f.rc} — ${String(f.why).split("\n")[0]}`);
+    if (fails.length > 8) lines.push(`· 그 밖 ${fails.length - 8}건`);
+    const msg = `${picked.length}건 중 ${done}건을 «${newStatus}» 로 바꿨습니다.\n`
+              + `${fails.length}건은 바꾸지 못했습니다.\n\n${lines.join("\n")}\n\n`
+              + "바꾸지 못한 건은 목록에서 하나씩 열어 다시 시도해 주세요.";
+    announce(`${picked.length}건 중 ${done}건 성공, ${fails.length}건 실패했습니다.`);
+    alert(msg);
+  }
+}
+
+/* 🔒 일괄 상태 변경 감사기록 — admin_audit (supabase/application_status_2.sql (라))
+   ⛔ 남기는 것: 접수번호 · 「접수 → 승인」 같은 상태 변화뿐.
+   ⛔ 남기지 않는 것: 신청자 이름·연락처·문의내용·안내문 본문. 기록하려다 개인정보를
+      한 벌 더 만드는 것은 본말전도다(그 표의 설계 원칙 그대로).
+   누가·언제는 서버가 채운다(actor_uid = auth.uid()). 표 제약: action ≤ 40자, target ≤ 60자, detail ≤ 200자. */
+async function auditBulkStatus(receiptNo, prevStatus, newStatus) {
+  try {
+    await sb.from("admin_audit").insert({
+      action: "BULK_STATUS_CHANGE",
+      target: String(receiptNo || "").slice(0, 60),     // ★ 접수번호만
+      target_type: "접수(공무원앱)",
+      detail: `상태 ${prevStatus} → ${newStatus} (일괄)`,
+      result: "성공",
+    });
+  } catch (e) { /* 기록 실패로 업무를 멈추지 않는다 */ }
 }
 
 /* 🔒 접수 행에서 «자격증명» 열을 떼어 낸다 — supabase/신청첨부.sql [1-A] 규약.
@@ -2413,6 +3028,9 @@ async function loadApplications() {
     return;
   }
   AALL = scrubApplications(data);     // 🔒 자격증명(attach_ticket) 을 «앱에 들이기 전에» 떼어 낸다
+  // ⚠ 자료를 새로 받았으면 선택은 지운다 — 그 사이 지워진 건이 선택에 남아 있을 수 있다.
+  clearASel();
+  renderTeamOptions();               // 🏢 담당팀 목록도 방금 받은 자료로 다시 채운다
   A_LOADED = true;
   ART_PENDING = 0; syncRtBanners();   // 새로 불러왔으니 «밀린 알림»도 지운다
   renderAStatusChips();
@@ -2423,8 +3041,13 @@ function subscribeApplicationsRealtime() {
   // 시민앱에서 신청하면 즉시 여기로 온다 → 화면을 갈아엎지 않고 «N건» 알림 띠만 올린다.
   if (!window.SangjuApply) return;
   SangjuApply.subscribeApplications(() => {
-    if (A_LOADED) { ART_PENDING += 1; syncRtBanners(); rtAutoApply("applications", loadApplications); }
-  });
+    if (A_LOADED) {
+      ART_PENDING += 1; syncRtBanners(); rtAutoApply("applications", loadApplications);
+      // 🔔 소리 — 켜 둔 사람에게만. 화면 띠(«새 접수 N건»)가 언제나 함께 뜨므로
+      //    소리만으로 정보를 전하지 않는다(KWCAG 5.4.1). A_LOADED 안이라 첫 화면에서는 울리지 않는다.
+      playNewBeep();
+    }
+  }, (status) => rtChannelStatus("applications", status));
 }
 
 function renderAStatusChips() {
@@ -2438,7 +3061,7 @@ function renderAStatusChips() {
     // 색만으로 필터 상태를 알리지 않도록 접근명에 «선택됨»을 함께 넣는다
     c.setAttribute("aria-pressed", A_STATUS === st ? "true" : "false");
     // 칩을 고르면 요약 카드로 좁혀둔 것은 푼다(둘이 겹쳐 영영 0건이 되는 일을 막는다)
-    c.onclick = () => { A_STATUS = st; A_SCOPE = ""; aPage = 0; renderAStatusChips(); renderApplications(); };
+    c.onclick = () => { A_STATUS = st; A_SCOPE = ""; aPage = 0; clearASel(); renderAStatusChips(); renderApplications(); };
     box.appendChild(c);
   });
 }
@@ -2460,8 +3083,11 @@ function renderApplications() {
     const rst = r.status || "접수";
     if (scope && !scope.test(r)) return false;
     if (A_STATUS !== "전체" && rst !== A_STATUS) return false;
+    // 🏢 담당팀 — 기억되는 필터. 걸려 있으면 위 #aScopeBar 띠가 반드시 함께 뜬다.
+    if (A_TEAM && String(r.team || "").trim() !== A_TEAM) return false;
     if (q) {
-      const blob = `${r.benefit_name || ""} ${r.applicant_name || ""} ${r.phone || ""} ${r.receipt_no || ""} ${r.team || ""}`.toLowerCase();
+      // 📍 읍·면·동도 검색 대상 — 별도 «지역 필터»를 늘리지 않는 대신 여기서 찾게 한다(규격서 §0)
+      const blob = `${r.benefit_name || ""} ${r.applicant_name || ""} ${r.phone || ""} ${r.receipt_no || ""} ${r.team || ""} ${regionLabel(r.region)}`.toLowerCase();
       if (!blob.includes(q)) return false;
     }
     return true;
@@ -2470,16 +3096,32 @@ function renderApplications() {
   rows.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
 
   $("#aCount").textContent = `총 ${rows.length}건`;
+  renderBulkBar();
   if (!rows.length) {
-    // 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절).
-    //   · 「전체」인데 0건 = 아직 접수 자체가 없는 것 → 기다리면 된다고 알린다.
-    //   · 상태 칩을 좁혀서 0건 = 조건을 넓히면 된다고 알린다.
-    //   · 요약 카드로 좁혀서 0건 = 「오늘 들어온 접수가 없습니다」처럼 «그 칸의 말»로 알린다.
-    list.innerHTML = scope
-      ? `<div class="empty">${esc(scope.empty)} 위 «전체 보기»를 누르면 모든 접수를 볼 수 있습니다.</div>`
-      : (A_STATUS === "전체"
-        ? '<div class="empty">아직 들어온 신청이 없습니다. 시민이 신청하면 이 자리에 바로 나타납니다.</div>'
-        : `<div class="empty">«${esc(A_STATUS)}» 상태인 신청이 없습니다. 위 «전체»를 누르면 모든 접수를 볼 수 있습니다.</div>`);
+    /* 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절).
+       ★ 2026-08-20 — 「심사중」이 0건이 되는 순간은 «허탕»이 아니라 «다 처리한 것»이다.
+         그때만 상상주도 캐릭터가 아래에서 살짝 떠오르며 축하한다(규격서 §14② «빈 화면 캐릭터»).
+         ⚠ 접수 자체가 0건인 «아직 아무 일도 없는» 화면에는 띄우지 않는다 — 축하할 일이 아니다.
+         ⚠ 캐릭터는 원색 그대로·형태 변형 없이 쓴다(규격서 §18). 뜻은 뒤따르는 글자가 전하므로 alt="". */
+    const cleared = (AALL.length > 0) && (A_STATUS === "심사중" || A_SCOPE === "review");
+    if (cleared) {
+      list.innerHTML =
+        '<div class="empty empty-cheer">' +
+          '<img src="assets/sangsang1.png" class="empty-mascot" alt="" width="112" height="112">' +
+          '<b class="cheer-title">심사중인 접수가 없습니다. 다 처리하셨어요.</b>' +
+          '<span class="cheer-sub">새 신청이 들어오면 이 자리에 바로 나타납니다. ' +
+            '위 «전체»를 누르면 처리한 건까지 모두 볼 수 있습니다.</span>' +
+        '</div>';
+      announce("심사중인 접수가 없습니다. 모두 처리하셨습니다.");
+    } else {
+      list.innerHTML = scope
+        ? `<div class="empty">${esc(scope.empty)} 위 «전체 보기»를 누르면 모든 접수를 볼 수 있습니다.</div>`
+        : (A_STATUS === "전체"
+          ? (A_TEAM
+            ? `<div class="empty">담당팀 «${esc(A_TEAM)}» 으로 들어온 신청이 없습니다. 위 «전체 보기»를 누르면 모든 담당팀의 접수를 볼 수 있습니다.</div>`
+            : '<div class="empty">아직 들어온 신청이 없습니다. 시민이 신청하면 이 자리에 바로 나타납니다.</div>')
+          : `<div class="empty">«${esc(A_STATUS)}» 상태인 신청이 없습니다. 위 «전체»를 누르면 모든 접수를 볼 수 있습니다.</div>`);
+    }
     $("#aPager").innerHTML = "";
     return;
   }
@@ -2491,21 +3133,33 @@ function renderApplications() {
   list.innerHTML = "";
   slice.forEach((r) => {
     const st = r.status || "접수";
+    const od = overdueDays(r);         // ⏳ 처리 기한 경과(0 이면 아직 기한 안)
+    const rid = String(r.id);
     const card = el("div", "pcard");
     // 키보드 접근: role=button + Enter/Space. 상태·사업명·신청자를 접근명에 포함(색 의존 금지).
     const aLabel = [
       `상태 ${st}`,
+      od ? `접수 후 ${od}일 경과` : "",          // ⏳ 색이 아니라 «글자»로도 알린다
       `사업 ${r.benefit_name || ""}`,
       `신청자 ${r.applicant_name || ""}`,
+      `읍면동 ${regionLabel(r.region)}`,        // 📍 값이 없으면 「미기재」로 읽힌다
       r.receipt_no ? `접수번호 ${r.receipt_no}` : "",
       r.citizen_reply ? "시민 안내문 공개중" : "",
     ].filter(Boolean).join(", ") + " — 접수 처리 열기";
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", aLabel);
-    card.innerHTML = `<div class="pcard-main">
+    /* ☑ 맨 앞 «고르기» 칸 — 여러 건 한꺼번에 상태를 바꾸기 위한 것.
+       ⚠ 이 칸을 누르는 것은 «줄 열기»가 아니다 → 아래에서 클릭·키 이벤트를 반드시 멈춘다.
+       ⚠ 낭독기에는 접수번호(없으면 사업명)로 «무엇을 고르는지» 밝힌다. */
+    const pickName = r.receipt_no || r.benefit_name || "이 접수";
+    card.innerHTML = `<span class="pick-wrap">` +
+        `<input type="checkbox" class="row-pick" data-id="${esc(rid)}"` +
+        ` aria-label="${esc(pickName)} 선택"${A_SEL.has(rid) ? " checked" : ""}></span>` +
+      `<div class="pcard-main">
         <div class="pcard-top">
           <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
+          ${od ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${od}일 경과</span>` : ""}
           ${r.team ? `<span class="cat-tag">${esc(r.team)}</span>` : ""}
           ${r.receipt_no ? `<span class="rc-tag"><span aria-hidden="true">🧾</span> ${esc(r.receipt_no)}</span>` : ""}
           ${r.citizen_reply ? `<span class="cr-tag"><span aria-hidden="true">💬</span> 시민 안내문 공개중</span>` : ""}
@@ -2514,15 +3168,29 @@ function renderApplications() {
         <div class="pcard-meta">
           <span><span aria-hidden="true">🙍</span> ${esc(r.applicant_name || "")}</span>
           ${r.phone ? `<span><span aria-hidden="true">📞</span> ${esc(r.phone)}</span>` : ""}
+          <span class="rg-meta"><span aria-hidden="true">📍</span> ${esc(regionLabel(r.region))}</span>
           <span><span aria-hidden="true">🗓</span> ${esc(fmtDateTime(r.created_at))}</span>
         </div>
         ${r.memo ? `<div class="pcard-memo"><span aria-hidden="true">💬</span> ${esc(r.memo)}</div>` : ""}
       </div>`;
     const openIt = () => openApplication(r);
-    card.onclick = openIt;
+    card.onclick = (ev) => {
+      // 고르기 칸(과 그 손가락 영역)에서 시작한 누름은 «줄 열기»가 아니다
+      if (ev.target && ev.target.closest && ev.target.closest(".pick-wrap")) return;
+      openIt();
+    };
     card.addEventListener("keydown", (ev) => {
+      if (ev.target !== card) return;                     // 체크상자의 Space 는 그쪽 몫
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openIt(); }
     });
+    const chk = card.querySelector(".row-pick");
+    if (chk) {
+      chk.addEventListener("click", (ev) => ev.stopPropagation());
+      chk.addEventListener("change", () => {
+        if (chk.checked) A_SEL.add(rid); else A_SEL.delete(rid);
+        renderBulkBar();
+      });
+    }
     applyJustChanged(card, r.id);      // 방금 상태를 바꾼 줄이면 «방금 변경» 배지 + 은은한 강조
     list.appendChild(card);
   });
@@ -2543,7 +3211,8 @@ function renderAPager(total, pages) {
     b.textContent = label;
     b.setAttribute("aria-label", aria);
     if (act) b.setAttribute("aria-current", "page");
-    if (dis) b.disabled = true; else b.onclick = () => { aPage = p; renderApplications(); };
+    // ⚠ 쪽을 옮기면 «보이지 않는 건이 선택된 채» 남지 않도록 선택을 지운다(일괄 처리 사고 방지)
+    if (dis) b.disabled = true; else b.onclick = () => { aPage = p; clearASel(); renderApplications(); };
     bar.appendChild(b);
   };
   mk("‹", aPage - 1, aPage <= 0, false, "이전 페이지");
@@ -2561,10 +3230,27 @@ async function openApplication(r) {
   $("#amBody").innerHTML = `
     <div class="pcard-top mb-10">
       <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
+      ${overdueDays(r) ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${overdueDays(r)}일 경과</span>` : ""}
       ${r.receipt_no ? `<span class="rc-tag"><span aria-hidden="true">🧾</span> ${esc(r.receipt_no)}</span>` : ""}
+      ${r.receipt_no ? `<button id="amCopyRc" class="mini-btn" type="button"
+          aria-label="접수번호 ${esc(r.receipt_no)} 복사"><span aria-hidden="true">📋</span> <span id="amCopyLab">복사</span></button>` : ""}
     </div>
+    <!-- 🖨 인쇄 전용 안내 — 화면에는 보이지 않고 «종이에만» 찍힌다(style.css .print-only).
+         개인정보가 종이로 나가는 순간이라 목적 외 이용을 못 박는다(개인정보보호법 §19). -->
+    <p class="print-only print-note">※ 이 문서에는 개인정보가 포함되어 있습니다.
+      담당 업무 목적으로만 사용하고, <b>목적 외 이용·제3자 제공을 금지</b>합니다.
+      사용 후에는 지체 없이 파기하십시오.</p>
     <div class="field"><div class="field-label">사업명</div><div class="field-value">${esc(r.benefit_name || "")}</div></div>
     <div class="field"><div class="field-label">신청자</div><div class="field-value"><span aria-hidden="true">🙍</span> ${esc(r.applicant_name || "")}${r.phone ? ` · <span aria-hidden="true">📞</span> <a href="tel:${esc((r.phone || "").replace(/[^0-9+]/g, ""))}">${esc(r.phone)}</a>` : ""}</div></div>
+    <!-- 📍 읍·면·동 — 시민앱이 신청서에서 «골라» 보낸 값(applications.region).
+         옛 신청에는 없을 수 있어 그때는 「미기재」로 둔다(숨기면 왜 없는지 알 수 없다). -->
+    <div class="field"><div class="field-label">읍·면·동</div><div class="field-value"><span aria-hidden="true">📍</span> ${esc(regionLabel(r.region))}${
+      /* ⚠ REGION_READY 를 «반드시» 함께 본다. 목록(data.json)을 못 받은 상태에서는
+         normalizeRegion() 이 무엇이든 "" 를 돌려주므로, 멀쩡한 「남원동」에도 경고가 붙는다
+         (2026-08-20 실측에서 실제로 그랬다). 판정할 수 없을 때는 «아무 말도 하지 않는다». */
+      (REGION_READY && String(r.region || "").trim() && !normalizeRegion(r.region))
+        ? ` <span class="rg-warn">— 표준 읍·면·동이 아니어서 통계에서는 「${esc(REGION_UNKNOWN)}」로 셉니다</span>` : ""
+    }</div></div>
     <div class="field"><div class="field-label">담당팀</div><div class="field-value">${esc(r.team || "-")}${r.manager_email ? ` · ${esc(r.manager_email)}` : ""}</div></div>
     <div class="field"><div class="field-label">문의사항</div><div class="pm-body-text">${esc(r.memo || "(없음)")}</div></div>
     <div class="field"><div class="field-label">신청일시</div><div class="field-value"><span aria-hidden="true">🗓</span> ${esc(fmtDateTime(r.created_at))}${r.source ? ` · ${esc(r.source)}` : ""}</div></div>
@@ -2595,12 +3281,22 @@ async function openApplication(r) {
       <p id="amReplyWarn" class="citizen-warn"><span aria-hidden="true">⚠</span>
         이 내용은 <b>신청자에게 그대로 보입니다.</b> 내부 판단·개인정보는 위의 «처리메모»에 적어 주세요.
         한 번 공개한 글은 되돌릴 수 없습니다.</p>
+      <!-- 💬 자주 쓰는 문장(상용구) — 누르면 아래 칸에 «덧붙는다». 저절로 저장되지 않는다.
+           ★ 문구는 CITIZEN_REPLY_PRESETS 한 곳에만 있다(app.js 위쪽). 화면 코드는 손댈 필요 없다.
+           ⚠ 넣은 뒤에도 «공개» 확인 창은 그대로 뜬다 — 상용구라고 검토를 건너뛰지 않는다. -->
+      <div class="reply-presets" role="group" aria-label="자주 쓰는 안내문 넣기">
+        <span class="reply-presets-cap">자주 쓰는 문장</span>
+        ${CITIZEN_REPLY_PRESETS.map((p, i) =>
+          `<button type="button" class="reply-preset" data-preset="${i}">${esc(p.label)}</button>`).join("")}
+      </div>
       <textarea id="amReply" class="form-textarea" maxlength="300" aria-describedby="amReplyWarn amReplyLimit"
                 placeholder="예) 서류 확인이 끝났습니다. 8월 25일까지 심사 결과를 문자로 안내드리겠습니다.">${esc(r.citizen_reply || "")}</textarea>
       <p id="amReplyLimit" class="field-hint">300자까지 쓸 수 있습니다. 안내에 필요한 내용만 간단히 적어 주세요.</p>
     </div>
+    <!-- 규격서 §0 «한 화면 버튼 3개 상한» — 삭제·인쇄·저장 정확히 셋. 여기에 더 늘리지 말 것. -->
     <div class="modal-actions">
       <button id="amDelete" class="nav-btn danger" type="button">🗑 삭제</button>
+      <button id="amPrint" class="nav-btn ghostish" type="button">🖨 인쇄</button>
       <button id="amSave" class="nav-btn" type="button">💾 저장</button>
     </div>`;
 
@@ -2608,7 +3304,55 @@ async function openApplication(r) {
   //    기다리지 않고(await 없이) 띄우되, 남은 오류도 삼켜 «처리되지 않은 거부»가 나지 않게 한다.
   renderApplicationFiles(r).catch(() => {});
 
-  $("#amSave").onclick = async () => {
+  // 📋 접수번호 복사 — 전화 응대·엑셀 붙여넣기 때 숫자를 눈으로 옮겨 적던 수고를 없앤다.
+  //    성공을 «글자»로 알린다: 단추 라벨이 잠깐 「복사됨」 으로 바뀌고 낭독기에도 안내가 간다.
+  const cp = $("#amCopyRc");
+  if (cp) cp.onclick = async () => {
+    const ok = await copyText(r.receipt_no, `접수번호 ${r.receipt_no} 를 복사했습니다.`);
+    const lab = $("#amCopyLab");
+    if (lab && ok) {
+      lab.textContent = "복사됨";
+      setTimeout(() => { if (lab.isConnected) lab.textContent = "복사"; }, 1600);
+    }
+  };
+
+  // 💬 상용구 — 누르면 안내문 칸에 «덧붙는다»(이미 쓴 글을 지우지 않는다).
+  //    300자를 넘게 되면 넣지 않고 그 사실을 알린다(칸의 상한을 몰래 넘기지 않는다).
+  document.querySelectorAll("#amBody .reply-preset").forEach((b) => {
+    b.onclick = () => {
+      const p = CITIZEN_REPLY_PRESETS[Number(b.getAttribute("data-preset"))];
+      const ta = $("#amReply");
+      if (!p || !ta) return;
+      const cur = (ta.value || "").trim();
+      const next = cur ? (cur + "\n" + p.text) : p.text;
+      if (next.length > 300) {
+        announce(`이미 쓰신 글에 더하면 300자를 넘습니다(${next.length}자). 글을 줄인 뒤 다시 눌러 주세요.`);
+        ta.focus();
+        return;
+      }
+      ta.value = next;
+      ta.focus();
+      ta.setSelectionRange(next.length, next.length);
+      announce(`«${p.label}» 문장을 넣었습니다. 내용을 확인한 뒤 저장해 주세요.`);
+    };
+  });
+
+  // 🖨 인쇄 — 이 접수 «한 건»만 종이로. 화면의 다른 것은 인쇄되지 않는다(style.css @media print).
+  //    ⚠ 개인정보가 종이로 나가므로, 인쇄물 맨 위에 목적 외 이용 금지 문구가 함께 찍힌다.
+  const pr = $("#amPrint");
+  if (pr) pr.onclick = () => {
+    document.body.classList.add("printing-modal");
+    const off = () => document.body.classList.remove("printing-modal");
+    // onafterprint 를 못 받는 브라우저가 있어 시간제한으로도 한 번 더 되돌린다
+    window.addEventListener("afterprint", off, { once: true });
+    setTimeout(off, 4000);
+    announce("인쇄 창을 엽니다. 이 접수 한 건만 인쇄됩니다.");
+    try { window.print(); } catch (e) { off(); }
+  };
+
+  // 🔒 연타 방어(bindOnce) — 시민 안내문 «공개 확인창»이 두 번 뜨거나
+  //    같은 접수에 update·감사기록이 두 번 나가지 않게 한다.
+  bindOnce($("#amSave"), async () => {
     const newStatus = $("#amStatus").value;
     const memo = ($("#amMemo").value || "").trim();
     // 💬 시민 안내문 — 내부 메모와 «별도 필드»로 보낸다(절대 합치지 않는다).
@@ -2665,14 +3409,16 @@ async function openApplication(r) {
     }
     closeModal($("#aModal"));
     markJustChanged(r.id);              // 다시 그릴 때 그 줄이 «방금 변경»으로 보이게
-    showDoneCheck("저장했습니다");
-    announce(reply
+    const dt = doneText("저장했습니다");            // 🎉 「… · 오늘 N번째」
+    showDoneCheck(dt);
+    announce((reply
       ? "신청 접수가 저장되었습니다. 시민 안내문은 신청자 화면에 그대로 공개됩니다."
-      : "신청 접수가 저장되었습니다.");
+      : "신청 접수가 저장되었습니다.") + dt.replace("저장했습니다", ""));
     await loadApplications();
-  };
+  });
 
-  $("#amDelete").onclick = async () => {
+  // 🔒 연타 방어(bindOnce) — 첨부 파기 → 접수 삭제 순서가 두 번 겹치지 않게.
+  bindOnce($("#amDelete"), async () => {
     const ok = await askConfirm({
       title: "이 신청을 삭제할까요?",
       body: `접수번호 ${r.receipt_no || "-"} 신청을 지웁니다.\n첨부파일이 있으면 함께 파기됩니다.\n되돌릴 수 없습니다.`,
@@ -2695,7 +3441,7 @@ async function openApplication(r) {
     closeModal($("#aModal"));
     announce("신청이 삭제되었습니다.");
     await loadApplications();
-  };
+  });
 
   openModal($("#aModal"));
 }
@@ -2781,10 +3527,11 @@ async function renderApplicationFiles(r) {
     // ⚠ 전역 SangjuForms 를 «맨이름»으로 부르면 forms.js 가 없을 때 ReferenceError 로 화면이 죽는다
     const size = (window.SangjuForms && SangjuForms.formatSize) ? SangjuForms.formatSize(row.size) : "";
     const meta = (ext ? ext + " 파일" : "파일") + (size ? " · " + size : "");
+    // ⚠ KWCAG 2.2 6.4.2 — 이 단추는 클릭 시 새 창을 미리 연다(위 handler). 접근명에 알린다.
     return `<li class="forms-item" data-id="${esc(String(row.id))}">
         <span class="forms-item-main"><span class="forms-item-name">📄 ${esc(nm)}</span>
           <span class="forms-item-meta">${esc(meta)}</span></span>
-        <button type="button" class="forms-open" aria-label="${esc(nm)} 내려받기">내려받기</button>
+        <button type="button" class="forms-open" aria-label="${esc(nm)} (${esc(meta)}) 내려받기, 새 창에서 열림">내려받기</button>
       </li>`;
   }).join("");
   const byId = {};

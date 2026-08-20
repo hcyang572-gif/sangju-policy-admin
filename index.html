@@ -194,6 +194,12 @@
                계정은 시스템 담당자가 만들어 임시 비밀번호를 알려 주므로, 그 값을 계속 쓰면
                «본인만 아는 비밀번호»가 되지 못한다(개인정보의 안전성 확보조치 기준). -->
           <button class="top-btn ghost" id="btnChangePw" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="14" r="4"/><path d="m11.2 10.8 8.8-8.8M17 5l2.4 2.4M14.2 7.8l2.4 2.4"/></svg><span>비밀번호 변경</span></button>
+          <!-- 🔔 새 접수 소리 알림 — ⛔ «기본은 꺼짐». 시연 중 저절로 울리는 일이 없어야 한다.
+               · 켜는 순간이 «사용자 몸짓»이라, 그때 AudioContext 를 만들어 둔다(브라우저 자동재생 정책).
+               · 색·아이콘만으로 알리지 않는다 — 라벨 글자가 「켜짐/꺼짐」을 직접 말한다(KWCAG 5.4.1).
+               · role="menuitemcheckbox" + aria-checked 로 낭독기에도 «켜짐/꺼짐»이 전해진다.
+               · 소리 파일을 받아 오지 않는다(WebAudio 로 짧은 «띵» 두 음). CSP 에 걸릴 외부 자원이 없다. -->
+          <button class="top-btn ghost" id="btnSound" type="button" role="menuitemcheckbox" aria-checked="false"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg><span id="btnSoundLab">새 접수 소리 꺼짐</span></button>
           <button class="top-btn ghost" id="btnLogout" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 17l5-5-5-5"/><path d="M20 12H9"/><path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6"/></svg><span>로그아웃</span></button>
         </div>
       </div>
@@ -289,6 +295,21 @@
         <h3 class="stats-cap" id="aTopTeamCap">담당팀별 접수 <span class="rank-sub" id="aTopTeamSub">집계 중</span></h3>
         <ol class="rank-list" id="aTopTeamList"></ol>
       </section>
+
+      <!-- 📍 읍·면·동별 신청 현황 — 위 「담당팀별 접수」와 «같은 모양»(이름 + 건수 + 비율 + 막대).
+           ⚠ 새 탭·새 화면을 만들지 않는다. 이 요약 패널(#aSummary) 안의 «한 줄»을 더 쓸 뿐이다.
+           ⚠ 왜 이것만 «가로 전체»인가 — 위 두 카드는 상위 3~5줄만 보이지만 여기는 25개 지역을
+              «0건까지 모두, 늘 같은 순서로» 보여야 한다(그래야 달마다 견줄 수 있다).
+              좁은 카드에 25줄을 세우면 화면 한 장을 통째로 먹으므로, 폭이 넓어질수록
+              2·3·4단으로 접어 담는다(style.css .region-list).
+           ⚠ 색으로 지역을 구분하지 않는다 — 25개를 색으로 나누면 아무도 못 읽는다.
+              막대는 담당팀 막대와 «같은 한 가지 색»이고, 뜻은 «이름과 숫자»가 전한다.
+           ⚠ 순서·0건 포함·「미기재」 맨 뒤 규칙은 app.js countByRegion() 한 곳에 있다
+              (파이썬 config.count_by_region() 과 같은 규칙 — 화면·엑셀·보고서의 숫자가 같아야 한다). -->
+      <section class="rank-card region-card" aria-labelledby="aRegionCap">
+        <h3 class="stats-cap" id="aRegionCap">읍·면·동별 신청 현황 <span class="rank-sub" id="aRegionSub">집계 중</span></h3>
+        <ol class="rank-list region-list" id="aRegionList"></ol>
+      </section>
     </div>
 
     <!-- 상태 필터 — «한 개만» 고르는 줄(전체/접수/심사중/승인/반려). 줄바꿈 알약(.chips.wrap).
@@ -305,8 +326,15 @@
       <button id="aScopeClear" class="scope-clear" type="button">전체 보기 <span aria-hidden="true">✕</span></button>
     </div>
     <div class="toolbar">
-      <label for="aSearch" class="sr-only">사업명 · 신청자 · 연락처 · 접수번호 검색</label>
-      <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="aSearch" class="search-input wide" type="search" placeholder="사업명 · 신청자 · 연락처 · 접수번호 검색" aria-label="사업명 · 신청자 · 연락처 · 접수번호 검색"></span>
+      <label for="aSearch" class="sr-only">사업명 · 신청자 · 연락처 · 접수번호 · 읍·면·동 검색</label>
+      <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="aSearch" class="search-input wide" type="search" placeholder="사업명 · 신청자 · 연락처 · 접수번호 · 읍·면·동 검색" aria-label="사업명 · 신청자 · 연락처 · 접수번호 · 읍·면·동 검색"></span>
+      <!-- 🏢 담당팀 좁혀보기 — 고른 값은 이 브라우저에 «기억»되어 다음 로그인에도 그대로 걸린다.
+           ⚠ 기억되는 필터는 «접수가 0건인 줄» 오해하게 만드는 것이 가장 큰 위험이다.
+              그래서 팀이 걸려 있으면 목록 위 #aScopeBar 띠가 «항상» 「담당팀 ○○ 으로 보는 중」 +
+              「전체 보기」를 함께 보여 준다(app.js renderAScopeUI). 띠를 없애지 말 것.
+           목록은 app.js 가 AALL 의 team 값으로 채운다(없는 팀을 지어내지 않는다). -->
+      <label for="aTeam" class="sr-only">담당팀으로 좁혀보기</label>
+      <select id="aTeam" class="sort-select" aria-label="담당팀으로 좁혀보기"><option value="">담당팀 전체</option></select>
       <span id="aCount" class="count" role="status" aria-live="polite"></span>
     </div>
     <!-- 실시간 알림 띠: 새 접수가 와도 화면을 저절로 바꾸지 않고 여기서 알린다(정지 기능 불필요) -->
@@ -317,8 +345,24 @@
     </div>
     <!-- 카드형 표의 «머리행» — 넓은 화면에서만 보인다(좁으면 카드가 세로로 쌓여 의미가 없다).
          카드마다 aria-label 로 상태·사업명·신청자가 이미 낭독되므로 여기서는 aria-hidden 으로 중복을 막는다. -->
+    <!-- ☑ 여러 건 한꺼번에 상태 바꾸기 — 고른 것이 «하나라도» 있을 때만 나타난다.
+         ⚠ 되돌리기가 없다. 그래서 ① 누르기 전 «몇 건을 무엇으로» 바꾸는지 확인 창을 반드시 띄우고
+            ② 끝난 뒤에는 «몇 건 성공 / 몇 건 실패(사유)»를 숨김 없이 알린다(app.js applyBulkStatus).
+         ⚠ 여기서 바꾸는 것은 «상태 하나»뿐이다 — 처리메모·시민 안내문은 건드리지 않는다.
+            (시민에게 나가는 글을 여러 건에 한꺼번에 뿌리는 길은 «일부러» 만들지 않았다) -->
+    <div id="aBulkBar" class="bulk-bar" role="group" aria-labelledby="aBulkCount" hidden>
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m4 12 5 5L20 6"/></svg>
+      <span id="aBulkCount" class="bulk-count" role="status" aria-live="polite"></span>
+      <label for="aBulkStatus" class="sr-only">일괄로 바꿀 상태</label>
+      <select id="aBulkStatus" class="sort-select"></select>
+      <button id="aBulkApply" class="top-btn solid" type="button">상태 바꾸기</button>
+      <button id="aBulkClear" class="scope-clear" type="button">선택 해제 <span aria-hidden="true">✕</span></button>
+    </div>
+    <!-- ★ 머리행은 스크롤해도 «위에 붙어» 있다(position:sticky). 한 쪽 12건을 내려보는 동안
+         어느 칸이 무엇인지 사라지지 않게 하기 위함이다. 좁은 화면(<900px)에서는 머리행 자체가 없다.
+         ⚠ 왼쪽 여백은 행의 «고르기 칸» 폭까지 더해 잡는다(style.css) — 안 그러면 글자 시작선이 어긋난다. -->
     <div class="list-head" aria-hidden="true">
-      <span>상태 · 담당팀 · 접수번호</span><span>사업명</span><span>신청자 · 연락처 · 접수일시</span>
+      <span>상태 · 담당팀 · 접수번호</span><span>사업명</span><span>신청자 · 연락처 · 읍·면·동 · 접수일시</span>
     </div>
     <div id="aList" class="cardlist rows"></div>
     <div id="aPager" class="pager-wrap"></div>
@@ -415,7 +459,7 @@
     <!-- ※ 실제 값은 version.js 를 읽어 app.js 가 갈아 끼운다.
          여기 적힌 것은 «그 전 한 순간» 보이는 값이므로 현재 버전과 맞춰 둔다
          (v0.0.2 로 굳어 있어 version.js 로드가 늦거나 막히면 두 해 전 버전이 보였다). -->
-    <button id="btnVersion" class="foot-link" type="button" aria-label="v0.4.5 — 버전별 개선사항 보기">v0.4.5</button>
+    <button id="btnVersion" class="foot-link" type="button" aria-label="v0.4.6 — 버전별 개선사항 보기">v0.4.6</button>
   </footer>
 </div>
 
