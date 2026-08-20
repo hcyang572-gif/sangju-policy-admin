@@ -124,6 +124,78 @@ function lockBodyScroll(on) {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   🚧 BgInert — 모달이 열려 있는 동안 «뒤 본문»을 통째로 비활성으로 만든다 (2026-08-20)
+   ────────────────────────────────────────────────────────────────────
+   왜 필요한가 — Tab 가둠만으로는 부족하다. 화면낭독기의 «스와이프 탐색»(가상 커서)은
+     Tab 순서를 따르지 않아서, 모달이 떠 있어도 뒤쪽 목록·버튼을 계속 읽어 준다.
+     브라우저 기본 alert() 은 이것을 자동으로 막아 줬지만, 자체 모달은 직접 해야
+     같은 수준이 된다(KWCAG 2.2 «초점 이동» 취지 — 지금 조작할 수 있는 것만 읽히게).
+   무엇을 하나 — <body> 의 «형제 덩어리» 중 지금 «맨 위» 모달을 뺀 나머지에
+     inert 와 aria-hidden="true" 를 «함께» 건다.
+       · inert       = 초점·클릭·낭독을 모두 막는다(요즘 브라우저)
+       · aria-hidden = inert 를 모르는 옛 브라우저에서도 «낭독»만은 막는다(병행 이유)
+   ⚠ 낭독 전용 알림칸(role="status"/"alert"/"log"·aria-live)은 건드리지 않는다 —
+     가려 버리면 「저장했습니다」 같은 안내가 영영 안 읽힌다.
+   ⚠ 되돌릴 때는 반드시 «원래 값»으로 되돌린다. 원래 aria-hidden="true" 였던
+     장식 요소(곶감 무대 등)의 값을 지워 버리면 그 뒤로 낭독기에 노출된다.
+   ⚠ 모달이 겹치면 «맨 위» 것만 살아 있어야 한다 → 새 모달을 열 때·닫을 때마다
+     apply(맨위요소) 를 다시 부르면 아래 모달도 배경으로 취급돼 자동으로 잠긴다.
+   ⚠ 닫을 때는 «먼저 풀고 나서» 호출 버튼으로 초점을 돌려준다. 순서를 바꾸면
+     아직 inert 안에 있는 버튼이라 focus() 가 먹지 않아 초점이 body 로 떨어진다.
+   ══════════════════════════════════════════════════════════════════════ */
+const BgInert = (function () {
+  const marked = new Map();     // 요소 → 원래 aria-hidden 값(원래 없었으면 null)
+  const SKIP_TAG = { SCRIPT: 1, LINK: 1, STYLE: 1, TEMPLATE: 1, META: 1, NOSCRIPT: 1 };
+
+  // 낭독 전용 알림칸인가(= 가리면 안 되는 것)
+  function isLive(el) {
+    if (el.hasAttribute("aria-live")) return true;
+    const r = (el.getAttribute("role") || "").toLowerCase();
+    return r === "status" || r === "alert" || r === "log";
+  }
+  function mark(el) {
+    if (marked.has(el)) return;                    // 이미 잠갔으면 원래 값을 덮어쓰지 않는다
+    marked.set(el, el.hasAttribute("aria-hidden") ? el.getAttribute("aria-hidden") : null);
+    el.setAttribute("aria-hidden", "true");
+    el.setAttribute("inert", "");
+  }
+  function unmark(el) {
+    if (!marked.has(el)) return;
+    const prev = marked.get(el);
+    marked.delete(el);
+    if (prev === null) el.removeAttribute("aria-hidden");
+    else el.setAttribute("aria-hidden", prev);
+    el.removeAttribute("inert");
+  }
+  function clear() {                               // 잠갔던 것을 «전부» 원래대로
+    Array.from(marked.keys()).forEach(unmark);     // ⚠ 순회 중 지우므로 키 목록을 먼저 복사한다
+  }
+  // top = 살아 있어야 할 «맨 위» 모달 요소.
+  // ⚠ top 이 없으면(= 모달이 다 닫힘) «전부 푼다». 이 갈래를 빠뜨리면 아래 반복문이
+  //   모든 형제를 배경으로 보고 도리어 화면 전체를 잠가 버린다(브라우저 확인에서 잡힌 결함).
+  function apply(top) {
+    const body = document.body;
+    if (!body) return;
+    if (!top) { clear(); return; }
+    Array.prototype.forEach.call(body.children, function (el) {
+      if (el === top || el.contains(top) || SKIP_TAG[el.tagName] || isLive(el)) { unmark(el); return; }
+      mark(el);
+    });
+  }
+  return { apply: apply, clear: clear };
+})();
+
+/* 지금 «맨 위» 모달을 기준으로 배경 비활성(inert)을 다시 건다.
+   이 앱의 모달은 «한 번에 하나»(_activeModal) + 그 위에 겹칠 수 있는 «확인·알림 창»(#askModal)
+   두 층뿐이다. 그래서 맨 위는 askModal 이 떠 있으면 그것, 아니면 _activeModal 이다.
+   여는 곳·닫는 곳 네 군데(openModal·closeModal·askConfirm·askDone)에서만 부른다. */
+function _bgInertSync() {
+  const ask = document.getElementById("askModal");
+  const top = (ask && !ask.classList.contains("hidden")) ? ask : _activeModal;
+  BgInert.apply(top || null);
+}
+
 function openModal(modal) {
   if (!modal) return;
   _lastFocus = document.activeElement;
@@ -138,6 +210,8 @@ function openModal(modal) {
   //    아무 일도 하지 않으므로, 그때 true 로 두면 닫을 때 남의 히스토리를 한 칸 되돌리게 된다.
   modal._sjNav = NAV_READY;
   lockBodyScroll(true);
+  // 🚧 배경 비활성 — 낭독기 스와이프 탐색이 뒤 본문으로 새지 않게. 첫 포커스 «전»에 건다.
+  _bgInertSync();
   // 첫 포커스: 닫기 버튼이 아닌 첫 입력요소 우선, 없으면 첫 포커스 대상
   const focusables = [...modal.querySelectorAll(FOCUS_SEL)].filter((n) => n.offsetParent !== null);
   const target = focusables.find((n) => !n.classList.contains("modal-close")) || focusables[0];
@@ -156,6 +230,8 @@ function closeModal(modal, opts) {
   try { modal.querySelectorAll('input[type="password"]').forEach((n) => { n.value = ""; }); } catch (e) {}
   if (_activeModal === modal) _activeModal = null;
   if (!_activeModal) lockBodyScroll(false);      // 남은 모달이 없을 때만 뒤 본문 스크롤을 푼다
+  // 🚧 배경 비활성 다시 계산 — ⚠ 반드시 초점 복귀 «전». 뒤에 두면 아직 inert 안이라 focus() 가 먹지 않는다.
+  _bgInertSync();
   if (_lastFocus && typeof _lastFocus.focus === "function") { try { _lastFocus.focus(); } catch (e) {} }
   _lastFocus = null;
   // ★ 모달이 열려 있는 동안 도착한 알림은 rtBusy() 때문에 띠가 «숨겨진 채» 카운트만 쌓인다.
@@ -212,21 +288,55 @@ function isModalDirty(modal) {
    ══════════════════════════════════════════════════════════════════════ */
 function askConfirm(opts) {
   opts = opts || {};
+  const alertOnly = !!opts.alert;   // 🔔 알림 모드 — 단추가 «확인» 하나뿐 (askAlert 참조)
   const m = document.getElementById("askModal");
-  // 안전망 — 마크업이 없는(캐시된 구버전 HTML) 화면에서도 «묻기»는 살아 있어야 한다.
-  if (!m) return Promise.resolve(window.confirm((opts.title || "") + "\n\n" + (opts.body || "")));
+  // 안전망 — 마크업이 없는(캐시된 구버전 HTML) 화면에서도 «알리기·묻기»는 살아 있어야 한다.
+  if (!m) {
+    const msg = (opts.title || "") + "\n\n" + (opts.body || "");
+    if (alertOnly) { window.alert(msg); return Promise.resolve(true); }
+    return Promise.resolve(window.confirm(msg));
+  }
   if (ASK_RESOLVE) return Promise.resolve(false);   // 이미 떠 있으면 중복으로 열지 않는다
   const t = $("#askTitle").querySelector("span") || $("#askTitle");
-  t.textContent = opts.title || "확인";
+  t.textContent = opts.title || (alertOnly ? "알림" : "확인");
   $("#askBody").textContent = opts.body || "";
   $("#askKeep").textContent = opts.cancelText || "취소";
+  $("#askKeep").hidden = alertOnly;                 // 알림에는 «취소»가 없다
   $("#askGo").textContent = opts.okText || "확인";
+  // 확인 창의 «확인»은 되돌릴 수 없는 쪽이라 빨강(danger), 알림 창의 «확인»은 그냥 닫기라 기본색.
+  $("#askGo").classList.toggle("danger", !alertOnly);
+  $("#askGo").classList.toggle("solid", alertOnly);
   ASK_LASTFOCUS = document.activeElement;
   m.classList.remove("hidden");
   lockBodyScroll(true);            // 모달 위에 겹쳐 떠도 뒤 본문은 잠긴 채로 둔다(이미 잠겼으면 무동작)
+  // 🚧 겹쳐 떴을 때 «안쪽(확인 창)»만 살린다 — 아래 모달도 배경으로 취급돼 함께 잠긴다.
+  _bgInertSync();
   return new Promise((resolve) => {
     ASK_RESOLVE = resolve;
-    setTimeout(() => { const b = $("#askKeep"); if (b) b.focus(); }, 30);   // 초점 = 안전한 쪽
+    // 초점 — 확인 창은 «안전한 쪽»(취소), 알림 창은 하나뿐인 «확인»
+    setTimeout(() => { const b = alertOnly ? $("#askGo") : $("#askKeep"); if (b) b.focus(); }, 30);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   🔔 askAlert — 브라우저 alert() 을 대신하는 «앱 안» 알림 창 (2026-08-20 양호창님 지시)
+   ────────────────────────────────────────────────────────────────────
+   왜 바꿨나 — alert() 은 창 맨 윗줄에 「hcyang572-gif.github.io 내용:」 같은
+     «출처 표기»를 강제로 붙인다(JS 로 못 지운다). 게다가 자바스크립트를 통째로 멈춰
+     「저장 중…」 같은 버튼 상태가 풀리지 않은 것처럼 보인다.
+   위 askConfirm 과 «같은» #askModal·같은 CSS 를 쓰고, «취소» 단추만 감춘다 — 새 디자인이 아니다.
+   계약 — askAlert(본문[, {title, okText}]) → Promise<true> (닫히면 풀린다)
+     · 알리기만 할 때는 그냥 부르면 된다. 닫힌 «뒤»에 이어서 할 일이 있으면 await 한다.
+   ⛔ 앞으로 alert() 을 새로 쓰지 말 것 — 한 곳만 남아도 거기서 출처 표기가 뜬다.
+     (시민앱 모바일웹의 appAlert/appConfirm 과 같은 규약이다)
+   ══════════════════════════════════════════════════════════════════════ */
+function askAlert(body, opts) {
+  opts = opts || {};
+  return askConfirm({
+    alert: true,
+    title: opts.title || "알림",
+    body: body == null ? "" : String(body),
+    okText: opts.okText || "확인",
   });
 }
 // 확인 창을 닫으며 결과를 넘긴다. Esc·바깥클릭·두 단추가 모두 여기로 모인다.
@@ -236,6 +346,8 @@ function askDone(v) {
   const m = document.getElementById("askModal");
   if (m) m.classList.add("hidden");
   if (!_activeModal) lockBodyScroll(false);   // 뒤에 남은 모달이 없을 때만 본문 스크롤을 푼다
+  // 🚧 아래 모달이 남아 있으면 그것을 다시 살린다. ⚠ 초점 복귀 «전»이어야 한다.
+  _bgInertSync();
   const back = ASK_LASTFOCUS; ASK_LASTFOCUS = null;
   if (back && typeof back.focus === "function") { try { back.focus(); } catch (e) {} }
   if (r) r(v);
@@ -2138,7 +2250,7 @@ function openEdit(r) {
     const saveBtn = $("#mSave");
     const obj = {};
     document.querySelectorAll("#mBody [data-k]").forEach((e) => { obj[e.dataset.k] = e.value; });
-    if (!(obj.name || "").trim()) { announce("사업명을 입력하세요."); alert("사업명을 입력하세요."); const nm = $("#f_name"); if (nm) nm.focus(); return; }
+    if (!(obj.name || "").trim()) { announce("사업명을 입력하세요."); askAlert("사업명을 입력하세요."); const nm = $("#f_name"); if (nm) nm.focus(); return; }
     // 🏷 분야 — 새 사업과 수정의 규칙이 «다르다»(2026-08-19 양호창님 결정, PC앱 webui 와 동일).
     //   · 새 사업 : 하나 이상 «직접» 골라야 저장된다. 안 골랐으면 화면 안 오류로 알리고 멈춘다.
     //     (키워드 자동분류만 믿으면 「문화누리 이용권 지원」·「상주 화장품 산업 육성」처럼
@@ -2184,10 +2296,12 @@ function openEdit(r) {
         ({ data, error } = await sb.from("benefits")
           .update(obj).eq("id", r.id).eq("updated_at", r.updated_at).select());
       }
-      if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
+      if (error) { announce(writeErrMsg(error, "저장")); askAlert(writeErrMsg(error, "저장")); return; }
       if (!data || !data.length) {
         announce("다른 담당자가 먼저 수정했습니다. 새로고침합니다.");
-        alert("⚠️ 다른 담당자가 먼저 이 사업을 수정했습니다.\n최신 내용으로 새로고침하니, 다시 확인 후 수정해 주세요.");
+        // ⚠ 여기서는 «닫기까지 기다린다» — 알림을 읽기도 전에 편집 창이 닫히고
+        //    목록이 새로 그려지면, 왜 내 수정이 사라졌는지 알 수 없다.
+        await askAlert("⚠️ 다른 담당자가 먼저 이 사업을 수정했습니다.\n최신 내용으로 새로고침하니, 다시 확인 후 수정해 주세요.");
         closeModal($("#modal"));
         await loadBenefits();
         return;
@@ -2204,7 +2318,7 @@ function openEdit(r) {
         delete obj.categories;
         ({ data, error } = await sb.from("benefits").insert(obj).select());
       }
-      if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
+      if (error) { announce(writeErrMsg(error, "저장")); askAlert(writeErrMsg(error, "저장")); return; }
       // 📎 「저장 시 함께 올림」으로 담아 둔 서식을 «지금» 올린다(사업명이 확정된 뒤).
       //    ⚠ 여기서 실패해도 사업 저장은 이미 끝났다 — 되돌리지 않고 «무엇이 안 올라갔는지»만 알린다.
       const saved = (data && data[0]) || { name: obj.name };
@@ -2228,7 +2342,7 @@ function openEdit(r) {
     });
     if (!ok) return;
     const res = await sb.from("benefits").delete().eq("id", r.id);
-    if (res.error) { announce(writeErrMsg(res.error, "삭제")); alert(writeErrMsg(res.error, "삭제")); return; }
+    if (res.error) { announce(writeErrMsg(res.error, "삭제")); askAlert(writeErrMsg(res.error, "삭제")); return; }
     closeModal($("#modal"));
     announce("삭제되었습니다.");
     await loadBenefits();
@@ -2297,7 +2411,7 @@ async function refreshFormsList(r) {
       } catch (e) {
         btn.disabled = false;
         const m = (e && e.message) || "삭제에 실패했습니다.";
-        fSetStatus(m, true); alert(m);
+        fSetStatus(m, true); askAlert(m);
       }
     };
   });
@@ -2352,7 +2466,7 @@ async function uploadPendingForms(benefit) {
             + failed.join("\n")
             + `\n\n목록에서 이 사업을 다시 열어 «서식 등록»으로 올려 주세요.`;
     announce(`서식 ${failed.length}건을 올리지 못했습니다.`);
-    alert(m);
+    askAlert(m);
   } else {
     announce(`서식 ${total}건을 함께 올렸습니다.`);
   }
@@ -2368,7 +2482,7 @@ function initFormsSection(r) {
     if (!file) { fSetStatus("등록할 파일을 선택해 주세요.", true); return; }
     // 검증은 «담을 때»도 «올릴 때»와 똑같이 한다(forms.js validateFile 하나만 쓴다).
     const bad = SangjuForms.validateFile(file);
-    if (bad) { fSetStatus(bad, true); alert(bad); return; }
+    if (bad) { fSetStatus(bad, true); askAlert(bad); return; }
     // ── 새 사업: 서버에 올리지 않고 목록에 담아만 둔다 ──
     if (!r) {
       if (PENDING_FORMS.some((f) => f.name === file.name && f.size === file.size)) {
@@ -2390,7 +2504,7 @@ function initFormsSection(r) {
       await refreshFormsList(r);
     } catch (e) {
       const m = (e && e.message) || "업로드에 실패했습니다.";
-      fSetStatus(m, true); alert(m);
+      fSetStatus(m, true); askAlert(m);
     } finally {
       upBtn.disabled = false;
     }
@@ -2702,7 +2816,7 @@ async function openProposal(r) {
     // 반영·불채택 전환 시 답변 필수
     if (REPLY_REQUIRED.has(newStatus) && !reply) {
       const m = `'${newStatus}' 상태로 변경하려면 담당부서 답변/사유를 반드시 입력해야 합니다.`;
-      announce(m); alert(m);
+      announce(m); askAlert(m);
       $("#pmReply").focus();
       return;
     }
@@ -2713,7 +2827,7 @@ async function openProposal(r) {
       updated_at: new Date().toISOString(),
     };
     const { error } = await sb.from("proposals").update(patch).eq("id", r.id);
-    if (error) { announce(writeErrMsg(error, "저장")); alert(writeErrMsg(error, "저장")); return; }
+    if (error) { announce(writeErrMsg(error, "저장")); askAlert(writeErrMsg(error, "저장")); return; }
     closeModal($("#pModal"));
     markJustChanged(r.id);
     const dt = doneText("저장했습니다");            // 🎉 「… · 오늘 N번째」
@@ -2924,7 +3038,7 @@ async function applyBulkStatus() {
   const skipped = chosen.length - picked.length;
   if (!picked.length) {
     announce(`고르신 ${chosen.length}건은 이미 «${newStatus}» 상태입니다. 바꿀 것이 없습니다.`);
-    alert(`고르신 ${chosen.length}건은 이미 «${newStatus}» 상태입니다.\n바꿀 것이 없어 그대로 두었습니다.`);
+    askAlert(`고르신 ${chosen.length}건은 이미 «${newStatus}» 상태입니다.\n바꿀 것이 없어 그대로 두었습니다.`);
     return;
   }
 
@@ -2943,14 +3057,15 @@ async function applyBulkStatus() {
 
   // ② 한 건씩 차례로. 진행 상황을 띠에 적어 «멈춘 것»으로 보이지 않게 한다.
   const fails = [];
-  let done = 0;
+  let done = 0, auditMiss = 0;   // auditMiss = 개인정보보호법 §29 접속기록을 «남기지 못한» 건수
   for (const r of picked) {
     if (cnt) cnt.textContent = `${done + 1}/${picked.length} 바꾸는 중…`;
     const prev = r.status || "접수";
     try {
       await SangjuApply.updateApplication(r.id, { status: newStatus });
       done += 1;
-      await auditBulkStatus(r.receipt_no, prev, newStatus);   // ④ 건마다 감사기록(실패해도 계속)
+      // ④ 건마다 감사기록. 실패해도 업무는 계속하되 «몇 건이 안 남았는지» 를 센다(§29).
+      if (!(await auditBulkStatus(r.receipt_no, prev, newStatus))) auditMiss += 1;
     } catch (err) {
       fails.push({ rc: r.receipt_no || `내부번호 ${r.id}`, why: writeErrMsg(err, "상태 변경") });
     }
@@ -2960,19 +3075,24 @@ async function applyBulkStatus() {
   await loadApplications();
 
   // ③ 결과를 «숨김 없이» 알린다
+  // 🔒 §29 — 「아직 안 남겼다」와 「남기지 못했다」는 다르다. 조용히 넘기지 않는다.
+  const auditNote = auditMiss
+    ? `\n\n※ 이 가운데 ${auditMiss}건은 접속기록(§29)을 남기지 못했습니다 — 시스템 담당자에게 알려 주세요.`
+    : "";
   if (!fails.length) {
     const tail = skipped ? `(이미 «${newStatus}» 이던 ${skipped}건은 그대로 두었습니다)` : "";
     const dt = doneText(`${done}건을 «${newStatus}» 로 바꿨습니다`);
     showDoneCheck(dt);
     announce(dt + ". " + tail);
+    if (auditMiss) askAlert(`${done}건을 «${newStatus}» 로 바꿨습니다.` + auditNote);
   } else {
     const lines = fails.slice(0, 8).map((f) => `· ${f.rc} — ${String(f.why).split("\n")[0]}`);
     if (fails.length > 8) lines.push(`· 그 밖 ${fails.length - 8}건`);
     const msg = `${picked.length}건 중 ${done}건을 «${newStatus}» 로 바꿨습니다.\n`
               + `${fails.length}건은 바꾸지 못했습니다.\n\n${lines.join("\n")}\n\n`
-              + "바꾸지 못한 건은 목록에서 하나씩 열어 다시 시도해 주세요.";
+              + "바꾸지 못한 건은 목록에서 하나씩 열어 다시 시도해 주세요." + auditNote;
     announce(`${picked.length}건 중 ${done}건 성공, ${fails.length}건 실패했습니다.`);
-    alert(msg);
+    askAlert(msg);
   }
 }
 
@@ -2983,14 +3103,21 @@ async function applyBulkStatus() {
    누가·언제는 서버가 채운다(actor_uid = auth.uid()). 표 제약: action ≤ 40자, target ≤ 60자, detail ≤ 200자. */
 async function auditBulkStatus(receiptNo, prevStatus, newStatus) {
   try {
-    await sb.from("admin_audit").insert({
+    const res = await sb.from("admin_audit").insert({
       action: "BULK_STATUS_CHANGE",
       target: String(receiptNo || "").slice(0, 60),     // ★ 접수번호만
       target_type: "접수(공무원앱)",
       detail: `상태 ${prevStatus} → ${newStatus} (일괄)`,
       result: "성공",
     });
-  } catch (e) { /* 기록 실패로 업무를 멈추지 않는다 */ }
+    // ⚠ supabase-js 의 insert 는 실패해도 «예외를 던지지 않는다» — {error} 로 돌려줄 뿐이다.
+    //    그래서 예전 try/catch 는 기록 실패를 «한 번도» 잡지 못했다(admin_audit 이 0행인데도 몰랐다).
+    if (res && res.error) throw res.error;
+    return true;
+  } catch (e) {
+    console.warn("[감사기록] 상태 변경 기록을 남기지 못했습니다:", e);
+    return false;   // 업무는 멈추지 않되, «몇 건이 안 남았는지» 는 호출측이 화면에 알린다
+  }
 }
 
 /* 🔒 접수 행에서 «자격증명» 열을 떼어 낸다 — supabase/신청첨부.sql [1-A] 규약.
@@ -3366,7 +3493,7 @@ async function openApplication(r) {
     //   → 안내문이 «새로 생기거나 달라졌을 때만» 확인한다(상태·메모만 고칠 때는 묻지 않는다).
     if (reply && reply !== prevReply) {
       if (reply.length > 300) {
-        alert(`시민 안내문은 300자까지 쓸 수 있습니다.\n지금은 ${reply.length}자입니다. 줄여 주세요.`);
+        askAlert(`시민 안내문은 300자까지 쓸 수 있습니다.\n지금은 ${reply.length}자입니다. 줄여 주세요.`);
         $("#amReply").focus();
         return;
       }
@@ -3405,7 +3532,7 @@ async function openApplication(r) {
       await SangjuApply.updateApplication(r.id, patch);
     } catch (err) {
       const m = writeErrMsg(err, "저장");
-      announce(m); alert(m); return;
+      announce(m); askAlert(m); return;
     }
     closeModal($("#aModal"));
     markJustChanged(r.id);              // 다시 그릴 때 그 줄이 «방금 변경»으로 보이게
@@ -3421,7 +3548,7 @@ async function openApplication(r) {
   bindOnce($("#amDelete"), async () => {
     const ok = await askConfirm({
       title: "이 신청을 삭제할까요?",
-      body: `접수번호 ${r.receipt_no || "-"} 신청을 지웁니다.\n첨부파일이 있으면 함께 파기됩니다.\n되돌릴 수 없습니다.`,
+      body: `접수번호 ${r.receipt_no || "-"} 신청을 지웁니다.\n첨부파일이 있으면 «먼저» 파기합니다 — 첨부를 다 지우지 못하면 접수도 지우지 않습니다.\n되돌릴 수 없습니다.`,
       cancelText: "취소",
       okText: "삭제"
     });
@@ -3431,12 +3558,15 @@ async function openApplication(r) {
     //    «잃어버려» 창고(submissions 버킷)의 실제 파일을 지울 방법이 없어진다
     //    → 주인 없는 개인정보 파일이 남는다(개인정보보호법 §21 파기 의무 위반).
     //    그래서 «파일 먼저, 접수 나중». 이 순서를 바꾸지 마세요.
-    await purgeApplicationFiles(r);
+    //    ★ 그래서 첨부를 «다 지웠을 때만» 접수를 지운다. 하나라도 못 지웠으면 여기서 멈춘다
+    //      — 접수를 남겨 두는 쪽은 언제든 다시 지울 수 있지만, 먼저 지우면 되돌릴 수 없다.
+    //      (PC앱 cloud_sync.delete_application 과 «같은» 규약이다.)
+    if (!(await purgeApplicationFiles(r))) return;
     try {
       await SangjuApply.deleteApplication(r.id);
     } catch (err) {
       const m = writeErrMsg(err, "삭제");
-      announce(m); alert(m); return;
+      announce(m); askAlert(m); return;
     }
     closeModal($("#aModal"));
     announce("신청이 삭제되었습니다.");
@@ -3482,52 +3612,95 @@ function attachExt(name) {
   return (e && e.length <= 6) ? e.toLowerCase() : "기타";
 }
 
-// 🔒 접속기록 — 실패해도 업무를 멈추지 않는다(PC앱 access_log.py 와 같은 원칙).
-async function auditAttachment(action, receiptNo, detail) {
+/* 🔒 접속기록(개인정보보호법 §29) — 업무를 멈추지는 않지만 «조용히» 넘기지도 않는다.
+   ⚠ 2026-08-20 확인 — supabase-js 의 insert 는 실패해도 «예외를 던지지 않는다».
+      {data, error} 로 돌려줄 뿐이라, 예전의 try/catch 는 기록 실패를 한 번도 잡지 못했다.
+      admin_audit 이 0행인데도 아무도 몰랐던 까닭이다. 반드시 res.error 를 본다.
+   반환 true = 남겼다 / false = 남기지 못했다. 실패하면 «화면에 한 줄» 남긴다
+        — 「아직 안 다뤘다」와 「기록이 실패했다」를 담당자가 구별할 수 있어야 한다.
+   ⛔ 남기는 것은 접수번호 · 건수 · 확장자뿐. 파일명 · 저장경로 · 서명 URL 금지. */
+async function auditAttachment(action, receiptNo, detail, result) {
   try {
-    await sb.from("admin_audit").insert({
+    const res = await sb.from("admin_audit").insert({
       action: action,                    // VIEW_ATTACHMENT · DELETE_ATTACHMENT (영문 대문자 규약)
-      target: receiptNo || "",           // ★ 접수번호만. 이름·연락처 금지
+      target: String(receiptNo || "").slice(0, 60),   // ★ 접수번호만. 이름 · 연락처 금지
       target_type: "접수(공무원앱)",
-      detail: detail || "",              // ★ 건수·확장자만. 파일명·경로·URL 금지
-      result: "성공",
+      detail: String(detail || "").slice(0, 200),     // ★ 건수 · 확장자만. 파일명 · 경로 · URL 금지
+      result: String(result || "성공").slice(0, 20),
     });
-  } catch (e) { /* 기록 실패는 조용히 넘어간다 */ }
+    if (res && res.error) throw res.error;
+    return true;
+  } catch (e) {
+    console.warn("[첨부] 접속기록을 남기지 못했습니다:", e);
+    const why = errKind(e) === "setup"
+      ? "기록 표(admin_audit)가 아직 준비되지 않았습니다."
+      : "기록 서버가 응답하지 않았습니다.";
+    afSetStatus("⚠️ 이 작업의 접속기록(§29)을 남기지 못했습니다 — " + why
+              + " 업무는 계속하셔도 되지만, 시스템 담당자에게 알려 주세요.", true);
+    return false;
+  }
 }
 
-// 접수 한 건의 첨부 목록을 읽는다. 못 읽으면 «빈 배열»(원인은 콘솔에만) — 화면은 감춘다.
+/* 📎 접수 한 건의 첨부 목록을 읽는다.
+   ★ «첨부 없음» 과 «못 읽음» 을 «반드시» 구분해 돌려준다 — 이 둘을 같게 다루면
+     (예전처럼 실패에도 [] 를 돌려주면) 첨부가 있는데도 «없다» 고 판단해 한 건도 안 지운 채
+     접수를 지우게 되고, 남은 파일을 찾을 단서가 통째로 사라진다.
+   반환 {ok, files, kind, msg} — PC앱 cloud_sync.list_application_files 와 같은 계약.
+     · ok:true, files:[]  → 첨부가 «없다»(또는 신청첨부.sql 미적용 = 지울 첨부가 없는 상태)
+     · ok:false          → «확인하지 못했다». 파기 · 삭제를 시작하면 안 된다. */
 async function listApplicationFiles(receiptNo) {
-  if (!receiptNo) return [];
+  const rc = String(receiptNo == null ? "" : receiptNo).trim();
+  if (!rc) {
+    return { ok: false, files: [], kind: "other",
+             msg: "어떤 접수 건인지 알 수 없어 첨부를 불러오지 않았습니다." };
+  }
   try {
     const res = await sb.from("application_files")
       .select("id,receipt_no,file_name,storage_path,size,content_type,created_at")
-      .eq("receipt_no", receiptNo)
+      .eq("receipt_no", rc)
       .order("created_at", { ascending: true });
-    if (res.error) {
-      // PGRST205(테이블 없음) = 아직 신청첨부.sql 미적용. 정상 상황으로 취급한다.
-      console.warn("[첨부] 목록 조회 생략:", res.error.message || res.error);
-      return [];
-    }
-    return res.data || [];
+    if (res && res.error) throw res.error;
+    return { ok: true, files: (res && res.data) || [], kind: "", msg: "" };
   } catch (e) {
+    const kind = errKind(e);
+    if (kind === "setup") {
+      // PGRST205(표 없음) = 아직 신청첨부.sql 미적용. 첨부를 «담을 곳» 자체가 없으므로
+      // 지울 첨부도 없다 — PC앱 cloud_sync.delete_application 의 kind=="setup" 처리와 같다.
+      console.warn("[첨부] 목록 표가 아직 없습니다(신청첨부.sql 미적용):", (e && e.message) || e);
+      return { ok: true, files: [], kind: "setup", msg: "" };
+    }
     console.warn("[첨부] 목록 조회 실패:", e);
-    return [];
+    return { ok: false, files: [], kind: kind,
+             msg: (e && e.message) || "첨부 목록을 읽지 못했습니다." };
   }
 }
 
 async function renderApplicationFiles(r) {
   const field = $("#amFilesField"), list = $("#amFiles");
   if (!field || !list) return;
-  const rows = await listApplicationFiles(r && r.receipt_no);
-  if (!rows.length) { field.hidden = true; return; }   // 첨부 없음·미적용·권한없음 → 조용히 감춘다
+  const listed = await listApplicationFiles(r && r.receipt_no);
+
+  // ★ «못 읽음» 을 감추면 담당자는 «첨부가 없다» 고 믿는다. 모른다는 사실을 그대로 알린다.
+  if (!listed.ok) {
+    field.hidden = false;
+    list.innerHTML = "";
+    afSetStatus(listed.kind === "perm"
+      ? "이 계정에는 첨부파일 목록을 볼 권한이 없습니다. 첨부가 있는지 «확인하지 못한» 상태입니다 — 시스템 담당자에게 계정 권한을 확인해 주세요."
+      : "첨부파일 목록을 불러오지 못했습니다. 첨부가 있는지 «확인하지 못한» 상태입니다 — 잠시 뒤 이 창을 닫았다 다시 열어 보시고, 계속되면 시스템 담당자에게 알려 주세요.", true);
+    return;
+  }
+
+  const rows = listed.files;
+  if (!rows.length) { field.hidden = true; return; }   // 첨부 «없음» · 신청첨부.sql 미적용 → 조용히 감춘다
   field.hidden = false;
+  afSetStatus("");
   list.innerHTML = rows.map((row) => {
     const nm = String(row.file_name || "첨부파일");
     const ext = attachExt(nm).toUpperCase();
     // ⚠ 전역 SangjuForms 를 «맨이름»으로 부르면 forms.js 가 없을 때 ReferenceError 로 화면이 죽는다
     const size = (window.SangjuForms && SangjuForms.formatSize) ? SangjuForms.formatSize(row.size) : "";
     const meta = (ext ? ext + " 파일" : "파일") + (size ? " · " + size : "");
-    // ⚠ KWCAG 2.2 6.4.2 — 이 단추는 클릭 시 새 창을 미리 연다(위 handler). 접근명에 알린다.
+    // ⚠ KWCAG 2.2 6.4.2 — 이 단추는 클릭 시 새 창을 미리 연다(아래 handler). 접근명에 알린다.
     return `<li class="forms-item" data-id="${esc(String(row.id))}">
         <span class="forms-item-main"><span class="forms-item-name">📄 ${esc(nm)}</span>
           <span class="forms-item-meta">${esc(meta)}</span></span>
@@ -3557,6 +3730,8 @@ async function renderApplicationFiles(r) {
         const url = res && res.data && res.data.signedUrl;
         if (!url) throw new Error("파일 주소를 받지 못했습니다.");
         // 🔒 «여는 순간» 기록한다 — 개인정보에 접근했다는 사실 자체가 남아야 한다.
+        //    기다리지 않고 창을 띄우되, 기록이 «실패하면» auditAttachment 가 아래 안내 위에
+        //    경고 한 줄을 덮어써 알린다(먼저 성공 문구가 찍히고, 뒤이어 경고가 남는다).
         auditAttachment("VIEW_ATTACHMENT", row.receipt_no, `파일 1건(${attachExt(row.file_name)})`);
         if (win) {
           win.location.replace(url);
@@ -3581,23 +3756,75 @@ async function renderApplicationFiles(r) {
 }
 
 /* 📎 접수 «삭제» 전에 첨부 실물부터 파기한다 (신청첨부.sql B-5).
-   ⚠ 반드시 접수 행을 지우기 «전»에 부를 것 — 접수를 먼저 지우면 cascade 로 목록이 사라져
-      storage_path 를 잃고, 창고에 주인 없는 개인정보 파일이 남는다(§21 파기 의무).
-   ⚠ 실패해도 삭제 자체는 막지 않는다. 다만 «남은 파일이 있다»는 사실은 담당자에게 알린다. */
+   ───────────────────────────────────────────────────────────────────────
+   ⚠ 반드시 접수 행을 지우기 «전»에 부를 것 — application_files 는 applications 를
+      on delete cascade 로 참조한다. 접수를 먼저 지우면 첨부 목록이 «함께» 사라져
+      storage_path 를 영영 잃고, 창고에 주인 없는 개인정보 파일이 남는다(§21 파기 의무).
+
+   ★ 반환 true  = 다 지웠다(또는 지울 것이 없었다) → 접수를 지워도 된다.
+      반환 false = 하나라도 못 지웠다 → «접수를 지우지 말 것».
+      — 접수를 남겨 두는 쪽은 언제든 다시 지울 수 있다. 먼저 지우는 쪽은 되돌릴 수 없다.
+      — 「시스템 담당자에게 파기를 요청하세요」 는 안내가 될 수 없다. 그 시점엔 경로를 이미
+         잃어 담당자도 «무엇을» 지워야 할지 알 수 없기 때문이다.
+      — PC앱 cloud_sync.delete_application · delete_submission_files_of 와 «같은» 규약이다.
+         두 앱의 파기 규칙은 반드시 같아야 한다 — 한쪽만 바꾸지 말 것. */
 async function purgeApplicationFiles(r) {
-  const receiptNo = r && r.receipt_no;
-  const rows = await listApplicationFiles(receiptNo);
-  if (!rows.length) return;
-  const paths = rows.map((x) => x.storage_path).filter(Boolean);
-  let failed = 0;
-  try {
-    const res = await sb.storage.from(ATTACH_BUCKET).remove(paths);
-    if (res && res.error) failed = paths.length;
-  } catch (e) { failed = paths.length; }
-  auditAttachment("DELETE_ATTACHMENT", receiptNo, `파일 ${paths.length}건 파기(실패 ${failed}건)`);
-  if (failed) {
-    alert(`⚠️ 첨부파일 ${failed}건을 저장소에서 지우지 못했습니다.\n`
-        + `접수는 그대로 삭제합니다만, 남은 파일은 시스템 담당자에게 파기를 요청해 주세요.\n`
-        + `(접수번호 ${receiptNo || "-"})`);
+  const receiptNo = (r && r.receipt_no) || "";
+  const listed = await listApplicationFiles(receiptNo);
+
+  // ① 목록을 «못 읽었다» — 첨부가 있는지조차 모른다. 시작조차 하지 않는다.
+  if (!listed.ok) {
+    const logged = await auditAttachment("DELETE_ATTACHMENT", receiptNo,
+                                         "첨부 목록 조회 실패 — 파기를 시작하지 않음", "실패");
+    await askAlert("⚠️ 첨부파일 목록을 읽지 못해 «접수 삭제를 멈췄습니다».\n"
+      + "첨부가 있는지 확인하지 못한 채 접수를 지우면, 남은 파일을 찾을 수 없게 됩니다.\n"
+      + "잠시 뒤 다시 시도하거나 시스템 담당자에게 알려 주세요.\n"
+      + `(접수번호 ${receiptNo || "-"})`
+      + (logged ? "" : "\n\n※ 이 작업의 접속기록(§29)도 남기지 못했습니다 — 함께 알려 주세요."));
+    return false;
   }
+
+  const rows = listed.files;
+  if (!rows.length) return true;          // 지울 첨부가 없다 = 성공(«없음» 은 실패가 아니다)
+
+  // storage_path 가 비어 있으면 «무엇을 지울지» 알 수 없다 → 실패로 센다(PC앱과 같다).
+  const paths = [];
+  let failed = 0;
+  rows.forEach((x) => {
+    const p = String((x && x.storage_path) || "").trim();
+    if (p) paths.push(p); else failed += 1;
+  });
+
+  if (paths.length) {
+    try {
+      const res = await sb.storage.from(ATTACH_BUCKET).remove(paths);
+      // ⚠ «이미 없는 파일» 은 실패가 아니다 — 원하던 상태다. remove 는 그런 경로를 error 없이
+      //    넘기므로 여기서는 error 만 실패로 본다(PC앱 delete_submission_file 의 404 규칙과 같다).
+      //    이 규칙이 없으면 이미 지워진 파일 하나 때문에 접수를 «영영» 못 지우게 된다.
+      if (res && res.error) throw res.error;
+    } catch (e) {
+      console.warn("[첨부] 파기 실패:", e);
+      failed += paths.length;
+    }
+  }
+
+  const total = rows.length;
+  const logged = await auditAttachment("DELETE_ATTACHMENT", receiptNo,
+      `파일 ${total}건 중 ${total - failed}건 파기(실패 ${failed}건)`, failed ? "실패" : "성공");
+  const logNote = logged ? ""
+    : "\n\n※ 이 작업의 접속기록(§29)도 남기지 못했습니다 — 함께 알려 주세요.";
+
+  // ② 하나라도 못 지웠으면 접수를 «그대로 둔다».
+  if (failed) {
+    await askAlert(`⚠️ 첨부파일 ${failed}건을 지우지 못해 «접수 삭제를 멈췄습니다».\n`
+      + "지금 접수를 지우면 남은 파일을 찾을 수 없게 됩니다.\n"
+      + "잠시 뒤 다시 시도하거나 시스템 담당자에게 알려 주세요.\n"
+      + `(접수번호 ${receiptNo || "-"})` + logNote);
+    return false;
+  }
+  // 파기는 끝났으나 «기록» 이 안 남았다면 그 사실은 반드시 알린다(§29).
+  if (!logged) {
+    await askAlert(`첨부파일 ${total}건을 파기했습니다. 이어서 접수를 삭제합니다.` + logNote);
+  }
+  return true;
 }
