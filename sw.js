@@ -25,7 +25,7 @@
 // 배포 버전 — 버전정보.json 의 "version" 및 version.js 의 APP_VERSION 과 항상 같은 값.
 // ⚠ 손으로 고치지 말고 루트의 `py -3 자원버전_동기화.py` 를 돌리면
 //    이 값과 index.html 의 ?v= 쿼리가 한 번에 맞춰진다.
-const ASSET_V = "0.4.7";
+const ASSET_V = "0.5.0";
 
 // v26 사유 (2026-08-19, 🔵손길) — index.html·style.css·app.js 를 «셋 다» 고쳤다.
 //   ① 폰(≤599px) «가로 띠» 로그인 배경을 낮춰 아이브로 대비를 4.45 → 5.90:1 로 올림 (style.css)
@@ -106,7 +106,10 @@ const ASSET_V = "0.4.7";
 //      「이달의 접수」 요약 패널에 «읍·면·동별 신청 현황» 막대를 더했다.
 //      ★ 25개 지역 목록은 JS 에 베끼지 않고 data.json 에서 받는다(build_data.py 196행 규약).
 //        → OPTIONAL 에 data.json 이 새로 들어갔다. 이것이 캐시 이름을 올리는 «직접적인» 이유다.
-const CACHE = "sangju-admin-v35";   // v35: 읍·면·동 표시·집계 + data.json 프리캐시
+const CACHE = "sangju-admin-v36";   // v36: 첨부 파기 규칙 통일 + 알림창 출처 표기 제거(2026-08-20).
+//                첨부 삭제 실패 시 접수 삭제도 함께 멈추도록 PC앱 정본에 맞춰 통일하고,
+//                admin_audit insert 실패 감지, alert() 출처 노출 제거·모달 배경 inert 처리.
+//      v35: 읍·면·동 표시·집계 + data.json 프리캐시
 //                + 정책제안 조회를 select("*") → «쓰는 칸만»(P_COLS) 으로 좁힘.
 //                  PIN 해시(pin_hash)가 공무원 브라우저까지 딸려 오지 않게 한다.
 //                  ⚠ 이 묶음(v30·v31)이 아직 배포 전이라 이름을 또 올리지 않고 사유만 덧붙인다.
