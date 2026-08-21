@@ -1023,6 +1023,108 @@ function renderChangelog() {
   });
 }
 
+/* ── 🧪 테스트 모드 «로그인 없이 둘러보기» ──────────────────────────────
+   ★ 스위치는 «한 곳»뿐이다 — config.js 의 TEST_MODE_ALLOW_GUEST.
+     화면은 그 값을 읽어 버튼을 내보낼 뿐, 스스로 판단하지 않는다.
+     그 값이 없는 옛 config.js 에서는 undefined → 버튼이 «안 보인다»(닫힌 쪽이 안전).
+   ★ 화면에서 감추는 것은 «안내»이지 «방어»가 아니다.
+     실제 차단은 Supabase RLS 가 한다 — 로그인하지 않은 접속(anon)은
+     applications(시민 개인정보)를 읽지도 쓰지도 못하고, benefits 도 쓰지 못한다.
+     그래서 이 모드에서 «되는 것»은 사업 조회와 시민 정책제안 열람뿐이다.
+   ⚠ PC앱(webui/app.js) 의 같은 덩어리와 문구·구조를 맞춰 두었다. 한쪽만 고치지 말 것. */
+let IS_GUEST = false;
+const GUEST_WRITE_MSG =
+  "테스트 모드(로그인 없이 둘러보기)에서는 저장·수정·삭제를 할 수 없습니다. "
+  + "실제 처리는 담당자 계정으로 로그인한 뒤 이용해 주세요.";
+
+function guestAllowed() {
+  try { return typeof TEST_MODE_ALLOW_GUEST !== "undefined" && TEST_MODE_ALLOW_GUEST === true; }
+  catch (e) { return false; }
+}
+
+// 로그인 카드의 «둘러보기» 덩어리 — 스위치가 켜져 있을 때만 보인다.
+function paintGuestGate() {
+  const box = $("#guestWrap");
+  if (box) box.classList.toggle("hidden", !guestAllowed());
+}
+
+// 본문 맨 위 «테스트 모드» 띠 — 게스트로 들어와 있는 동안에만 보인다.
+function paintGuestNotice() {
+  const box = $("#guestNotice");
+  if (box) box.classList.toggle("hidden", !IS_GUEST);
+}
+
+/* 관리자 전용 기능 잠금 — 계정 관리·비밀번호 변경을 «아예 내보내지 않는다».
+   ⚠ 눌러 봐야 세션이 없어 실패할 조작을 남겨 두지 않는다(막다른 길 금지).
+     로그아웃은 남긴다 — 테스트 모드를 빠져나가 로그인 화면으로 가는 유일한 길이다. */
+function paintGuestLocks() {
+  if (!IS_GUEST) return;
+  const pw = $("#btnChangePw");
+  if (pw) pw.hidden = true;
+}
+
+/* 쓰기 차단 — «한 곳»에서 막는다.
+   서버(RLS)가 이미 막지만, 그때 나오는 말은 영어 권한 오류라 담당자가 이해할 수 없다.
+   여기서 먼저 걸러 «왜 안 되는지»를 우리 말로 돌려준다.
+   ⚠ 예외를 던지지 «않고» supabase-js 와 같은 모양({data,error})으로 돌려준다 —
+     기존 호출부의 오류 처리(res.error 검사)가 그대로 동작해야 하기 때문이다.
+   ⚠ .insert(...).select() 처럼 이어 부르는 곳이 있으므로 체인 메서드도 흉내 낸다. */
+function _guestBlocked() {
+  const payload = { data: null, error: { message: GUEST_WRITE_MSG, code: "GUEST_READONLY" } };
+  const stub = {
+    then: (ok, no) => Promise.resolve(payload).then(ok, no),
+    catch: (f) => Promise.resolve(payload).catch(f),
+    finally: (f) => Promise.resolve(payload).finally(f)
+  };
+  ["select", "eq", "neq", "in", "is", "match", "order", "limit", "single", "maybeSingle"]
+    .forEach((m) => { stub[m] = () => stub; });
+  return stub;
+}
+
+function installGuestReadOnlyGuard() {
+  if (installGuestReadOnlyGuard._on) return;
+  installGuestReadOnlyGuard._on = true;
+  try {
+    const origFrom = sb.from.bind(sb);
+    sb.from = function (table) {
+      const b = origFrom(table);
+      ["insert", "update", "upsert", "delete"].forEach((m) => {
+        if (typeof b[m] === "function") b[m] = () => _guestBlocked();
+      });
+      return b;
+    };
+    if (sb.storage && typeof sb.storage.from === "function") {
+      const origStorage = sb.storage.from.bind(sb.storage);
+      sb.storage.from = function (bucket) {
+        const s = origStorage(bucket);
+        ["upload", "remove", "move", "copy"].forEach((m) => {
+          if (typeof s[m] === "function") {
+            s[m] = () => Promise.resolve({ data: null, error: { message: GUEST_WRITE_MSG } });
+          }
+        });
+        return s;
+      };
+    }
+  } catch (e) {
+    // 막지 못했어도 서버(RLS)가 여전히 막는다 — 앱을 멈추지는 않는다.
+    console.warn("[테스트 모드] 쓰기 차단 설치 실패:", e);
+  }
+}
+
+async function doGuestLogin() {
+  const err = $("#loginErr");
+  if (!guestAllowed()) {
+    if (err) err.textContent = "지금은 둘러보기를 쓸 수 없습니다.";
+    return;
+  }
+  IS_GUEST = true;
+  installGuestReadOnlyGuard();
+  if (err) err.textContent = "";
+  const pw = $("#pw"); if (pw) pw.value = "";
+  await showApp();
+  try { announce("테스트 모드로 들어왔습니다. 관리자 전용 기능은 잠겨 있습니다."); } catch (e) {}
+}
+
 // ── 진입 관문 ────────────────────────────────────────────────────────────
 // 세션이 «있을 때만» 앱으로 들어간다. 없으면 로그인 화면에 머문다.
 // (showApp() 을 호출하는 곳은 이 블록과 login() 성공 시점 두 곳뿐이어야 한다)
@@ -1035,6 +1137,10 @@ function renderChangelog() {
     console.warn("[로그인] 세션 확인 실패 — 로그인 화면 유지:", e);
   }
   if (session) { showApp(); return; }
+  // 🧪 로그인 화면에 머무는 «지금»이 둘러보기 버튼을 내보낼 유일한 자리다.
+  paintGuestGate();
+  const gb = $("#guestBtn");
+  if (gb) gb.addEventListener("click", doGuestLogin);
   // 로그인 화면 유지 — 키보드 이용자가 바로 입력할 수 있게 첫 칸에 초점(KWCAG 6.4.3)
   try { $("#email").focus(); } catch (e) {}
 })();
@@ -1251,6 +1357,9 @@ async function login() {
 async function showApp() {
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
+  // 🧪 테스트 모드 — 띠를 올리고 관리자 전용 기능을 잠근다(게스트일 때만 동작).
+  paintGuestNotice();
+  paintGuestLocks();
   // ⬅ 히스토리 루트를 «첫 탭»으로 잡는다. 여기서 뒤로가기를 누르면 앱이 종료되는 것이 정상.
   //    (로그인 화면에서는 NAV_READY 가 거짓이라 히스토리를 전혀 건드리지 않는다)
   navReset({ type: "tab", tab: pCurrentTab });
@@ -3238,6 +3347,19 @@ function renderApplications() {
   $("#aCount").textContent = `총 ${rows.length}건`;
   renderBulkBar();
   if (!rows.length) {
+    /* 🧪 테스트 모드 — 신청 접수는 시민의 이름·연락처가 든 개인정보라, 로그인하지 않은
+       접속에는 서버(RLS)가 «한 건도» 내주지 않는다. 그래서 여기는 «0건»이 아니라
+       «볼 수 없다»가 맞는 말이다. 빈 화면으로 두면 「접수가 없구나」로 오해한다. */
+    if (IS_GUEST && !AALL.length) {
+      list.innerHTML =
+        '<div class="empty">신청 접수 내역은 테스트 모드에서 볼 수 없습니다. '
+        + '시민의 이름·연락처가 담긴 개인정보라, 담당자 계정으로 로그인하셔야 열립니다.<br>'
+        + '사업 관리·시민 정책제안 탭은 그대로 둘러보실 수 있습니다.</div>';
+      $("#aCount").textContent = "";
+      $("#aPager").innerHTML = "";
+      announce("신청 접수 내역은 테스트 모드에서 볼 수 없습니다.");
+      return;
+    }
     /* 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절).
        ★ 2026-08-20 — 「심사중」이 0건이 되는 순간은 «허탕»이 아니라 «다 처리한 것»이다.
          그때만 상상주도 캐릭터가 아래에서 살짝 떠오르며 축하한다(규격서 §14② «빈 화면 캐릭터»).

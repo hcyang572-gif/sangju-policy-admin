@@ -125,7 +125,13 @@ window.SangjuApply = (function () {
     if (!sb) return [];
     var res = await sb.from(TABLE).select("*").order("created_at", { ascending: false });
     if (res.error) throw res.error;
-    return res.data || [];
+    // 🗑 시민이 스스로 취소한 접수는 «없는 것»으로 본다 (2026-08-21)
+    //    supabase/신청취소_260821.sql — applications.canceled_at 이 채워지면 취소된 건.
+    //    행 자체는 남겨 둔다(감사기록·복구용). 시민앱·PC앱도 같은 기준으로 거른다.
+    //    ⚠ 서버 쿼리(.is("canceled_at", null))로 거르지 «않는» 이유: 그 SQL 을 아직
+    //      실행하지 않은 환경에서는 컬럼이 없어 42703 으로 목록 전체가 죽는다.
+    //      여기서 걸러 두면 컬럼이 있든 없든 목록은 언제나 뜬다.
+    return (res.data || []).filter(function (r) { return !(r && r.canceled_at); });
   }
 
   // ── 공무원 상태변경 · 처리메모 · 시민 안내문 — patch = {status?, admin_memo?, citizen_reply?} ──

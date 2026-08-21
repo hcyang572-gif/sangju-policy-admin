@@ -1590,3 +1590,35 @@ a[href^="mailto:"],a[href^="http"],.login-help strong,.forms-item-name,
 /* 📍 표준 읍·면·동이 아닌 값이 들어왔을 때의 곁말(접수 상세) — 담당자가 «고쳐야 할 값»임을 알게 한다.
    목록 카드에는 자리가 없어 넣지 않는다(상세에서만). 글자 #93380F on #FFFFFF = 7.37:1 */
 .rg-warn{font-size:0.8125rem;font-weight:700;color:var(--gotgam-t);}
+
+/* ══════════════════════════════════════════════════════════════
+   🧪 테스트 모드 — «로그인 없이 둘러보기» (config.js TEST_MODE_ALLOW_GUEST)
+   ⚠ 이 덩어리는 시범 운영 기간 전용이다. 정식 서비스 때 스위치를 끄면
+     .hidden 이 유지되어 아무것도 그려지지 않는다(CSS 는 지우지 않아도 된다).
+   ★ 색은 «주의»가 아니라 «알림» 톤이다 — 오류(빨강)와 헷갈리면 안 된다.
+   ⚠ PC앱 webui/style.css 의 같은 덩어리와 «같은 모양»이다. 한쪽만 고치지 말 것.
+   ══════════════════════════════════════════════════════════════ */
+.login-guest{display:flex;flex-direction:column;gap:10px;min-width:0;
+  margin-top:16px;padding-top:18px;border-top:1px solid var(--line);}
+.login-guest-t{margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:0.8125rem;font-weight:700;color:var(--sub);min-width:0;}
+.login-guest-h{margin:0;font-size:0.75rem;font-weight:600;line-height:1.55;color:var(--sub);
+  min-width:0;text-wrap:pretty;word-break:keep-all;overflow-wrap:break-word;}
+/* 보조 버튼 — 주요 버튼(로그인)과 «같은 무게»로 보이면 안 된다: 테두리형 */
+.login-btn.ghost{background:#fff;color:var(--gotgam-t);border:1.5px solid var(--gotgam-l);
+  box-shadow:none;font-weight:700;}                                   /* 흰 7.47:1 */
+.login-btn.ghost:hover{background:var(--gotgam-ll);border-color:var(--gotgam-d);}
+.login-btn.ghost:active{background:var(--gotgam-l);}
+.login-btn.ghost .ico{color:currentColor;}
+/* «테스트 모드» 알약 — 로그인 카드와 본문 띠에서 같은 모양으로 쓴다 */
+.test-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;
+  background:var(--gotgam-d);color:#fff;font-size:0.6875rem;font-weight:800;
+  letter-spacing:.01em;white-space:nowrap;}                           /* 흰글자 5.21:1 */
+/* 본문 맨 위 띠 — 로그인 만료 띠(.session-banner)와 같은 자리·같은 높이감으로 두되
+   색은 감빛 계열로 구분한다. 글자 #93380F on #FDF0E4 = 6.67:1 (AA 충족). */
+.guest-notice{display:flex;align-items:center;gap:10px;margin:0;padding:11px 20px;
+  background:var(--gotgam-ll);border-bottom:2px solid var(--gotgam);border-left:5px solid var(--gotgam);
+  color:var(--gotgam-t);font-size:0.875rem;font-weight:700;}
+.guest-notice .ico{flex:0 0 auto;width:20px;height:20px;}
+.guest-notice-text{margin:0;flex:1;min-width:0;line-height:1.5;
+  text-wrap:pretty;word-break:keep-all;overflow-wrap:break-word;}

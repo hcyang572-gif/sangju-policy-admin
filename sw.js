@@ -106,7 +106,8 @@ const ASSET_V = "0.5.0";
 //      「이달의 접수」 요약 패널에 «읍·면·동별 신청 현황» 막대를 더했다.
 //      ★ 25개 지역 목록은 JS 에 베끼지 않고 data.json 에서 받는다(build_data.py 196행 규약).
 //        → OPTIONAL 에 data.json 이 새로 들어갔다. 이것이 캐시 이름을 올리는 «직접적인» 이유다.
-const CACHE = "sangju-admin-v38";   // v38: data.js 사본 프리캐시(행정망 .json 차단 대비, 2026-08-21, 📱모바일).
+const CACHE = "sangju-admin-v39";   // v39: 테스트 모드 «로그인 없이 둘러보기»(2026-08-21, 📱모바일).
+// (v38: data.js 사본 프리캐시 — 행정망 .json 차단 대비, 2026-08-21, 📱모바일)
 //                                    v37: 요약 카드 색 토큰 + 클릭 좁혀보기 되돌리기(2026-08-21, 🔴검수).
 //                <button data-scope>→<div> 로 되돌아가 클릭 바인딩(toggleAScope)이 사라졌다 —
 //                옛 index.html(버튼)+새 app.js(바인딩 없음) 조합이면 카드가 눌리지 않는 채 남는다.
