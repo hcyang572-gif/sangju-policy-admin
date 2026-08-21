@@ -830,9 +830,29 @@ function regionLabel(value) {
 async function loadRegionMeta() {
   try {
     const v = window.APP_VERSION ? ("?v=" + window.APP_VERSION) : "";
-    const res = await fetch("data.json" + v, { credentials: "same-origin" });
-    if (!res || !res.ok) throw new Error("HTTP " + (res ? res.status : "?"));
-    const d = await res.json();
+    let d = null;
+    try {
+      const res = await fetch("data.json" + v, { credentials: "same-origin" });
+      if (!res || !res.ok) throw new Error("HTTP " + (res ? res.status : "?"));
+      d = await res.json();
+    } catch (e1) {
+      /* 행정망(업무망) 폴백 (2026-08-21) — 업무망 프록시가 «.json 요청»만 걸러 내는 사례가 있다.
+         build_data.py 가 data.json 과 «같은 순간·같은 내용»으로 써 둔 data.js 를 <script> 로
+         끼워 넣어 window.__SANGJU_DATA__ 에서 읽는다. 단일 출처는 여전히 data.json 이다. */
+      console.warn("[읍·면·동] data.json 을 읽지 못했습니다 — data.js 사본으로 재시도:", e1);
+      d = await new Promise((resolve) => {
+        try {
+          if (window.__SANGJU_DATA__) return resolve(window.__SANGJU_DATA__);
+          const s = document.createElement("script");
+          s.src = "data.js" + (v || "?") + (v ? "&" : "") + "nc=" + Date.now();
+          s.async = true;
+          s.onload = () => resolve(window.__SANGJU_DATA__ || null);
+          s.onerror = () => resolve(null);
+          (document.head || document.documentElement).appendChild(s);
+        } catch (e2) { resolve(null); }
+      });
+      if (!d) throw e1;
+    }
     SJ_REGIONS = Array.isArray(d.regions) ? d.regions.slice() : [];
     SJ_REGION_GROUPS = Array.isArray(d.region_groups) ? d.region_groups : [];
     SJ_REGION_ETC = String(d.region_etc || "");
