@@ -123,13 +123,8 @@
   function setNum(id, n) {
     var e = $(id);
     if (!e) return;
-    /* 낭독기에는 「오늘 접수 3건, 누르면 해당 접수만 봅니다」로 읽힌다.
-       ⚠ 단추에 aria-label 이 걸리면 그 «이름»이 안쪽 글자보다 앞선다 → 건수를 여기 담는다. */
-    var btn = (e.closest ? e.closest("button.kpi[data-scope]") : null);
-    if (btn) {
-      var sd = SCOPES[btn.getAttribute("data-scope")];
-      if (sd) btn.setAttribute("aria-label", sd.label + " " + n + "건, 누르면 해당 접수만 봅니다");
-    }
+    /* ⛔ 2026-08-21 — 카드가 «단추»이던 시절 aria-label 을 갈아 끼우던 대목은 삭제했습니다.
+       지금 카드는 <div> 라, 낭독기는 안쪽 글자(.kpi-sr 의 숫자 + 라벨)를 그대로 읽습니다. */
     if (typeof window.sjCountUp === "function" && e.querySelector(".kpi-vis")) { window.sjCountUp(e, n); return; }
     e.textContent = String(n);
   }

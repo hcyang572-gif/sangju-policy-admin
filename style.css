@@ -54,6 +54,32 @@
   --shadow:0 1px 2px rgba(80,50,30,.06), 0 8px 20px -10px rgba(80,50,30,.18);
   /* 라운드 — 카드·패널·모달 20px / 버튼·입력칸 12px / 칩·배지 999px */
   --r-card:20px; --r-ctl:12px; --r-pill:999px;
+
+  /* ── 📊 요약 지표 카드 «성격별» 색 (2026-08-21 양호창님 지시) ──────────────────
+     네 카드가 모두 흰 바탕이라 어느 칸이 무엇인지 눈으로 갈라지지 않았다.
+     칸마다 «연한 틴트 + 진한 강조 테두리 + 진한 숫자색» 세 겹으로 성격을 입힌다.
+     ⚠ 색만으로 뜻을 전하지 않는다 — 라벨 글자(오늘 접수·심사중·이달 승인·이달 반려)가
+        그대로 남아 있고, 색은 «찾기 쉽게» 돕는 보조 수단이다(KWCAG 5.4.1).
+     ⚠ 대비는 모두 실측값이다. -ink 는 틴트 위 글자, -line 은 비텍스트(3:1 기준).
+        접수 #1B4F91/#EAF1FB 7.18 · 심사 #7A5B00/#FDF1DC 5.60
+        승인 #1E6B2A/#E7F4E9 5.79 · 반려 #A52714/#FCEBE8 6.28  (모두 4.5:1 이상)
+     ⚠ 이 색은 «접수 처리 탭의 네 카드(.kpis)»에만 쓴다. 사업·시민 제안 탭의
+        요약 띠(.sum-mini)는 뜻이 달라 예전 그대로 둔다. */
+  --kpi-now-bg:#EAF1FB; --kpi-now-line:#1B4F91; --kpi-now-ink:#1B4F91;  /* 오늘 접수 — 블루 */
+  --kpi-rev-bg:#FDF1DC; --kpi-rev-line:#8A6708; --kpi-rev-ink:#7A5B00;  /* 심사중  — 앰버 */
+  --kpi-ok-bg:#E7F4E9;  --kpi-ok-line:#1E6B2A;  --kpi-ok-ink:#1E6B2A;   /* 이달 승인 — 그린 */
+  --kpi-no-bg:#FCEBE8;  --kpi-no-line:#A52714;  --kpi-no-ink:#A52714;   /* 이달 반려 — 레드 */
+}
+/* 이 앱은 «밝은 화면 전용»이다(다크 팔레트를 따로 두지 않는다).
+   운영체제가 어두운 화면이어도 브라우저가 색을 뒤집지 않도록 밝은 화면임을 밝혀 둔다. */
+:root{color-scheme:light;}
+/* 훗날 다크 팔레트를 붙일 때를 위한 자리 — 지금은 data-theme 을 아무도 걸지 않아 «잠자는» 규칙이다.
+   어두운 바탕에서는 틴트를 «어둡게», 글자를 «밝게» 뒤집어야 대비가 유지된다(모두 4.5:1 이상). */
+:root[data-theme="dark"]{
+  --kpi-now-bg:#16233A; --kpi-now-line:#7FAEE8; --kpi-now-ink:#B9D4F5;
+  --kpi-rev-bg:#2C2412; --kpi-rev-line:#D7A93A; --kpi-rev-ink:#F0CE7A;
+  --kpi-ok-bg:#152B1A;  --kpi-ok-line:#6DBE7C;  --kpi-ok-ink:#A9DDB2;
+  --kpi-no-bg:#301917;  --kpi-no-line:#E08C80;  --kpi-no-ink:#F3B4AC;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
@@ -441,6 +467,59 @@ body.modal-open{overflow:hidden;}
   font-size:0.875rem;font-family:inherit;color:var(--ink);line-height:1.7;resize:vertical;background:#fff;}
 .form-input:focus,.form-textarea:focus,.search-input:focus,.sort-select:focus,.st-select:focus{border-color:var(--gotgam);}
 .modal-actions{display:flex;gap:12px;margin-top:24px;padding-top:20px;border-top:1px solid var(--line);}
+/* ══════════════════════════════════════════════════════════════════════
+   📝 「새 사업 추가 / 사업 수정」 화면 색감 (2026-08-21 양호창님 지시)
+   ────────────────────────────────────────────────────────────────────
+   흰 바탕에 회색 입력칸만 늘어서 «어디부터 어디까지가 한 항목인지» 눈으로 갈라지지
+   않던 화면입니다. ⚠ 배치·필드 구성·동작은 «한 글자도» 바꾸지 않았습니다 —
+   색과 시각적 위계(무엇이 먼저 읽혀야 하는지)만 손봤습니다.
+     ① 본문 바탕을 옅은 크림으로 낮춰, 흰 항목 카드가 떠 보이게 한다.
+     ② 항목마다 흰 카드 + 부드러운 그림자 + 라운드, 라벨 앞에 브랜드 컬러 막대.
+     ③ 입력칸은 포커스가 오면 브랜드 컬러 테두리 + 은은한 링(어디에 쓰는 중인지 또렷하게).
+     ④ «(필수 …)» 는 글자 그대로 두되 배지 꼴로 눈에 띄게.
+     ⑤ 저장 버튼만 브랜드 그라데이션 — 이 화면의 «단 하나의 결론»이라 제일 무겁게.
+   ⚠ 선택자를 모두 #mBody 로 묶었습니다. 접수 상세(#aModal)의 .notice-field·
+      .citizen-field 등 다른 모달은 이 규칙의 영향을 받지 않습니다.
+   ══════════════════════════════════════════════════════════════════════ */
+#mBody{background:var(--cream);}
+/* 항목 카드 — 흰 면 + 왼쪽 브랜드 막대. 겉여백(20px)은 예전 .field 그대로다. */
+#mBody .field,#mBody .forms-section{
+  background:var(--card);border:1.5px solid var(--line);border-left:5px solid var(--gotgam-l);
+  border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);}
+/* 📎 서식 칸은 예전에 «윗줄»로 갈라져 있었다 — 카드가 됐으니 그 줄은 필요 없다 */
+#mBody .forms-section{margin-top:20px;padding-top:14px;border-top:1.5px solid var(--line);}
+/* 라벨 앞 컬러 막대 — 항목의 «머리»가 어디인지 한눈에. 뜻은 글자가 전한다(막대는 장식). */
+#mBody .field-label{display:flex;align-items:center;flex-wrap:wrap;gap:7px;}
+#mBody .field-label::before{content:"";flex:none;width:4px;height:15px;border-radius:2px;
+  background:var(--gotgam);}
+/* 입력칸 — 쉬는 동안은 옅은 크림(흰 카드 위에서 «넣는 자리»가 또렷하게),
+   글을 넣는 동안은 흰 바탕 + 브랜드 테두리 + 링. 테두리 색은 --field(3.39:1) 그대로 둔다. */
+#mBody .form-input,#mBody .form-textarea{background:var(--cream);
+  transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;}
+#mBody .form-input:focus,#mBody .form-textarea:focus{
+  background:#fff;border-color:var(--gotgam);box-shadow:0 0 0 3px rgba(184,74,28,.20);}
+#mBody .form-input:hover,#mBody .form-textarea:hover{border-color:var(--gotgam-t);}
+/* «(필수 · 하나 이상 …)» — 배지 꼴. #A52714 on #FDECEA = 6.6:1 (AA 충족) */
+#mBody .req-note{display:inline-block;padding:2px 9px;border-radius:var(--r-pill);
+  background:#FDECEA;border:1px solid var(--danger);font-size:0.6875rem;line-height:1.7;}
+/* «(여러 개 고를 수 있습니다 …)» — 있으면 좋은 안내라 한 단계 낮춘 배지 */
+#mBody .field-opt{display:inline-block;padding:2px 9px;border-radius:var(--r-pill);
+  background:var(--gotgam-ll);border:1px solid var(--gotgam-l);color:var(--sub);
+  font-size:0.6875rem;font-weight:700;line-height:1.7;}   /* #FDF0E4 위 6.03:1 */
+/* 마무리 줄 — 카드들 아래 «결론»이라 바탕과 한 칸 띄운다 */
+#mBody .modal-actions{margin-top:20px;padding-top:18px;}
+/* 💾 저장 — 이 화면의 단 하나의 결론. 흰 글자 대비는 그라데이션 «양 끝»에서 모두 5.2:1 이상
+   (#B84A1C 5.21 · #93380F 7.47). 삭제(danger)는 예전 그대로 흰 면 + 붉은 글자다. */
+#mBody .modal-actions .top-btn.solid{
+  background:linear-gradient(135deg,var(--gotgam-d) 0%,#A6420F 55%,var(--gotgam-t) 100%);
+  border-color:var(--gotgam-t);box-shadow:0 6px 16px -8px rgba(147,56,15,.7);}
+#mBody .modal-actions .top-btn.solid:hover{
+  background:linear-gradient(135deg,var(--gotgam-t) 0%,#7E2F0C 100%);}
+/* 좁은 화면(320px)에서는 카드 안여백을 줄여 입력칸 폭을 지킨다 */
+@media (max-width:380px){
+  #mBody .field,#mBody .forms-section{padding:12px 12px;border-left-width:4px;}
+}
+
 /* 📎 필요서류 서식 등록/삭제(편집 모달) — 곶감 팔레트만 사용. 색만으로 정보전달 금지.
    목록 글자 #33241C on #FFFFFF = 14.9:1, 메타 #6E594A = 6.6:1 (AA 충족). */
 .forms-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
@@ -922,21 +1001,10 @@ button:active,[role="button"]:active,.foot-link:active{transform:scale(.97);}
      1180px 안폭 기준 392 + 16 + 350 + 16 + 350, 1320px 안폭 기준 392 + 16 + 420 + 16 + 420. */
 .stats-card{flex:0 0 392px;}
 @media (max-width:900px){ .stats-card,.rank-card{flex:1 1 100%;} }
-/* ── 🔎 눌리는 요약 카드 (2026-08-19 양호창님 지시) ─────────────────────────────
-   접수 처리 탭의 네 카드만 <button> 이다(사업·시민 제안 탭의 .kpi 는 그대로 <div>).
-   button 기본 꼴(굴림체·가운데 정렬·회색 테두리)을 지우고 위 .kpi 모양을 그대로 잇는다.
-   ⚠ 크기(높이·글자)는 위 .kpi 한 곳에서만 정한다 — 여기서 다시 키우지 말 것. */
-button.kpi{font-family:inherit;color:inherit;text-align:left;width:100%;cursor:pointer;
-  -webkit-appearance:none;appearance:none;
-  transition:border-color var(--dur-micro,.15s) ease, background var(--dur-micro,.15s) ease;}
-button.kpi:hover{border-color:var(--gotgam-l);background:var(--gotgam-ll);}
-/* 선택된 카드 — ⚠ 색만으로 알리지 않는다.
-   ① 테두리가 1.5px → 3px 로 «두꺼워지고»(안여백을 1.5px 줄여 카드 크기는 그대로),
-   ② 라벨 앞에 «✓» 가 붙고, ③ 라벨에 밑줄이 그어진다. 낭독기에는 aria-pressed 로 알린다. */
-button.kpi[aria-pressed="true"]{border:3px solid var(--gotgam-d);padding:7.5px 12.5px;
-  background:var(--gotgam-ll);}
-button.kpi[aria-pressed="true"] > span{color:var(--gotgam-t);text-decoration:underline;}  /* 연한 바탕 위 6.67:1 */
-button.kpi[aria-pressed="true"] > span::before{content:"✓ ";font-weight:800;}
+/* ⛔ 2026-08-21 — 「요약 카드를 눌러 목록을 좁혀 보는」 기능은 «되돌렸습니다»(양호창님 지시).
+      네 카드는 다시 «보여주기 전용»(<div>)입니다. 그래서 button.kpi 용 꼴(커서·hover·
+      aria-pressed 눌림 표시)을 여기서 통째로 지웠습니다. 되살리지 마세요 —
+      마크업(index.html)·동작(app.js)도 함께 되돌아가 있어 CSS 만 살리면 «죽은 규칙»이 됩니다. */
 
 /* 「무엇만 보는 중」 알림 띠 — 칩을 늘리지 않고 한 줄로 알리고, 되돌리는 단추를 함께 둔다 */
 .scope-bar{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 14px;
@@ -953,6 +1021,23 @@ button.kpi[aria-pressed="true"] > span::before{content:"✓ ";font-weight:800;}
 .kpi.k-rev b{color:#7A5B00;}           /* 심사중  — 흰 6.9:1 (보조 금빛은 «글자색 금지»라 어두운 갈금색) */
 .kpi.k-ok  b{color:var(--navy-d);}     /* 승인    — 흰 7.70:1 */
 .kpi.k-no  b{color:var(--danger);}     /* 반려    — 흰 7.24:1 */
+
+/* ── 📊 접수 처리 탭 네 카드 «성격별» 색 (2026-08-21) ─────────────────────────
+   연한 틴트 바탕 + 왼쪽 굵은 강조선 + 진한 숫자색. 색 값은 :root 의 --kpi-* 한 곳에만 둔다.
+   ⚠ 크기(높이·안여백·글자)는 위 .kpi 에서 정한 그대로다 — 왼쪽 선(5px)만큼 안여백을 줄여
+      카드 크기가 다른 탭의 요약 띠와 어긋나지 않게 맞춘다.
+   ⚠ 색만으로 알리지 않는다 — 라벨 글자가 무엇을 센 수인지 그대로 말한다. */
+/* 테두리는 «왼쪽만» 진하게 — 나머지 세 변은 틴트에 가깝게 낮춰 카드가 소리치지 않게 한다.
+   ⚠ 아래 k-* 규칙은 border-left-color 하나만 건드린다(border-color 로 쓰면 이 줄이 덮인다). */
+.kpis .kpi{border-color:rgba(80,50,30,.10);border-left-width:5px;padding-left:10px;}
+.kpis .kpi.k-now{background:var(--kpi-now-bg);border-left-color:var(--kpi-now-line);}
+.kpis .kpi.k-rev{background:var(--kpi-rev-bg);border-left-color:var(--kpi-rev-line);}
+.kpis .kpi.k-ok {background:var(--kpi-ok-bg); border-left-color:var(--kpi-ok-line);}
+.kpis .kpi.k-no {background:var(--kpi-no-bg); border-left-color:var(--kpi-no-line);}
+.kpis .kpi.k-now b{color:var(--kpi-now-ink);}
+.kpis .kpi.k-rev b{color:var(--kpi-rev-ink);}
+.kpis .kpi.k-ok  b{color:var(--kpi-ok-ink);}
+.kpis .kpi.k-no  b{color:var(--kpi-no-ink);}
 
 /* ════════════════════════════════════════════════════════════
    📋 카드형 표 — 목업의 «행이 카드처럼 떨어진 표»

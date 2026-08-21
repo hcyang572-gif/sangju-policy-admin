@@ -2161,11 +2161,16 @@ function openEdit(r) {
     // C8: field-label → <label for> 로 input/textarea id와 연결
     const fid = `f_${key}`, hid = hint ? `h_${key}` : "";
     const aria = hint ? ` aria-describedby="${hid}"` : "";
+    // ⚠ 실제 저장을 막는 필수 칸은 사업명 하나뿐(저장 시 obj.name 검사) — 그 사실을 시각 배지뿐 아니라
+    //   required/aria-required 로도 전달한다(스크린리더가 «필수»를 놓치지 않게, 2026-08-21 잣대 점검).
+    const req = key === "name";
+    const reqLab = req ? `${label} <span class="req-note">(필수)</span>` : label;
+    const reqAttr = req ? ` required aria-required="true"` : "";
     html += `<div class="field${notice ? " notice-field" : ""}">` +
-      `<label class="field-label" for="${fid}">${label}</label>` +
+      `<label class="field-label" for="${fid}">${reqLab}</label>` +
       (hint ? `<p class="field-hint" id="${hid}">${esc(hint)}</p>` : ``) +
-      (multi ? `<textarea id="${fid}" class="form-textarea" data-k="${key}"${aria}>${esc(v)}</textarea>`
-             : `<input id="${fid}" class="form-input" data-k="${key}"${aria} value="${esc(v)}">`) + `</div>`;
+      (multi ? `<textarea id="${fid}" class="form-textarea" data-k="${key}"${aria}${reqAttr}>${esc(v)}</textarea>`
+             : `<input id="${fid}" class="form-input" data-k="${key}"${aria}${reqAttr} value="${esc(v)}">`) + `</div>`;
   });
   // 🏷 분야(카테고리) — 새 사업·수정 «둘 다»에 둔다.
   //    ⛔ 이 자리를 없애지 마세요. 없던 시절에는 공무원앱으로 올린 사업의 categories 가
@@ -2926,24 +2931,14 @@ function renderTeamOptions() {
    ══════════════════════════════════════════════════════════════════════ */
 let A_SEL = new Set();
 function clearASel() { A_SEL.clear(); }
-// 카드 누름 — 같은 카드를 다시 누르면 «전체»로 되돌아온다(요건 ②)
-function toggleAScope(key) {
-  const t = window.sjScopes;
-  if (!key || !t || !t[key]) return;
-  A_SCOPE = (A_SCOPE === key) ? "" : key;
-  if (A_SCOPE) A_STATUS = "전체";
-  aPage = 0;
-  clearASel();
-  renderAStatusChips();
-  renderApplications();
-}
+// ⛔ 2026-08-21 — 카드를 눌러 좁혀 보던 toggleAScope() 는 삭제했습니다(양호창님 지시).
+//    A_SCOPE 자체는 «항상 빈 값»으로 남습니다 — 담당팀 필터 띠(#aScopeBar)가 같은 자리를 쓰기 때문에
+//    변수와 renderAScopeUI() 는 그대로 둡니다(지우면 담당팀 띠가 함께 사라집니다).
 // 「무엇만 보는 중인지」 한 줄 띠 + 카드의 눌림 표시를 실제 상태에 맞춘다.
 // ⚠ renderApplications() 안에서 매번 부른다 — 실시간 접수로 목록을 다시 그려도 표시가 안 풀린다(요건 ⑥).
 function renderAScopeUI() {
+  // ⛔ 카드에 눌림 표시(aria-pressed)를 하던 줄은 지웠습니다 — 카드는 더 이상 단추가 아닙니다.
   const def = aScopeDef();
-  document.querySelectorAll("#aSummary button.kpi[data-scope]").forEach((b) => {
-    b.setAttribute("aria-pressed", b.getAttribute("data-scope") === A_SCOPE ? "true" : "false");
-  });
   const bar = $("#aScopeBar"), txt = $("#aScopeText");
   if (!bar) return;
   /* 무엇으로 좁혀 보는 중인지 «한 줄»로 모아 알린다.
@@ -2971,10 +2966,8 @@ function bindApplicationsUI() {
   loadTeamPref();
   const s = $("#aSearch");
   if (s) s.addEventListener("input", debounce(() => { aPage = 0; clearASel(); renderApplications(); }, 300));
-  // 요약 카드 네 장 — 진짜 <button> 이라 Enter·Space·Tab 은 브라우저가 알아서 해 준다
-  document.querySelectorAll("#aSummary button.kpi[data-scope]").forEach((b) => {
-    b.addEventListener("click", () => toggleAScope(b.getAttribute("data-scope")));
-  });
+  // ⛔ 2026-08-21 — 요약 카드 네 장의 «클릭해서 좁혀 보기»는 되돌렸습니다(양호창님 지시).
+  //    카드는 다시 <div>(보여주기 전용)이라 연결할 클릭이 없습니다. 되살리지 마세요.
   const sc = $("#aScopeClear");
   if (sc) sc.onclick = () => {
     // 「전체 보기」 — 요약 카드 좁힘과 «기억된 담당팀»을 함께 푼다(띠에 적힌 그대로).

@@ -106,7 +106,10 @@ const ASSET_V = "0.5.0";
 //      「이달의 접수」 요약 패널에 «읍·면·동별 신청 현황» 막대를 더했다.
 //      ★ 25개 지역 목록은 JS 에 베끼지 않고 data.json 에서 받는다(build_data.py 196행 규약).
 //        → OPTIONAL 에 data.json 이 새로 들어갔다. 이것이 캐시 이름을 올리는 «직접적인» 이유다.
-const CACHE = "sangju-admin-v36";   // v36: 첨부 파기 규칙 통일 + 알림창 출처 표기 제거(2026-08-20).
+const CACHE = "sangju-admin-v37";   // v37: 요약 카드 색 토큰 + 클릭 좁혀보기 되돌리기(2026-08-21, 🔴검수).
+//                <button data-scope>→<div> 로 되돌아가 클릭 바인딩(toggleAScope)이 사라졌다 —
+//                옛 index.html(버튼)+새 app.js(바인딩 없음) 조합이면 카드가 눌리지 않는 채 남는다.
+// v36: 첨부 파기 규칙 통일 + 알림창 출처 표기 제거(2026-08-20).
 //                첨부 삭제 실패 시 접수 삭제도 함께 멈추도록 PC앱 정본에 맞춰 통일하고,
 //                admin_audit insert 실패 감지, alert() 출처 노출 제거·모달 배경 inert 처리.
 //      v35: 읍·면·동 표시·집계 + data.json 프리캐시

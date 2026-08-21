@@ -33,7 +33,7 @@
 <meta name="apple-mobile-web-app-title" content="상주정책(공무원용)">
 <meta name="application-name" content="상주정책(공무원용)">
 
-<link rel="stylesheet" href="style.css?v=0.5.0">
+<link rel="stylesheet" href="style.css?v=0.5.1">
 <link rel="icon" href="assets/icon-admin-192.png">
 </head>
 <body>
@@ -241,17 +241,17 @@
       <!-- 요약 지표 4개 — 규격서 §14 «숫자 카운트업».
            ⚠ 최종값은 .kpi-sr 에 «먼저» 들어간다(낭독기는 이 값만 읽는다).
               눈에 보이는 .kpi-vis 는 aria-hidden 이라, 0 에서 올라가는 도중이 낭독되지 않는다. -->
-      <!-- ★ 2026-08-19 — 네 카드는 «눌러서 그 건만 보기» 단추다(양호창님 지시).
-           · 진짜 <button> 이라 Tab · Enter · Space 가 저절로 되고, 낭독기도 «단추»로 읽는다.
-           · aria-label 은 stats.js 가 숫자를 채울 때마다 「오늘 접수 3건, 누르면 해당 접수만 봅니다」로 갱신한다.
-           · 지금 무엇으로 좁혀져 있는지는 aria-pressed + 굵은 테두리 + 라벨 앞 «✓»(색 의존 금지)로 알린다.
-           · 세는 기준(오늘/심사중/이달 승인/이달 반려)은 stats.js 의 window.sjScopes 한 곳뿐이다 —
-             카드 숫자와 목록 건수가 «같은 함수»로 나오므로 어긋날 수 없다. -->
+      <!-- ⛔ 2026-08-21 — 네 카드를 «눌러서 그 건만 보기» 단추로 만들었던 작업을 되돌렸습니다(양호창님 지시).
+           다시 «보여주기 전용» <div> 입니다 — 클릭·호버·커서·role·tabindex·키보드 처리가 없습니다.
+           되살리지 마세요(style.css 의 button.kpi 규칙과 app.js 의 카드 클릭 연결도 함께 지웠습니다).
+           · 세는 기준(오늘/심사중/이달 승인/이달 반려)은 여전히 stats.js 의 window.sjScopes 한 곳뿐입니다.
+           · 카드마다 «성격에 맞는 색»(블루·앰버·그린·레드)이 입혀 있습니다 — style.css 의 --kpi-* 참조.
+             색만으로 알리지 않으며, 라벨 글자가 무엇을 센 수인지 그대로 말합니다. -->
       <section class="kpis" aria-label="접수 현황 요약">
-        <button type="button" class="kpi k-now" data-scope="today" aria-pressed="false" aria-label="오늘 접수 0건, 누르면 해당 접수만 봅니다"><b id="kpiToday"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>오늘 접수</span></button>
-        <button type="button" class="kpi k-rev" data-scope="review" aria-pressed="false" aria-label="심사중 0건, 누르면 해당 접수만 봅니다"><b id="kpiReview"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>심사중</span></button>
-        <button type="button" class="kpi k-ok" data-scope="okM" aria-pressed="false" aria-label="이달 승인 0건, 누르면 해당 접수만 봅니다"><b id="kpiOk"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 승인</span></button>
-        <button type="button" class="kpi k-no" data-scope="noM" aria-pressed="false" aria-label="이달 반려 0건, 누르면 해당 접수만 봅니다"><b id="kpiNo"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 반려</span></button>
+        <div class="kpi k-now"><b id="kpiToday"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>오늘 접수</span></div>
+        <div class="kpi k-rev"><b id="kpiReview"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>심사중</span></div>
+        <div class="kpi k-ok"><b id="kpiOk"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 승인</span></div>
+        <div class="kpi k-no"><b id="kpiNo"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 반려</span></div>
       </section>
 
       <figure id="aStats" class="stats-card">
@@ -631,13 +631,13 @@
         integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- 공통 버전·개선사항 단일 소스(앱 스크립트보다 먼저 로드) -->
-<script src="version.js?v=0.5.0"></script>
-<script src="config.js?v=0.5.0"></script>
+<script src="version.js?v=0.5.1"></script>
+<script src="config.js?v=0.5.1"></script>
 <!-- 서식 스토리지 공용 헬퍼(세 앱 공통). app.js 보다 먼저 로드 -->
-<script src="forms.js?v=0.5.0"></script>
+<script src="forms.js?v=0.5.1"></script>
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
-<script src="apply_client.js?v=0.5.0"></script>
-<script src="app.js?v=0.5.0"></script>
+<script src="apply_client.js?v=0.5.1"></script>
+<script src="app.js?v=0.5.1"></script>
 <!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
      CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.
        · tap.js   — 버튼 눌림 파동 + 햅틱(진동). 화면에 무엇을 그리지는 않는다.
@@ -646,13 +646,13 @@
        · icons.js — app.js 가 «만들어 내는» 화면의 이모지를 인라인 SVG 로 바꿔 끼운다.
          (app.js 를 고치지 않고 «그려진 뒤의 글자»만 바꾼다 — 세 앱이 글자 단위로 같아야 하는
           문자열까지 원본을 건드리지 않고 다룰 수 있다) -->
-<script src="tap.js?v=0.5.0"></script>
-<script src="icons.js?v=0.5.0"></script>
-<script src="stats.js?v=0.5.0"></script>
-<script src="a2hs.js?v=0.5.0"></script>
+<script src="tap.js?v=0.5.1"></script>
+<script src="icons.js?v=0.5.1"></script>
+<script src="stats.js?v=0.5.1"></script>
+<script src="a2hs.js?v=0.5.1"></script>
 
 <!-- PWA 서비스워커 등록 (상대경로 → /admin/ 하위에서만 동작, 시민앱과 분리) -->
 <!-- 서비스워커 등록 — CSP 적용을 위해 인라인 대신 별도 파일(sw-register.js)로 둔다 -->
-<script src="sw-register.js?v=0.5.0"></script>
+<script src="sw-register.js?v=0.5.1"></script>
 </body>
 </html>
