@@ -3803,14 +3803,7 @@ async function openProposal(r) {
            (KWCAG 6.1.1 «키보드 사용 보장»). 초점을 받으면 ↑↓·PageDown 으로 읽어 내려갑니다.
            ⚠ 초점 테두리는 파일 위쪽 :focus-visible 공통 규칙이 그려 줍니다. -->
       <ul class="cmt-list" id="pmComments" tabindex="0" role="group" aria-label="시민 댓글 목록" aria-live="polite"><li class="forms-empty">불러오는 중…</li></ul>
-      <!-- ⭐⭐ 이 안내문이 «정본»입니다(2026-08-25). 세 앱이 «글자 단위로» 같아야 합니다
-           (디자인_규격서.md 18절 · 「공무원앱이 기준」 2026-08-24). PC앱도 이 글자로 맞춥니다.
-           ⛔ 「공무원이 여기에 글을 쓰지 않는다」는 한 줄을 빼지 마세요 — 그것이 이 개정의 요지입니다.
-           🧪 테스트 모드(게스트)에는 감추기·삭제 단추가 없으므로 그 문장도 빼고 보여 줍니다. -->
-      <p class="cmt-read-note" id="pmCmtNote"><span aria-hidden="true">ⓘ</span>
-        이 자리는 <b>시민들끼리 나눈 의견을 읽는 곳</b>입니다. 공무원은 여기에 글을 쓰지 않습니다.
-        시민에게 하는 답은 아래 <b>「담당부서 답변」 한 통</b>으로 보내 주세요.${IS_GUEST ? "" :
-        ` 신고되었거나 부적절한 글은 각 댓글의 <b>「감추기」</b>로 시민 화면에서 가릴 수 있습니다.`}</p>
+      <!-- ⛔ 2026-08-25 양호창님 지시 — 댓글 목록 아래 ⓘ 안내 문단은 세 앱에서 뺐다(불필요). 되살릴 때는 PC앱(webui/proposals.js)에도 함께 넣을 것. -->
     </div>
     <div class="field">
       <label class="field-label" for="pmStatus">진행 상태 변경</label>

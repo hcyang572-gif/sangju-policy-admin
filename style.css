@@ -1087,18 +1087,7 @@ body.modal-open{overflow:hidden;}
 .cmt-acts .mini-btn.danger{border-color:#F0C9C4;color:var(--danger);}
 .cmt-acts .mini-btn.danger:hover{background:#FDECEA;border-color:var(--danger);}
 
-/* ── ⓘ 시민 댓글 «읽는 곳» 안내 한 줄 ──────────────────────────────────────
-   ⛔ 2026-08-25 — 여기 있던 «공무원 답글 쓰기 상자»(.cmt-write / .cmt-write-to /
-      .cmt-write-row / .cmt-write-lab / .cmt-dept / .cmt-write-note / .cmt-write-actions)
-      한 벌을 없앴습니다. 공무원이 댓글을 다는 기능 자체를 폐지했기 때문입니다(양호창님).
-      되살리지 마세요 — 시민에게 하는 답은 「담당부서 답변」 한 통뿐입니다.
-   ⚠ 안내 색은 아래 「담당부서 답변」(.citizen-field)과 같은 청록 계열로 둡니다 —
-      두 자리가 «시민이 읽는 글»로 이어져 있음을 색으로도 잇습니다.
-   ⚠ 색만으로 알리지 않습니다 — 글자가 「공무원은 여기에 글을 쓰지 않습니다」라고 직접 말합니다.
-   대비 실측(직접 계산) — #00474D on #EAF5F6 9.41:1 (기준 4.5:1 이상). */
-.cmt-read-note{margin:10px 0 0;padding:10px 12px;border:1.5px solid var(--navy-l);
-  border-radius:var(--r-ctl);background:var(--navy-ll);
-  font-size:var(--fs-eyebrow);font-weight:var(--fw-bold);line-height:var(--lh-caption);color:#00474D;}
+/* ⛔ 2026-08-25 양호창님 지시 — 댓글 목록 아래 ⓘ 안내 문단(.cmt-read-note)을 세 앱에서 모두 뺐습니다(불필요). 규칙도 함께 지웠습니다. */
 
 .toggle-line{display:flex;align-items:center;gap:8px;font-size:var(--fs-caption);font-weight:var(--fw-bold);color:var(--ink);cursor:pointer;}
 
@@ -2275,8 +2264,7 @@ a[href^="mailto:"],a[href^="http"],.login-help strong,.forms-item-name,
     border-bottom:1px solid #000;}
   body.printing-modal .modal-body{overflow:visible !important;}
   /* 종이에서 누를 수 없는 것들 — 닫기·저장·삭제·인쇄·복사·상용구는 찍지 않는다 */
-  /* ⚠ .cmt-read-note 는 «담당자에게 하는 안내»라 종이에는 찍지 않는다(내용이 아니다) */
-  .modal-close,.modal-actions,.mini-btn,.reply-presets,.cmt-read-note{display:none !important;}
+  .modal-close,.modal-actions,.mini-btn,.reply-presets{display:none !important;}
   /* 여러 줄 값이 페이지 사이에서 잘리지 않게 */
   .field{break-inside:avoid;page-break-inside:avoid;}
 }
