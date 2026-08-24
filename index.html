@@ -33,7 +33,7 @@
 <meta name="apple-mobile-web-app-title" content="상주정책(공무원용)">
 <meta name="application-name" content="상주정책(공무원용)">
 
-<link rel="stylesheet" href="style.css?v=0.6.0">
+<link rel="stylesheet" href="style.css?v=0.7.0">
 <link rel="icon" href="assets/icon-admin-192-v3.png">
 </head>
 <body>
@@ -259,9 +259,9 @@
             DOM 만 바꾸면 화살표가 엉뚱한 탭으로 갔습니다. 2026-08-24 실측 확인).
          ⚠ 화면 안 제목(h2.sr-only)·안내문(.hint-tab)도 «같은 글자»여야 합니다. 아래 각 섹션 참조. -->
   <nav class="tabbar" role="tablist" aria-label="관리 화면 전환">
-    <button id="tabApplications" class="tab-btn on" type="button" role="tab" aria-selected="true" aria-controls="secApplications" tabindex="0"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>신청사업 현황</span></button>
-    <button id="tabProposals" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secProposals" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>정책제안 현황</span></button>
-    <button id="tabBenefits" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secBenefits" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>진행사업 현황</span></button>
+    <button id="tabApplications" class="tab-btn on" type="button" role="tab" aria-selected="true" aria-controls="secApplications" aria-label="신청사업 현황" tabindex="0"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>신청사업<span class="tab-x"> 현황</span></span></button>
+    <button id="tabProposals" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secProposals" aria-label="정책제안 현황" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>정책제안<span class="tab-x"> 현황</span></span></button>
+    <button id="tabBenefits" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secBenefits" aria-label="진행사업 현황" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>진행사업<span class="tab-x"> 현황</span></span></button>
   </nav>
 
   <!-- ⚠ main 은 문서에 하나만 둘 수 있다(보이는 main 중복 금지, main 에 tabpanel 역할 부여 불가)
@@ -299,15 +299,22 @@
              예전의 «연한 틴트 + 왼쪽 5px 선»은 이 탭에만 걸려 있어 탭마다 카드가 달라 보였습니다.
              색 값은 style.css :root 의 --st-* 한 곳뿐이고, 도넛 조각도 «같은 값»을 씁니다.
              색만으로 알리지 않으며, 라벨 글자가 무엇을 센 수인지 그대로 말합니다. -->
-      <section class="kpis" aria-label="접수 현황 요약">
+      <section class="kpis statrow" aria-label="접수 현황 요약">
         <div class="kpi k-now"><b id="kpiToday"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>오늘 접수</span></div>
         <div class="kpi k-rev"><b id="kpiReview"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>심사중</span></div>
         <div class="kpi k-ok"><b id="kpiOk"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 승인</span></div>
         <div class="kpi k-no"><b id="kpiNo"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>이달 반려</span></div>
       </section>
 
+      <!-- ▾ 접기 — 네 구역(이달의 접수·접수 많은 사업·담당팀별·읍·면·동별)이 «같은 한 벌»을 쓴다.
+           마크업 규약: 제목(.stats-cap) 안에 .fold-btn[aria-expanded][aria-controls] 하나,
+                        그 바로 아래 같은 id 의 .fold-body 하나. 그러면 stats.js 가 알아서 이어 준다.
+           다섯 번째 구역이 생겨도 이 두 줄만 흉내 내면 된다(JS·CSS 를 새로 만들 필요 없음). -->
       <figure id="aStats" class="stats-card">
-      <figcaption class="stats-cap">이달의 접수 <b id="aStatsTotal">0</b>건 · 상태별</figcaption>
+      <figcaption class="stats-cap">
+        <button type="button" class="fold-btn" aria-expanded="true" aria-controls="aStatsBody">이달의 접수 <b id="aStatsTotal">0</b>건 · 상태별<svg class="fold-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button>
+      </figcaption>
+      <div class="fold-body" id="aStatsBody">
       <div class="donut-wrap">
         <svg class="donut" viewBox="0 0 140 140" role="img" aria-labelledby="aStatsT aStatsD">
           <title id="aStatsT">이달의 접수 상태별 비중</title>
@@ -337,6 +344,7 @@
         </div>
         <!-- 이달 ↔ 지난달 견주기 — stats.js 가 created_at 만 세어 채운다(글자만, 색 의존 없음) -->
         <p class="stats-note" id="aStatsNote"></p>
+      </div><!-- /#aStatsBody -->
       </figure>
 
       <!-- 📈 도넛 옆 «요약 카드» 두 장 (2026-08-19 추가)
@@ -344,14 +352,14 @@
            그 자리를 «이미 있는 접수 자료로 계산되는 것»만 골라 채운다 — 사업별·담당팀별 접수 건수.
            ⚠ 없는 수치를 지어내지 않는다. ⚠ 개인정보(이름·연락처)는 세지도, 보여주지도 않는다.
            ⚠ 막대는 «곁들이는 그림»일 뿐이라 aria-hidden — 건수·비율은 언제나 «글자»로 함께 있다. -->
-      <section class="rank-card" aria-labelledby="aTopBizCap">
-        <h3 class="stats-cap" id="aTopBizCap">접수 많은 사업 <span class="rank-sub" id="aTopBizSub">집계 중</span></h3>
-        <ol class="rank-list" id="aTopBizList"></ol>
+      <section class="rank-card" id="aTopBizCard" aria-labelledby="aTopBizCap">
+        <h3 class="stats-cap" id="aTopBizCap"><button type="button" class="fold-btn" aria-expanded="true" aria-controls="aTopBizBody">접수 많은 사업 <span class="rank-sub" id="aTopBizSub">집계 중</span><svg class="fold-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button></h3>
+        <div class="fold-body" id="aTopBizBody"><ol class="rank-list" id="aTopBizList"></ol></div>
       </section>
 
-      <section class="rank-card" aria-labelledby="aTopTeamCap">
-        <h3 class="stats-cap" id="aTopTeamCap">담당팀별 접수 <span class="rank-sub" id="aTopTeamSub">집계 중</span></h3>
-        <ol class="rank-list" id="aTopTeamList"></ol>
+      <section class="rank-card" id="aTopTeamCard" aria-labelledby="aTopTeamCap">
+        <h3 class="stats-cap" id="aTopTeamCap"><button type="button" class="fold-btn" aria-expanded="true" aria-controls="aTopTeamBody">담당팀별 접수 <span class="rank-sub" id="aTopTeamSub">집계 중</span><svg class="fold-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button></h3>
+        <div class="fold-body" id="aTopTeamBody"><ol class="rank-list" id="aTopTeamList"></ol></div>
       </section>
 
       <!-- 📍 읍·면·동별 신청 현황 — 위 「담당팀별 접수」와 «같은 모양»(이름 + 건수 + 비율 + 막대).
@@ -359,14 +367,14 @@
            ⚠ 왜 이것만 «가로 전체»인가 — 위 두 카드는 상위 3~5줄만 보이지만 여기는 25개 지역을
               «0건까지 모두, 늘 같은 순서로» 보여야 한다(그래야 달마다 견줄 수 있다).
               좁은 카드에 25줄을 세우면 화면 한 장을 통째로 먹으므로, 폭이 넓어질수록
-              2·3·4단으로 접어 담는다(style.css .region-list).
+              2단·3단으로 접어 담는다(style.css .region-list · 2026-08-24 양호창님 지시로 «기본 3열»).
            ⚠ 색으로 지역을 구분하지 않는다 — 25개를 색으로 나누면 아무도 못 읽는다.
               막대는 담당팀 막대와 «같은 한 가지 색»이고, 뜻은 «이름과 숫자»가 전한다.
            ⚠ 순서·0건 포함·「미기재」 맨 뒤 규칙은 app.js countByRegion() 한 곳에 있다
               (파이썬 config.count_by_region() 과 같은 규칙 — 화면·엑셀·보고서의 숫자가 같아야 한다). -->
-      <section class="rank-card region-card" aria-labelledby="aRegionCap">
-        <h3 class="stats-cap" id="aRegionCap">읍·면·동별 신청 현황 <span class="rank-sub" id="aRegionSub">집계 중</span></h3>
-        <ol class="rank-list region-list" id="aRegionList"></ol>
+      <section class="rank-card region-card" id="aRegionCard" aria-labelledby="aRegionCap">
+        <h3 class="stats-cap" id="aRegionCap"><button type="button" class="fold-btn" aria-expanded="true" aria-controls="aRegionBody">읍·면·동별 신청 현황 <span class="rank-sub" id="aRegionSub">집계 중</span><svg class="fold-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button></h3>
+        <div class="fold-body" id="aRegionBody"><ol class="rank-list region-list" id="aRegionList"></ol></div>
       </section>
     </div>
 
@@ -401,8 +409,6 @@
       <span id="aRtText" class="rt-banner-text"></span>
       <button id="aRtBtn" class="rt-banner-btn" type="button">새로고침</button>
     </div>
-    <!-- 카드형 표의 «머리행» — 넓은 화면에서만 보인다(좁으면 카드가 세로로 쌓여 의미가 없다).
-         카드마다 aria-label 로 상태·사업명·신청자가 이미 낭독되므로 여기서는 aria-hidden 으로 중복을 막는다. -->
     <!-- ☑ 여러 건 한꺼번에 상태 바꾸기 — 고른 것이 «하나라도» 있을 때만 나타난다.
          ⚠ 되돌리기가 없다. 그래서 ① 누르기 전 «몇 건을 무엇으로» 바꾸는지 확인 창을 반드시 띄우고
             ② 끝난 뒤에는 «몇 건 성공 / 몇 건 실패(사유)»를 숨김 없이 알린다(app.js applyBulkStatus).
@@ -416,13 +422,16 @@
       <button id="aBulkApply" class="top-btn solid" type="button">상태 바꾸기</button>
       <button id="aBulkClear" class="scope-clear" type="button">선택 해제 <span aria-hidden="true">✕</span></button>
     </div>
-    <!-- ★ 머리행은 스크롤해도 «위에 붙어» 있다(position:sticky). 한 쪽 12건을 내려보는 동안
-         어느 칸이 무엇인지 사라지지 않게 하기 위함이다. 좁은 화면(<900px)에서는 머리행 자체가 없다.
-         ⚠ 왼쪽 여백은 행의 «고르기 칸» 폭까지 더해 잡는다(style.css) — 안 그러면 글자 시작선이 어긋난다. -->
-    <div class="list-head" aria-hidden="true">
-      <span>상태 · 담당팀 · 접수번호</span><span>사업명</span><span>신청자 · 연락처 · 읍·면·동 · 접수일시</span>
-    </div>
-    <div id="aList" class="cardlist rows"></div>
+    <!-- ⭐⭐ 2026-08-25 양호창님 — 「신청사업 현황도 정책제안·진행사업과 «같이 4열»로」
+         ─────────────────────────────────────────────────────────────────────────
+         예전에는 이 목록만 «한 줄에 한 건»(class="cardlist rows")인 표였다. 그래서
+         넓은 화면에서 정책제안·진행사업은 4열인데 신청만 1열이라 세 탭이 다른 물건처럼 보였다.
+         이제 세 목록이 «같은 .cardlist 격자»를 쓴다 — 1열 → 2열(≥900) → 3열(≥1320) → 4열(≥1700).
+         ⛔ 여기에 「rows」를 되돌려 붙이지 마세요. 붙이는 순간 이 탭만 다시 1열이 됩니다.
+         ⛔ 표의 «머리행»(.list-head, 「상태·담당팀·접수번호 / 사업명 / 신청자…」)도 함께 없앴습니다.
+            격자에서는 열이 «가로»로 늘어서므로 머리글자가 어느 칸도 가리키지 못합니다.
+            그 정보는 카드 안의 배지·글자와 카드마다 달린 aria-label 이 그대로 전합니다. -->
+    <div id="aList" class="cardlist"></div>
     <div id="aPager" class="pager-wrap"></div>
   </section>
 
@@ -432,15 +441,23 @@
     <h2 class="sr-only">진행사업 현황</h2>
     <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span><b class="hint-tab">진행사업 현황</b> — 사업을 찾아 고치거나 새로 올립니다.</span></p>
     <!-- 요약 띠 — 값은 app.js renderBSummary() 가 채운다(실제로 세는 수만 둔다). -->
-    <div id="bSummary" class="sum-mini" hidden>
+    <div id="bSummary" class="sum-mini statrow" hidden>
       <div class="kpi k-now"><b id="kpiBAll"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>전체 사업</span></div>
       <div class="kpi k-rev"><b id="kpiBCat"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>분야</span></div>
       <div class="kpi k-ok"><b id="kpiBNote"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>접수 안내 있음</span></div>
     </div>
     <!-- 분야 필터 — «여러 개» 고를 수 있는 격자(.chips.grid). 행·열이 맞아 눈이 편하다.
          ⚠ 상태 필터(.chips.wrap, 알약 줄)와 «모양»으로 역할이 갈린다. 둘을 같은 모양으로 만들지 말 것. -->
-    <div class="chips-cap" id="catCap" hidden>분야로 좁혀보기 <span class="chips-cap-sub">(여러 개 가능)</span></div>
-    <div id="catChips" class="chips grid" role="group" aria-labelledby="catCap"></div>
+    <!-- 🗂 분야 칩 접기 (2026-08-25 양호창님 「분야 칩도 접게 해줘」) — 규격서 §19-7 «한 벌» 그대로.
+         마크업 규약: 제목 안에 .fold-btn[aria-expanded][aria-controls] 하나 + 그 바로 아래 같은 id 의 .fold-body.
+         그러면 stats.js 의 initFolds() 가 «저절로» 이어 준다(새 코드가 필요 없다).
+    ⭐⭐ .fold-sum — «접혀 있을 때 지금 무엇으로 걸러졌는지»를 말한다(「분야 — 청년 · 주거·부동산 (2개)」).
+         ⛔ 이것을 지우지 마세요. 접힌 채 걸러져 있으면 「왜 목록이 이것뿐이지?」 하고 헤맵니다.
+            글자는 app.js 의 paintCatFoldSum() 이 칩을 그릴 때마다 갱신합니다.
+    ⛔ 분야를 «골랐다고» 저절로 접히게 하지 마세요 — 화면이 스스로 접는 일은 없습니다(양호창님).
+    ⚠ aria-labelledby 는 그대로 둡니다 — 접기 단추가 제목 자리를 대신하므로 이름은 여전히 이 줄입니다. -->
+    <div class="chips-cap fold-cap" id="catCap" hidden><button type="button" class="fold-btn" aria-expanded="true" aria-controls="catChips">분야로 좁혀보기 <span class="chips-cap-sub">(여러 개 가능)</span><span class="fold-sum" id="catFoldSum"></span><svg class="fold-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button></div>
+    <div id="catChips" class="chips grid fold-body" role="group" aria-labelledby="catCap"></div>
     <div class="toolbar">
       <label for="search" class="sr-only">사업명 · 내용 · 담당팀 검색</label>
       <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="search" class="search-input wide" type="search" placeholder="사업명 · 내용 · 담당팀 검색" aria-label="사업명 · 내용 · 담당팀 검색"></span>
@@ -475,7 +492,7 @@
     <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span><b class="hint-tab">정책제안 현황</b> — 시민 제안을 검토하고 답변합니다. 블라인드 글도 여기서는 보입니다.</span></p>
     <!-- 요약 띠 — 설계안 «통계는 각 탭 상단 요약 띠». 값은 app.js renderPSummary() 가 채운다.
          ⚠ 최종값은 .kpi-sr 에 먼저 넣고 .kpi-vis 만 카운트업한다(규격서 §14). -->
-    <div id="pSummary" class="sum-mini" hidden>
+    <div id="pSummary" class="sum-mini statrow" hidden>
       <div class="kpi k-now"><b id="kpiPAll"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>전체 제안</span></div>
       <div class="kpi k-rev"><b id="kpiPNew"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>검토 대기</span></div>
       <div class="kpi k-ok"><b id="kpiPDone"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>답변 완료</span></div>
@@ -483,11 +500,23 @@
     <!-- 상태(하나만) = 알약 줄 · 분야(여러 개) = 격자. 접수 처리·사업 탭과 같은 규약. -->
     <div class="chips-cap" id="pStatusCap">상태로 좁혀보기 <span class="chips-cap-sub">(하나만)</span></div>
     <div id="pStatusChips" class="chips wrap" role="group" aria-labelledby="pStatusCap"></div>
-    <div class="chips-cap" id="pCatCap" hidden>분야로 좁혀보기 <span class="chips-cap-sub">(여러 개 가능)</span></div>
-    <div id="pCatChips" class="chips grid" role="group" aria-labelledby="pCatCap"></div>
+    <!-- 🗂 분야 칩 접기 (2026-08-25 양호창님 「분야 칩도 접게 해줘」) — 규격서 §19-7 «한 벌» 그대로.
+         마크업 규약: 제목 안에 .fold-btn[aria-expanded][aria-controls] 하나 + 그 바로 아래 같은 id 의 .fold-body.
+         그러면 stats.js 의 initFolds() 가 «저절로» 이어 준다(새 코드가 필요 없다).
+    ⭐⭐ .fold-sum — «접혀 있을 때 지금 무엇으로 걸러졌는지»를 말한다(「분야 — 청년 · 주거·부동산 (2개)」).
+         ⛔ 이것을 지우지 마세요. 접힌 채 걸러져 있으면 「왜 목록이 이것뿐이지?」 하고 헤맵니다.
+            글자는 app.js 의 paintCatFoldSum() 이 칩을 그릴 때마다 갱신합니다.
+    ⛔ 분야를 «골랐다고» 저절로 접히게 하지 마세요 — 화면이 스스로 접는 일은 없습니다(양호창님).
+    ⚠ aria-labelledby 는 그대로 둡니다 — 접기 단추가 제목 자리를 대신하므로 이름은 여전히 이 줄입니다. -->
+    <div class="chips-cap fold-cap" id="pCatCap" hidden><button type="button" class="fold-btn" aria-expanded="true" aria-controls="pCatChips">분야로 좁혀보기 <span class="chips-cap-sub">(여러 개 가능)</span><span class="fold-sum" id="pCatFoldSum"></span><svg class="fold-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button></div>
+    <div id="pCatChips" class="chips grid fold-body" role="group" aria-labelledby="pCatCap"></div>
     <div class="toolbar">
-      <label for="pSearch" class="sr-only">제목 · 내용 · 닉네임 검색</label>
-      <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="pSearch" class="search-input wide" type="search" placeholder="제목 · 내용 · 닉네임 검색" aria-label="제목 · 내용 · 닉네임 검색"></span>
+      <!-- ⭐ 2026-08-25 — 「접수번호」를 검색 대상에 넣고 «이름표에도» 적었다.
+           목록 카드에서 접수번호 배지를 뺐으므로(양호창님 「자리를 과도하게 차지한다」),
+           눈으로 훑어 찾던 길 대신 «검색으로 찾는 길»이 보여야 한다.
+           ⚠ 신청 접수 탭(#aSearch)의 이름표와 «같은 말투»다 — 한쪽만 고치지 마세요. -->
+      <label for="pSearch" class="sr-only">제목 · 내용 · 닉네임 · 접수번호 검색</label>
+      <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="pSearch" class="search-input wide" type="search" placeholder="제목 · 내용 · 닉네임 · 접수번호 검색" aria-label="제목 · 내용 · 닉네임 · 접수번호 검색"></span>
       <label for="pSortSel" class="sr-only">정렬 기준</label>
       <select id="pSortSel" class="sort-select" aria-label="정렬 기준">
         <option value="new">최신순</option>
@@ -540,7 +569,12 @@
 <div id="aModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="amTitle">
   <div class="modal">
     <div class="modal-head admin">
-      <span id="amTitle" class="modal-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>신청 접수</span></span>
+      <!-- ⭐ data-first-focus — 모달을 열었을 때 «첫 초점»이 앉는 자리(app.js openModal).
+           2026-08-25 에 「📋 접수번호 복사」 단추를 없앴다. 그 단추가 이 모달의 첫 초점이었던 터라
+           표시가 없으면 초점이 신청자 전화번호 링크(tel:)로 떨어진다 — 읽기도 전에 «전화 걸기»가
+           손끝에 걸린다. 제목에 초점을 두어 낭독기가 「신청 접수 처리」부터 읽게 한다.
+           ⚠ tabindex="-1" 이라 Tab 순서에는 들어가지 않는다(초점 트랩 FOCUS_SEL 도 그대로). -->
+      <span id="amTitle" class="modal-title" tabindex="-1" data-first-focus><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>신청 접수</span></span>
       <button id="amClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="amBody" class="modal-body"></div>
@@ -551,7 +585,10 @@
 <div id="pModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
   <div class="modal">
     <div class="modal-head admin">
-      <span id="pmTitle" class="modal-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>정책제안</span></span>
+      <!-- ⭐ data-first-focus — 위 #amTitle 과 «같은 이유·같은 규약»(app.js openModal).
+           「📋 접수번호 복사」를 없앤 뒤 표시가 없으면 초점이 시민 댓글 목록(tabindex="0")으로
+           떨어져, 검토 화면이 열리자마자 댓글부터 읽히던 문제가 있었다. -->
+      <span id="pmTitle" class="modal-title" tabindex="-1" data-first-focus><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>정책제안</span></span>
       <button id="pmClose" class="modal-close" type="button" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="pmBody" class="modal-body"></div>
@@ -740,13 +777,13 @@
         integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- 공통 버전·개선사항 단일 소스(앱 스크립트보다 먼저 로드) -->
-<script src="version.js?v=0.6.0"></script>
-<script src="config.js?v=0.6.0"></script>
+<script src="version.js?v=0.7.0"></script>
+<script src="config.js?v=0.7.0"></script>
 <!-- 서식 스토리지 공용 헬퍼(세 앱 공통). app.js 보다 먼저 로드 -->
-<script src="forms.js?v=0.6.0"></script>
+<script src="forms.js?v=0.7.0"></script>
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
-<script src="apply_client.js?v=0.6.0"></script>
-<script src="app.js?v=0.6.0"></script>
+<script src="apply_client.js?v=0.7.0"></script>
+<script src="app.js?v=0.7.0"></script>
 <!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
      CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.
        · tap.js   — 버튼 눌림 파동 + 햅틱(진동). 화면에 무엇을 그리지는 않는다.
@@ -755,13 +792,13 @@
        · icons.js — app.js 가 «만들어 내는» 화면의 이모지를 인라인 SVG 로 바꿔 끼운다.
          (app.js 를 고치지 않고 «그려진 뒤의 글자»만 바꾼다 — 세 앱이 글자 단위로 같아야 하는
           문자열까지 원본을 건드리지 않고 다룰 수 있다) -->
-<script src="tap.js?v=0.6.0"></script>
-<script src="icons.js?v=0.6.0"></script>
-<script src="stats.js?v=0.6.0"></script>
-<script src="a2hs.js?v=0.6.0"></script>
+<script src="tap.js?v=0.7.0"></script>
+<script src="icons.js?v=0.7.0"></script>
+<script src="stats.js?v=0.7.0"></script>
+<script src="a2hs.js?v=0.7.0"></script>
 
 <!-- PWA 서비스워커 등록 (상대경로 → /admin/ 하위에서만 동작, 시민앱과 분리) -->
 <!-- 서비스워커 등록 — CSP 적용을 위해 인라인 대신 별도 파일(sw-register.js)로 둔다 -->
-<script src="sw-register.js?v=0.6.0"></script>
+<script src="sw-register.js?v=0.7.0"></script>
 </body>
 </html>

@@ -253,9 +253,23 @@ function openModal(modal) {
   lockBodyScroll(true);
   // 🚧 배경 비활성 — 낭독기 스와이프 탐색이 뒤 본문으로 새지 않게. 첫 포커스 «전»에 건다.
   _bgInertSync();
-  // 첫 포커스: 닫기 버튼이 아닌 첫 입력요소 우선, 없으면 첫 포커스 대상
+  /* 첫 포커스 ────────────────────────────────────────────────────────────
+     ① [data-first-focus] 가 있으면 «그것»을 먼저 잡는다.
+        ⚠ 2026-08-25 — 접수 처리·정책제안 모달에서 「📋 복사」 단추를 없앴다.
+           그 단추가 두 모달의 «첫 초점 대상»이었던 터라, 없애자 초점이
+           신청자 전화번호 링크(tel:)·댓글 목록 같은 엉뚱한 곳으로 떨어졌다.
+           → 두 모달은 제목(#amTitle·#pmTitle, tabindex="-1")을 첫 초점으로 잡아
+             낭독기가 «무엇이 열렸는지»부터 읽게 한다. Tab 을 누르면 닫기 → 본문
+             순서로 그대로 이어진다(tabindex="-1" 은 FOCUS_SEL 밖이라 트랩도 그대로).
+        ⛔ 상태 <select> 를 첫 초점으로 삼지 말 것 — 초점이 든 select 는 ↑↓ 만으로
+           값이 바뀌어, 읽으려던 사람이 모르는 사이에 처리 상태를 고치게 된다.
+     ② 없으면 예전대로 «닫기 버튼이 아닌 첫 입력요소» → 첫 포커스 대상 순서.
+        (비밀번호 변경 모달의 «현재 비밀번호» 칸이 이 규약으로 잡힌다) */
+  const firstMark = modal.querySelector("[data-first-focus]");
   const focusables = [...modal.querySelectorAll(FOCUS_SEL)].filter((n) => n.offsetParent !== null);
-  const target = focusables.find((n) => !n.classList.contains("modal-close")) || focusables[0];
+  const target = (firstMark && firstMark.offsetParent !== null)
+    ? firstMark
+    : (focusables.find((n) => !n.classList.contains("modal-close")) || focusables[0]);
   if (target) setTimeout(() => target.focus(), 30);
   // 💬 댓글 실시간 — 「제안 검토」 모달이면 여기서 열린다(closeModal 과 한 쌍).
   try { syncPCommentSub(); } catch (e) { /* 실시간이 실패해도 화면은 멀쩡해야 한다 */ }
@@ -674,7 +688,9 @@ function doneText(base) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   📋 글자 복사 — 접수번호처럼 «눈으로 옮겨 적던» 값을 한 번에 집어 준다.
+   📋 글자 복사 — «눈으로 옮겨 적던» 값을 한 번에 집어 준다.
+   ⚠ 2026-08-25 현재 쓰는 곳은 «현재 주소 복사»(행정망 안내) 한 곳뿐이다 —
+      접수번호 복사 단추는 양호창님 지시로 없앴다(공무원앱·PC앱 동시).
    클립보드 API 가 막힌 환경(구형·비보안 컨텍스트)에서는 임시 textarea 로 물러난다.
    ⚠ 성공·실패를 «글자»로 알린다(announce). 색·아이콘만으로 알리지 않는다.
    ⚠ style 속성이 아니라 CSSOM 으로 넣는다 — CSP style-src 'self' 가 인라인 style 을 막는다.
@@ -743,6 +759,22 @@ let SJ_REGION_ETC_WORDS = []; // 「관외」·「타지역」 류 (data.json re
 let SJ_REGION_ALIASES = {};   // 옛 이름·오타 → 정식  (data.json region_aliases · 4개)
 let SJ_LEGAL_DONG = {};       // 법정동 → 행정동      (data.json region_legal_dong · 36개)
 let REGION_READY = false;     // data.json 을 받았는가(못 받아도 앱은 그대로 돈다)
+/* 🏢 사업명 → «지금» 담당팀 (data.json programs 의 사업명·팀명) — 2026-08-25
+   ⚠ 무엇에 쓰는가 : «집계»에만 쓴다(도넛 옆 「담당팀별 접수」 순위표).
+      접수 행의 team 은 «신청 시점 스냅샷»(supabase/applications.sql:74)이라,
+      부서가 개편되면 폐지된 팀 이름이 순위에 오른다. 실제로 「건강증진과 출산장려팀 3건 ·
+      출산지원팀 3건 · (출산장려팀) 11건」처럼 한 팀이 세 갈래로 갈라져 있었다.
+   ⛔ «상세보기»의 담당팀(app.js 접수 상세)에는 절대 쓰지 말 것 — 그 칸은 «그때의 기록»이고,
+      기록을 지금 값으로 덮으면 되돌릴 수 없다.
+   ⚠ 표를 못 받으면 통째로 비운다(아래 catch) — 반쯤 채워진 표는 «어떤 사업은 통일되고
+      어떤 사업은 안 되는» 어정쩡한 순위표를 만든다. 그때는 스냅샷만으로 예전처럼 센다. */
+let SJ_PROGRAM_TEAM = Object.create(null);
+let PROGRAM_TEAM_READY = false;
+/* 사업명 대조용 정규화 — 띄어쓰기·괄호·가운뎃점·붙임표만 털어 낸다(글자는 그대로 둔다).
+   ⚠ 여기서 «말»을 바꾸지 않는다(예: 「지원」 떼기). 그렇게 하면 다른 사업끼리 붙어 버린다. */
+function normBenefitName(v) {
+  return String(v == null ? "" : v).replace(/[\s()（）\[\]{}·ㆍ,./\-–—~]/g, "");
+}
 /* 🏷 분야 «이름» 목록 — data.json categories (= config.POLICY_CATEGORIES 의 키 차례 그대로).
    ⛔ 여기에 분야 이름을 베껴 적지 마세요. 아래 loadRegionMeta() 가 채웁니다.
    ⚠ 못 받으면 빈 배열로 남고, categoryKeys() 가 비상용 사본으로 떨어집니다(앱은 그대로 돕니다). */
@@ -913,6 +945,16 @@ async function loadRegionMeta() {
           어떤 분야의 사업이 0건이 되면 그 분야가 칩에서 사라져 «새 사업에 붙일 수도 없게» 된다
           (그러면 영영 0건 — 스스로 굳어지는 결함). 그런 분야가 생기면 config.py 의
           ALWAYS_SHOW_CATEGORIES 에 넣으면 build_data.py 가 다시 실어 준다. */
+    SJ_PROGRAM_TEAM = Object.create(null);
+    if (Array.isArray(d.programs)) {
+      for (let pi = 0; pi < d.programs.length; pi++) {
+        const pg = d.programs[pi];
+        const nm = normBenefitName(pg && pg["사업명"]);
+        const tm = String((pg && pg["팀명"]) || "").trim();
+        if (nm && tm && !(nm in SJ_PROGRAM_TEAM)) SJ_PROGRAM_TEAM[nm] = tm;
+      }
+    }
+    PROGRAM_TEAM_READY = Object.keys(SJ_PROGRAM_TEAM).length > 0;
     SJ_CATEGORIES = Array.isArray(d.categories) ? d.categories.filter(Boolean) : [];
     SJ_REGIONS = Array.isArray(d.regions) ? d.regions.slice() : [];
     SJ_REGION_GROUPS = Array.isArray(d.region_groups) ? d.region_groups : [];
@@ -936,6 +978,10 @@ async function loadRegionMeta() {
        ⚠ 반쯤 채워진 목록을 남기지 않는다 — 위 읍·면·동과 같은 원칙이다. */
     SJ_CATEGORIES = [];
     REGION_READY = false;
+    /* 사업명→담당팀 표도 «통째로» 비운다 — 위 읍·면·동과 같은 원칙(반쯤 채우지 않는다).
+       그러면 stats.js 가 예전처럼 «접수 스냅샷»만으로 센다(집계가 멈추지는 않는다). */
+    SJ_PROGRAM_TEAM = Object.create(null);
+    PROGRAM_TEAM_READY = false;
   }
   // stats.js(차트)와 화면이 «같은 규칙»을 쓰도록 한 곳에서만 내보낸다 — window.sjScopes 와 같은 방식.
   window.sjRegions = {
@@ -943,6 +989,16 @@ async function loadRegionMeta() {
     etc: SJ_REGION_ETC, unknown: REGION_UNKNOWN,
     etcWords: SJ_REGION_ETC_WORDS, aliases: SJ_REGION_ALIASES, legalDong: SJ_LEGAL_DONG,
     normalize: normalizeRegion, countBy: countByRegion, label: regionLabel,
+  };
+  /* 🏢 집계 전용 «지금 담당팀» 조회 — stats.js 의 담당팀 순위표만 쓴다.
+     ⛔ 화면의 «접수 상세»에서 부르지 말 것(그 칸은 신청 시점 스냅샷이어야 한다). */
+  window.sjBenefits = {
+    ready: PROGRAM_TEAM_READY,
+    n: Object.keys(SJ_PROGRAM_TEAM).length,
+    teamOf(name) {
+      const k = normBenefitName(name);
+      return (k && SJ_PROGRAM_TEAM[k]) || "";
+    },
   };
   if (A_LOADED) renderApplications();      // 이미 목록이 떠 있으면 정식 이름으로 다시 그린다
   return REGION_READY;
@@ -1463,7 +1519,7 @@ function buildChromeIntent() {
     "#Intent;scheme=https;package=com.android.chrome;" +
     "S.browser_fallback_url=" + encodeURIComponent(cur) + ";end";
 }
-// 현재 주소 복사 — 복사 절차는 공용 copyText() 한 곳에 있다(접수번호 복사와 같은 코드).
+// 현재 주소 복사 — 복사 절차는 공용 copyText() 한 곳에 있다.
 async function copyCurrentUrl() {
   await copyText(window.location.href, "주소를 복사했어요. 브라우저에 붙여넣어 열어주세요.");
 }
@@ -2117,6 +2173,28 @@ function renderPSummary() {
   countUp($("#kpiPDone"), PALL.filter((r) => (r.admin_reply || "").trim()).length);
 }
 
+/* ⭐⭐ 접힌 분야 칩의 «요약 한 줄» (2026-08-25) ────────────────────────────────
+   접혀 있을 때 「분야 — 청년 · 주거·부동산 (2개)」처럼 «지금 무엇으로 걸러졌는지»를 말한다.
+   ⛔ 이것이 없으면 접어 둔 담당자가 며칠 뒤 「왜 목록이 이것뿐이지?」 하고 헤맨다 —
+      접기 기능에서 가장 중요한 한 줄이다. 지우지 말 것.
+   ⚠ 펼쳐져 있을 때도 «글자를 지우지 않는다» — 칩이 이미 색으로 말하고 있으니 중복이지만,
+      접는 «순간» 글자가 새로 나타나면 줄 높이가 튀고 낭독기가 그것을 못 따라 읽는다.
+      대신 CSS 가 «펼침일 때는 감춘다»(.fold-btn[aria-expanded="true"] .fold-sum { display:none }).
+   ⚠ 이름이 길어지지 않게 «세 개까지»만 적고 나머지는 개수로 말한다.
+   ⚠ 아무것도 안 골랐으면 「전체」다 — 빈칸으로 두면 «걸러진 것이 없다»가 안 전해진다. */
+function foldSumText(set) {
+  const list = [...set];
+  if (!list.length) return "— 전체";
+  if (list.length <= 3) return "— " + list.join(" · ");
+  return "— " + list.slice(0, 3).join(" · ") + ` 외 ${list.length - 3}개`;
+}
+function paintCatFoldSum(id, set) {
+  const el2 = $("#" + id);
+  if (!el2) return;
+  const n = set.size;
+  el2.textContent = foldSumText(set) + (n ? ` (${n}개)` : "");
+}
+
 function renderCats() {
   const box = $("#catChips"); box.innerHTML = "";
   // 분야가 하나도 없으면 이름표(「분야로 좁혀보기」)만 덩그러니 남는다 → 함께 감춘다
@@ -2130,6 +2208,7 @@ function renderCats() {
     c.onclick = () => { SELCATS.has(cat) ? SELCATS.delete(cat) : SELCATS.add(cat); page = 0; renderCats(); render(); };
     box.appendChild(c);
   });
+  paintCatFoldSum("catFoldSum", SELCATS);   // 접힌 줄의 요약을 늘 최신으로
 }
 
 // 🕘 사업 한 건의 «최신 시각»(밀리초). 최신순 정렬에만 쓴다.
@@ -2180,10 +2259,17 @@ function render() {
     // 색만으로 알리지 않도록 접근명에도 «접수 안내»를 함께 넣는다
     card.setAttribute("aria-label",
       `${r.name || "사업"}${note ? `, 접수 안내 ${note}` : ""} 수정`);
+    /* ⭐⭐ 카드 높이 통일 (2026-08-25 양호창님 「카드 높이를 같게 해 줘」)
+       ① 제목에 title 속성 — 2줄에서 «…»로 잘려도 온전한 사업명이 마우스·낭독기에 남는다.
+          (잘린 글자를 그냥 두면 「전통시장…」이 무슨 사업인지 알 길이 없다)
+       ② 「📌 접수 안내」가 없는 카드에도 «빈 자리»를 둔다 — 있고 없고에 따라 카드가
+          40px 씩 달라지던 것을 막는다. 보이지 않고(visibility:hidden · style.css)
+          낭독기도 읽지 않는다(aria-hidden). ⛔ 이 빈 칸을 지우지 마세요. */
     card.innerHTML = `<div class="card-main">
-        <div class="card-title">📂 ${esc(r.name)}</div>
+        <div class="card-title" title="${esc(r.name || "")}">📂 ${esc(r.name)}</div>
         <div class="card-desc">${esc(content.slice(0, 90)) || "—"}</div>
-        ${note ? `<div class="card-note">${NOTE_LABEL} · ${esc(note)}</div>` : ""}
+        ${note ? `<div class="card-note">${NOTE_LABEL} · ${esc(note)}</div>`
+               : `<div class="card-note is-empty" aria-hidden="true"></div>`}
       </div>
       <span class="badge ${team ? "" : "warn"}"${team ? ` title="${esc(team)}"` : ""}>${team ? esc(team) : "담당팀 확인 필요"}</span>`;
     // 담당팀 색 구분: 팀명별 결정적 색을 배지에 적용(시민앱과 동일). null이면 중립 유지.
@@ -2520,7 +2606,7 @@ function errKind(error) {
 // 목록 자리에 넣을 오류 안내 HTML(원인별 문구 + 다시 시도 버튼)
 function errBoxHtml(error, retryId) {
   const kind = errKind(error);
-  const btn = retryId ? `<button id="${retryId}" class="err-retry" type="button">🔄 다시 시도</button>` : "";
+  const btn = retryId ? `<button id="${retryId}" class="err-retry" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12a8 8 0 1 1 2.3 5.7"/><path d="M4 18v-5h5"/></svg><span>다시 시도</span></button>` : "";
   if (kind === "conn") {
     return `<div class="err-box" role="alert">
       <div class="err-title">⏸ 클라우드 서비스가 일시적으로 응답하지 않습니다.</div>
@@ -2621,7 +2707,7 @@ function openEdit(r) {
         <input type="file" id="formsFile" class="forms-file"
           accept=".hwp,.hwpx,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip,.txt"
           aria-label="등록할 서식 파일 선택">
-        <button type="button" id="formsUpload" class="top-btn solid">${r ? "⬆ 서식 등록" : "➕ 목록에 담기"}</button>
+        <button type="button" id="formsUpload" class="top-btn solid">${r ? '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20V6"/><path d="M6 12l6-6 6 6"/><path d="M4 4h16"/></svg><span>서식 등록</span>' : '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg><span>목록에 담기</span>'}</button>
       </div>
       <p class="forms-status" id="formsStatus" role="status" aria-live="polite"></p>
     </div>`;
@@ -2637,7 +2723,7 @@ function openEdit(r) {
         ? ` 비워 두고 저장하면 사업명·내용을 보고 자동으로 분류합니다.`
         : ` <b>하나 이상</b> 골라야 저장됩니다. «자동 분류로 채우기»를 누르면 사업명·내용을 보고 골라 드립니다(고른 뒤 확인해 주세요).`}</p>
       <div class="forms-upload">
-        <button type="button" id="editCatAuto" class="top-btn ghost">🔄 자동 분류로 채우기</button>
+        <button type="button" id="editCatAuto" class="top-btn ghost"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12a8 8 0 1 1 2.3 5.7"/><path d="M4 18v-5h5"/></svg><span>자동 분류로 채우기</span></button>
         <span class="forms-status" id="editCatCount" role="status" aria-live="polite"></span>
       </div>
       <!-- ⛔ 드롭다운으로 바꾸지 마세요 — 복수 선택이 «필수 조건»입니다(2026-08-19 양호창님).
@@ -2660,8 +2746,8 @@ function openEdit(r) {
         «끝내는 단추»는 언제나 «채울 것이 다 끝난 뒤»에 온다.
      ⚠ 삭제는 «맨 끝» — 되돌릴 수 없는 단추를 먼저 닿는 자리에 두지 않는다
         (정책제안 모달 #pmSave → #pmDelete 와 같은 차례). */
-  html += `<div class="modal-actions"><button id="mSave" class="top-btn solid">💾 저장</button>` +
-    (r ? `<button id="mDel" class="top-btn danger">🗑 삭제</button>` : ``) + `</div>`;
+  html += `<div class="modal-actions"><button id="mSave" class="top-btn solid"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>` +
+    (r ? `<button id="mDel" class="top-btn danger"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>` : ``) + `</div>`;
   $("#mBody").innerHTML = html;
 
   // 분야 칩 채우기.
@@ -2831,7 +2917,7 @@ async function refreshFormsList(r) {
       : `<span class="forms-item-name">📄 ${esc(nm)}</span>`;
     return `<li class="forms-item" data-id="${esc(String(row.id))}">
         <span class="forms-item-main">${nameHtml}<span class="forms-item-meta" aria-hidden="true">${esc(meta)}</span></span>
-        <button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제">🗑 삭제</button>
+        <button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>
       </li>`;
   }).join("");
   // 삭제 버튼 바인딩(행 데이터는 클로저로 잡아둔다)
@@ -2882,7 +2968,7 @@ function renderPendingForms() {
     return `<li class="forms-item" data-i="${i}">
         <span class="forms-item-main"><span class="forms-item-name">📄 ${esc(f.name)}</span>
           <span class="forms-item-meta">${esc(size)}${size ? " · " : ""}저장 시 함께 올림</span></span>
-        <button type="button" class="forms-del" aria-label="${esc(f.name)} 목록에서 빼기">🗑 빼기</button>
+        <button type="button" class="forms-del" aria-label="${esc(f.name)} 목록에서 빼기"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>빼기</span></button>
       </li>`;
   }).join("");
   list.querySelectorAll(".forms-item").forEach((li) => {
@@ -3179,21 +3265,28 @@ function isMissingProposalMemo(error) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   💬 시민 댓글·답글 — 조회(A-07) + 공무원 답글 «쓰기» (2026-08-24)
+   💬 시민 댓글·답글 — ⭐ «읽기 + 관리» 전용 (A-07, 2026-08-24 · 2026-08-25 개정)
    ────────────────────────────────────────────────────────────────────
+   ⛔⛔ 2026-08-25 양호창님 결정 — 「공무원앱과 PC앱에서 공무원이 댓글을 다는 기능은
+      불필요할 것 같아. 그냥 심사 진행현황을 알려주니까 그것만 있으면 될 것 같아.
+      굳이 공무원이 댓글을 다는 거는 부적절해 보여.」
+      ⇒ 공무원이 «대화하듯» 글을 쓰는 장치를 «통째로» 걷어냈다.
+         · 없앤 것 — 쓰기 상자(cmt-write)·부서명 칸·글자수 상한 검사·
+                     add_official_comment / edit_official_comment RPC 호출·답글/수정 단추.
+         · 시민에게 하는 답은 proposals.admin_reply(「담당부서 답변」) «한 통»뿐이다.
+      ⛔ 되살리지 마세요. DB 의 proposal_comments 표와 두 RPC 는 «그대로 두었을 뿐»이고
+         (양호창님: 「코드만 제거, DB 는 둘」), 앱에서 부르지 않는 것이 결정 사항이다.
+
+   ✅ 남긴 것 — 시민들끼리 나눈 의견을 «읽는» 일과, 그 자리를 «관리»하는 일.
+      · 시민 댓글 읽기 + 시민끼리 주고받은 «답글 1단 들여쓰기»(대화 흐름을 그대로 보여 준다)
+      · 신고 수 표시 · «감추기 / 다시 보이기» · «삭제»
+        (양호창님이 시민 댓글을 남기기로 하셨으니 욕설·광고를 치울 수단은 있어야 한다.
+         이것은 «글을 쓰는 일»이 아니라 «관리»다.)
+      · 옛 자료에 공무원 답글(is_official)이 남아 있으면 «읽기»로는 그대로 보인다 —
+        렌더 코드를 지우면 지난 대화가 화면에서 사라지므로 두었다.
+
    ✅ proposal_comments 는 회수한 칸이 없어 select("*") 를 «써도 됩니다»(🩷자물쇠 확인).
       proposals·proposal_likes 와 규약이 다릅니다 — 헷갈리지 마세요.
-
-   ⛔⛔ 담당자 «이름·이메일·계정 uuid» 를 이 표에 보내지 마세요.
-      proposal_comments 는 «익명 시민이 읽는 표»입니다. 앱이 보내는 것은 «부서명» 하나뿐이고,
-      화면에 뜨는 이름은 서버가 「상주시 ○○과」로 만들어 줍니다(add_official_comment 675행).
-      부서를 비우면 서버가 「상주시 담당부서」로 적습니다 — 그래도 개인은 드러나지 않습니다.
-      ⚠ 「누가 썼는지」는 서버가 admin_audit 에 따로 남깁니다(개인정보보호법 §29).
-         그 기록은 공무원만 보며, 시민 화면에는 어떤 경로로도 나가지 않습니다.
-
-   ⚠⚠ proposals.admin_reply(공식 답변 «한 통»)와 공무원 «댓글»(결론 이전의 «대화», 여러 개)은
-      «다른 것»입니다. 화면에서 자리가 나뉘어 있습니다.
-      ⛔ 공무원 댓글을 admin_reply 에 옮겨 적지 마세요 — 대화와 결론이 뒤섞입니다.
 
    깊이는 «1단»입니다 — 댓글(parent_id 없음) 아래 답글만. 답글의 답글은 DB 트리거가 막습니다.
    ⚠ 지워진 댓글은 내용·닉네임이 «실제로 비어» 있습니다 → 「삭제된 댓글입니다」 자리표시.
@@ -3203,21 +3296,9 @@ function isMissingProposalMemo(error) {
       공무원이 감춘 것과 신고로 감춰진 것은 뜻이 달라, 되돌릴지 판단이 갈립니다.
    ══════════════════════════════════════════════════════════════════════ */
 const CMT_HIDE_THRESHOLD = 5;   // ⚠ 서버(제안댓글_260824.sql v_threshold)와 «같은 값». 한쪽만 고치지 말 것.
-const PROPOSAL_DEPT_KEY = "sangju_admin_dept";
 let P_CMT_REPORTS = {};         // comment_id → 신고한 «사람» 수(서버와 같은 셈법: reporter_key 중복 제거)
-let P_CMT_PID = null;           // 지금 열어 둔 제안 id — 글을 올린 뒤 다시 불러오는 데 쓴다
-let P_CMT_ROWS = [];            // 마지막으로 받아 온 댓글 원본(수정 모드에서 본문을 되찾는다)
-/* 지금 무엇을 쓰는 중인가 — kind: "new"(새 댓글) / "reply"(답글) / "edit"(내 답글 고치기) */
-let PC_MODE = { kind: "new", parentId: null, editId: null };
-
-/* 🏢 부서명 — «이 브라우저»에 기억해 둔다(담당자가 매번 적지 않도록).
-   ⚠ 개인정보가 아니다(부서명뿐). ⛔ 담당자 이름을 여기에 적지 않도록 화면 안내문이 못 박는다. */
-function officialDept() {
-  try { return (localStorage.getItem(PROPOSAL_DEPT_KEY) || "").trim(); } catch (e) { return ""; }
-}
-function saveOfficialDept(v) {
-  try { localStorage.setItem(PROPOSAL_DEPT_KEY, String(v || "").trim()); } catch (e) { /* 못 기억해도 그만 */ }
-}
+let P_CMT_PID = null;           // 지금 열어 둔 제안 id — 감추기·삭제 뒤 다시 불러오는 데 쓴다
+let P_CMT_ROWS = [];            // 마지막으로 받아 온 댓글 원본
 
 async function loadProposalComments(id) {
   const box = $("#pmComments"); if (!box) return;
@@ -3308,15 +3389,12 @@ function commentLi(c, isReply) {
        가림        = 공무원이 직접 감춘 것
      ⚠ 신고 수를 못 읽은 경우에는 «신고로»라고 단정하지 않는다(틀린 말을 하지 않는 쪽). */
   const byReport = c.is_hidden && reps >= CMT_HIDE_THRESHOLD;
-  /* 🔧 처리 단추 — 🧪 테스트 모드(게스트)에서는 아예 내보내지 않는다.
+  /* 🔧 관리 단추 — 🧪 테스트 모드(게스트)에서는 아예 내보내지 않는다.
      이 저장소 원칙: 「눌러 봐야 실패할 조작을 남기지 않는다」(paintGuestLocks 머리말).
-     ⚠ 답글은 «댓글(1단)»에만 단다 — 답글에 답글을 달면 DB 트리거가 막는다(깊이 1단). */
+     ⛔ 2026-08-25 — 「답글」·「수정」 단추를 없앴다(공무원이 댓글을 다는 기능 폐지, 양호창님).
+        남은 둘은 «글을 쓰는 일»이 아니라 욕설·광고를 치우는 «관리»다. */
   const acts = IS_GUEST ? "" : `
       <div class="cmt-acts">
-        ${isReply ? "" : `<button type="button" class="mini-btn" data-act="reply" data-id="${esc(c.id)}"
-            aria-label="${who} 댓글에 답글 달기">답글</button>`}
-        ${c.is_official ? `<button type="button" class="mini-btn" data-act="edit" data-id="${esc(c.id)}"
-            aria-label="이 공무원 답글 수정">수정</button>` : ""}
         <button type="button" class="mini-btn" data-act="${c.is_hidden ? "show" : "hide"}" data-id="${esc(c.id)}"
             aria-label="${c.is_hidden ? "이 댓글 다시 보이기" : "이 댓글 감추기"}">${c.is_hidden ? "다시 보이기" : "감추기"}</button>
         <button type="button" class="mini-btn danger" data-act="del" data-id="${esc(c.id)}"
@@ -3337,15 +3415,14 @@ function commentLi(c, isReply) {
   return li;
 }
 
-/* 🔧 댓글 단추 한 곳 — 목록에 맡겨 둔 처리기가 어떤 단추가 눌렸는지 가려낸다. */
+/* 🔧 댓글 관리 단추 한 곳 — 목록에 맡겨 둔 처리기가 어떤 단추가 눌렸는지 가려낸다.
+   ⛔ 2026-08-25 — "reply"·"edit" 갈래를 없앴다(공무원 댓글 쓰기 폐지, 양호창님).
+      남은 것은 «감추기 / 다시 보이기»와 «삭제» 뿐이다. */
 async function onCommentAction(ev) {
   const b = ev.target.closest ? ev.target.closest("button[data-act]") : null;
   if (!b) return;
   ev.preventDefault();
   const id = b.getAttribute("data-id"), act = b.getAttribute("data-act");
-  const row = P_CMT_ROWS.find((c) => c.id === id);
-  if (act === "reply") { setCommentMode({ kind: "reply", parentId: id }); return; }
-  if (act === "edit")  { setCommentMode({ kind: "edit", editId: id, body: row ? row.body : "" }); return; }
   if (act === "hide" || act === "show") {
     const hide = act === "hide";
     /* ⚠ «감추기»는 되돌릴 수 있어 확인창을 두지 않는다(다시 보이기 단추가 바로 옆에 있다).
@@ -3385,89 +3462,14 @@ async function callCommentRpc(fn, args, doneMsg) {
   return true;
 }
 
-/* ✍ 쓰기 상자의 «상태»를 바꾼다 — 새 댓글 / 답글 / 내 답글 고치기.
-   ⚠ 지금 무엇을 쓰는 중인지 «글자»로 늘 보인다(#pmCmtTo). 색·자리로만 알리지 않는다.
-   ⚠ 초점을 본문 칸으로 옮긴다 — 단추를 누른 사람이 곧바로 이어서 쓸 수 있게(KWCAG 6.4.1 흐름). */
-function setCommentMode(m) {
-  PC_MODE = { kind: m.kind || "new", parentId: m.parentId || null, editId: m.editId || null };
-  const to = $("#pmCmtTo"), ta = $("#pmCmtBody"), send = $("#pmCmtSend"),
-        cancel = $("#pmCmtCancel"), deptRow = $("#pmCmtDeptRow");
-  if (!to || !ta) return;
-  if (PC_MODE.kind === "reply") {
-    const p = P_CMT_ROWS.find((c) => c.id === PC_MODE.parentId);
-    const who = p ? (p.is_official ? (p.official_dept || "담당 부서") : (p.author_nick || "익명")) : "";
-    to.textContent = `${who} 님의 댓글에 «답글»을 답니다.`;
-    if (send) send.textContent = "답글 올리기";
-    if (deptRow) deptRow.hidden = false;
-  } else if (PC_MODE.kind === "edit") {
-    to.textContent = "내가 쓴 공무원 답글을 «고치는» 중입니다.";
-    ta.value = m.body || "";
-    if (send) send.textContent = "고친 내용 저장";
-    // ⚠ 고치기는 본문만 바꾼다(RPC 가 부서명을 받지 않는다) → 부서 칸을 감춘다
-    if (deptRow) deptRow.hidden = true;
-  } else {
-    to.textContent = "이 제안에 «공무원 댓글»을 답니다.";
-    if (send) send.textContent = "댓글 올리기";
-    if (deptRow) deptRow.hidden = false;
-  }
-  if (cancel) cancel.hidden = PC_MODE.kind === "new";
-  ta.focus();
-  /* 💬 «새 글» 상태로 돌아왔다 = 답글을 올렸거나 고치기를 취소했다 → 이제 목록을
-     갈아엎어도 잃을 것이 없다. 그동안 바빠서 미뤄 둔 실시간 갱신을 여기서 흘려보낸다.
-     ⚠ 초점은 방금 #pmCmtBody(=#pmComments «밖») 로 갔으므로 다시 그려도 안 뺏긴다.
-     ⚠ 쓰다 만 글이 남아 있으면 pcmtBusy() 가 다시 막고 미룬 채로 둔다 — 잃지 않는다. */
-  if (PC_MODE.kind === "new") { try { flushPCommentRefresh(); } catch (e) { /* 무시 */ } }
-}
-
-/* 📤 올리기 — 새 댓글·답글은 add_official_comment, 고치기는 edit_official_comment.
-   ⛔ 앱이 보내는 것은 «부서명»뿐이다. 담당자 이름·이메일·uuid 를 넣지 말 것(익명이 읽는 표). */
-async function submitOfficialComment() {
-  const ta = $("#pmCmtBody"); if (!ta || !P_CMT_PID) return;
-  const body = (ta.value || "").trim();
-  if (!body) { announce("답글 내용을 입력하세요."); ta.focus(); return; }
-  /* 500자 상한은 서버가 못 박고 있다(add_official_comment 666행).
-     여기서도 먼저 걸러 «보냈다가 거절당하는» 왕복을 아낀다 — 문구는 서버와 같은 뜻으로 맞춘다. */
-  if (body.length > 500) {
-    const m = `공무원 답글은 500자까지 쓸 수 있습니다.\n지금은 ${body.length}자입니다. 줄여 주세요.`;
-    announce(m); askAlert(m); ta.focus(); return;
-  }
-  const send = $("#pmCmtSend");
-  if (send) send.disabled = true;                 // 🔒 연타 방어 — 같은 글이 두 번 올라가지 않게
-  try {
-    if (PC_MODE.kind === "edit") {
-      const ok = await callCommentRpc("edit_official_comment",
-        { p_id: PC_MODE.editId, p_body: body }, "답글을 고쳤습니다.");
-      if (!ok) return;
-    } else {
-      const dept = ($("#pmCmtDept") ? $("#pmCmtDept").value : "").trim();
-      saveOfficialDept(dept);
-      /* ⚠ 시민 화면에 «공개»되는 글이다 — 삭제보다 되돌리기 어렵다(이미 읽혔을 수 있다).
-         그래서 올리기 전에 무엇이 나가는지 그대로 보여 주고 한 번 묻는다.
-         (신청접수 «시민 안내문»과 같은 규약 — 두 화면의 확인 강도를 같게 둔다) */
-      const okOpen = await askConfirm({
-        title: "이 답글을 시민에게 공개할까요?",
-        body: "아래 글이 시민 화면에 「그대로」 보입니다.\n\n"
-            + "────────────────\n" + body + "\n────────────────\n\n"
-            + `표시 이름 : 상주시 ${dept || "담당부서"}\n`
-            + "담당자 이름·연락처가 들어 있지는 않은지 확인해 주세요. 한 번 공개하면 되돌릴 수 없습니다.",
-        cancelText: "다시 보기",
-        okText: "공개"
-      });
-      if (!okOpen) { ta.focus(); return; }
-      const ok = await callCommentRpc("add_official_comment", {
-        p_proposal_id: P_CMT_PID,
-        p_parent_id: PC_MODE.kind === "reply" ? PC_MODE.parentId : null,
-        p_body: body,
-        p_dept: dept || null,
-      }, "답글을 올렸습니다. 시민 화면에 공개됩니다.");
-      if (!ok) return;
-    }
-    ta.value = "";
-    setCommentMode({ kind: "new" });
-  } finally {
-    if (send) send.disabled = false;
-  }
-}
+/* ⛔⛔ 2026-08-25 — 여기 있던 공무원 «쓰기» 코드 두 덩이를 없앴습니다(양호창님 결정).
+     ① setCommentMode()      — 새 댓글 / 답글 / 내 답글 고치기 «모드» 전환
+     ② submitOfficialComment() — add_official_comment · edit_official_comment RPC 로 올리기
+        (부서명 저장 · 500자 세기 · 「시민에게 공개할까요?」 확인창이 여기 딸려 있었습니다)
+   되살리지 마세요 — 「공무원이 댓글을 다는 거는 부적절해 보여」(양호창님).
+   시민에게 하는 답은 아래 «담당부서 답변»(proposals.admin_reply) 한 통뿐입니다.
+   ⚠ callCommentRpc() 는 «지우지 않았습니다» — 감추기(set_comment_hidden)·
+     삭제(delete_comment_admin)가 그 함수를 그대로 씁니다. */
 
 function subscribeProposalsRealtime() {
   sb.channel("proposals-rt")
@@ -3508,21 +3510,17 @@ let PCMT_SUB_PID = "";
 let PCMT_PENDING = false;       // 「바빠서 미뤄 둔 갱신이 있다」
 
 /* 지금 갈아엎으면 «무엇을 잃는가» — 시민앱 cmtTyping() 과 같은 자리의 판정.
-   ⚠ 쓰기 상자(#pmCmtBody)는 #pmComments «밖»에 있어 다시 그려도 글자가 살아 있다.
-      그래도 아래 둘은 지켜야 한다.
-        ① 초점이 댓글 목록 «안»에 있다 — innerHTML 을 갈면 초점이 body 로 튄다.
-           낭독기 사용자는 읽던 자리를 통째로 잃는다(KWCAG 6.4.1 «초점 이동»).
-        ② 답글·고치기를 «쓰는 중»이다 — 대상 글이 목록에서 사라지면 무엇을 고치던
-           중이었는지 화면에서 사라진다.
-   ⚠ 미룬 갱신은 «버리지 않는다» — PCMT_PENDING 에 남겨 두었다가 setCommentMode() 가
-     새 글 상태로 돌아올 때 흘려보낸다. 안 그러면 그 사이 바뀐 댓글이 영영 안 보인다. */
+   ① 초점이 댓글 목록 «안»에 있다 — innerHTML 을 갈면 초점이 body 로 튄다.
+      낭독기 사용자는 읽던 자리를 통째로 잃는다(KWCAG 6.4.1 «초점 이동»).
+   ⛔ 2026-08-25 — 예전에는 ②「공무원이 답글을 쓰는 중」도 함께 봤다. 쓰기 기능을 없애면서
+      그 갈래도 사라졌다(PC_MODE·#pmCmtBody). 남은 판정은 ① 하나뿐이다.
+   ⚠ 미룬 갱신은 «버리지 않는다» — PCMT_PENDING 에 남겨 두었다가, 초점이 목록을 떠날 때
+     openProposal() 이 걸어 둔 focusout 처리기가 흘려보낸다.
+     안 그러면 읽는 동안 도착한 댓글이 영영 안 보인다. */
 function pcmtBusy() {
   const box = $("#pmComments");
   const a = document.activeElement;
   if (box && a && box.contains(a)) return true;                       // ①
-  if (PC_MODE && PC_MODE.kind !== "new") return true;                 // ②
-  const ta = $("#pmCmtBody");
-  if (ta && String(ta.value || "").trim() !== "") return true;        // ② 쓰다 만 글
   return false;
 }
 
@@ -3534,8 +3532,9 @@ function applyPCommentRefresh() {
   loadProposalComments(P_CMT_PID).catch(() => {});
 }
 
-/* 미뤄 둔 갱신 흘려보내기 — setCommentMode() 가 «새 글» 상태로 돌아올 때 부른다.
-   (답글을 올렸거나·고치기를 취소했거나 = 이제 갈아엎어도 잃을 것이 없다) */
+/* 미뤄 둔 갱신 흘려보내기 — 초점이 댓글 목록을 «떠날» 때 부른다
+   (openProposal() 이 #pmComments 에 걸어 둔 focusout 처리기).
+   이제 갈아엎어도 잃을 것이 없다 = 읽던 자리를 지킬 필요가 사라졌다. */
 function flushPCommentRefresh() {
   if (!PCMT_PENDING) return;
   applyPCommentRefresh();
@@ -3604,6 +3603,7 @@ function renderPCatChips() {
     c.onclick = () => { P_SELCAT.has(cat) ? P_SELCAT.delete(cat) : P_SELCAT.add(cat); pPage = 0; renderPCatChips(); renderProposals(); };
     box.appendChild(c);
   });
+  paintCatFoldSum("pCatFoldSum", P_SELCAT);   // 접힌 줄의 요약을 늘 최신으로
 }
 
 function fmtDate(s) {
@@ -3618,7 +3618,12 @@ function renderProposals() {
     if (P_STATUS !== "전체" && (r.status || "접수") !== P_STATUS) return false;
     if (P_SELCAT.size && !P_SELCAT.has(r.category)) return false;
     if (q) {
-      const blob = `${r.title || ""} ${r.body || ""} ${r.author_nick || ""} ${r.region || ""}`.toLowerCase();
+      /* ⭐ 2026-08-25 — 검색 대상에 «접수번호(proposal_no)» 를 더했다.
+         목록 카드에서 접수번호 배지를 뺐기 때문이다(양호창님 「자리를 과도하게 차지한다」).
+         눈으로 훑어 찾던 길을 없앴으면 «찾는 길»은 반드시 남겨 두어야 한다 —
+         시민이 전화로 「20260820-101500-01」 을 불러 줄 때 이 칸에 그대로 넣어 찾는다.
+         ⛔ 이 한 칸을 지우지 마세요(신청 접수 탭의 receipt_no 검색과 «짝»입니다). */
+      const blob = `${r.title || ""} ${r.body || ""} ${r.author_nick || ""} ${r.region || ""} ${r.proposal_no || ""}`.toLowerCase();
       if (!blob.includes(q)) return false;
     }
     return true;
@@ -3657,16 +3662,25 @@ function renderProposals() {
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", aLabel);
+    /* ⭐⭐ 배지 «차례» 규약 (2026-08-25 개정 · 세 앱 공통)
+          상태 → (경과) → 블라인드 → 신고 → 분야
+       ⭐ 2026-08-25 양호창님 — 「접수번호 배지가 과도하게 자리를 많이 차지한다. 제거해 줘」
+          목록 카드에서 접수번호 배지(.rc-tag)를 뺐다 — 신청 접수 목록과 «같이» 뺀다.
+          ⛔ 되살리지 마세요. 접수번호는 검토 창(openProposal) 맨 위와 카드 aria-label 에 그대로 있습니다.
+       ⚠ 배지 줄은 «한 줄»이라 넘치면 «맨 뒤»가 …로 줄어든다.
+          잘리는 것이 «분야»가 되도록 분야를 맨 뒤에 둔다 —
+          분야는 title 속성과 검토 창에서 확인할 수 있지만,
+          「🚩 신고 N」이 잘리면 «지금 손봐야 할 글»을 목록에서 놓친다.
+       ⛔ 분야를 앞으로 옮기지 마세요(그러면 신고가 대신 잘립니다). */
     card.innerHTML = `<div class="pcard-main">
         <div class="pcard-top">
           <span class="st-badge st-${esc(st)}">${esc(st)}</span>
           ${days ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${days}일 경과</span>` : ""}
-          ${r.proposal_no ? `<span class="rc-tag"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>${esc(r.proposal_no)}</span>` : ""}
-          ${r.category ? `<span class="cat-tag">${esc(r.category)}</span>` : ""}
           ${r.is_hidden ? `<span class="hide-tag"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
           ${reps ? `<span class="report-tag"><span aria-hidden="true">🚩</span> 신고 ${reps}</span>` : ""}
+          ${r.category ? `<span class="cat-tag" title="${esc(r.category)}"><span>${esc(r.category)}</span></span>` : ""}
         </div>
-        <div class="pcard-title">${esc(r.title)}</div>
+        <div class="pcard-title" title="${esc(r.title || "")}">${esc(r.title)}</div>
         <div class="pcard-meta">
           <span class="like-tag"><span aria-hidden="true">👍</span> 공감 ${r.like_count || 0}</span>
           ${cmts ? `<span class="cmt-tag"><span aria-hidden="true">💬</span> 댓글 ${cmts}</span>` : ""}
@@ -3757,9 +3771,9 @@ async function openProposal(r) {
     <div class="pcard-top mb-10">
       <span class="st-badge st-${esc(st)}">${esc(st)}</span>
       ${days ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${days}일 경과</span>` : ""}
+      <!-- 🧾 접수번호 «글자»는 그대로 둔다. 2026-08-25 에 없앤 것은 옆의 「📋 복사」 단추뿐이다
+           (양호창님 「불필요해 보인다」 · 신청접수 모달과 «같이» 뺐다). 번호를 지우지 말 것. -->
       ${r.proposal_no ? `<span class="rc-tag"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>${esc(r.proposal_no)}</span>` : ""}
-      ${r.proposal_no ? `<button id="pmCopyNo" class="mini-btn" type="button"
-          aria-label="접수번호 ${esc(r.proposal_no)} 복사"><span aria-hidden="true">📋</span> <span id="pmCopyLab">복사</span></button>` : ""}
       ${r.category ? `<span class="cat-tag">${esc(r.category)}</span>` : ""}
       ${r.is_hidden ? `<span class="hide-tag"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
     </div>
@@ -3774,43 +3788,29 @@ async function openProposal(r) {
       ? tpl.map(([lab, v]) => `<div class="field"><div class="field-label">${esc(lab)}</div><div class="pm-body-text">${esc(v)}</div></div>`).join("")
       : `<div class="field"><div class="field-label">내용</div><div class="pm-body-text">${esc(r.body || "")}</div></div>`}
     ${reps ? `<div class="field"><div class="field-label"><span aria-hidden="true">🚩</span> 신고 ${reps}건</div><div id="pmReports" class="pm-reports" role="status" aria-live="polite">불러오는 중…</div></div>` : ""}
-    <!-- 💬 시민 댓글·답글 (A-07) — «읽기 전용»이다.
-         ⚠ 아래 «담당부서 답변»(admin_reply)과 «다른 것»이다.
-            답변은 결론 «한 통», 댓글은 결론에 이르기까지의 «대화»(여러 개)다.
-            ⛔ 공무원 댓글을 답변 칸에 옮겨 적지 말 것 — 대화와 결론이 뒤섞인다. -->
+    <!-- 💬 시민 댓글·답글 (A-07) — ⭐ «읽고 관리하는» 자리다. 공무원이 «쓰는» 자리가 아니다.
+         ⛔ 2026-08-25 양호창님 결정 — 공무원이 대화하듯 댓글·답글을 다는 기능을 없앴다.
+            (「그냥 심사 진행현황을 알려주니까 그것만 있으면 될 것 같아.
+              굳이 공무원이 댓글을 다는 거는 부적절해 보여」)
+            ⛔ 쓰기 상자(cmt-write)·부서명 칸·「댓글 올리기」를 되살리지 마세요.
+         ✅ 시민끼리 주고받은 «답글 1단 들여쓰기»는 그대로다 — 대화가 흐름대로 보여야 한다
+            (양호창님: 「시민들 간은 열어둬」 · 시민앱의 댓글 쓰기도 그대로 둔다).
+         ✅ 시민에게 하는 답은 아래 «담당부서 답변»(admin_reply) «한 통»뿐이다. -->
     <div class="field">
-      <div class="field-label"><span aria-hidden="true">💬</span> <span id="pmCmtCap">시민 댓글${cmts ? ` ${cmts}건` : ""}</span> <span class="field-opt">(대화용 · «결론 한 통»은 아래 «담당부서 답변»에 적습니다)</span></div>
+      <div class="field-label"><span aria-hidden="true">💬</span> <span id="pmCmtCap">시민 댓글${cmts ? ` ${cmts}건` : ""}</span> <span class="field-opt">(시민들끼리 나눈 의견을 «읽는 곳»입니다)</span></div>
       <!-- ⛔ tabindex="0" 를 지우지 마세요 — 이 목록은 340px 를 넘으면 «스스로 스크롤»됩니다.
            초점을 받을 수 없는 스크롤 상자는 «키보드만 쓰는 이용자»가 아래 댓글을 영영 못 읽습니다
            (KWCAG 6.1.1 «키보드 사용 보장»). 초점을 받으면 ↑↓·PageDown 으로 읽어 내려갑니다.
            ⚠ 초점 테두리는 파일 위쪽 :focus-visible 공통 규칙이 그려 줍니다. -->
       <ul class="cmt-list" id="pmComments" tabindex="0" role="group" aria-label="시민 댓글 목록" aria-live="polite"><li class="forms-empty">불러오는 중…</li></ul>
-      ${IS_GUEST ? "" : `
-      <!-- ✍ 공무원 답글 쓰기 (2026-08-24)
-           ⛔ 담당자 «이름·이메일·계정»을 여기서 보내지 않습니다 — 보내는 것은 «부서명» 하나뿐이고,
-              화면에 뜨는 이름은 서버가 「상주시 ○○과」로 만듭니다(add_official_comment).
-           ⚠ 이 글은 «시민에게 공개»됩니다. 아래 담당부서 답변(결론 한 통)과 자리를 나눠 두었습니다.
-           🧪 테스트 모드(게스트)에서는 상자 자체를 내보내지 않습니다 — 눌러 봐야 막히는 조작을 남기지 않습니다. -->
-      <div class="cmt-write" id="pmCmtWrite">
-        <p class="cmt-write-to" id="pmCmtTo" role="status" aria-live="polite">이 제안에 «공무원 댓글»을 답니다.</p>
-        <div class="cmt-write-row" id="pmCmtDeptRow">
-          <label class="cmt-write-lab" for="pmCmtDept">부서명</label>
-          <input id="pmCmtDept" class="form-input cmt-dept" type="text" maxlength="30"
-                 placeholder="예) 교통에너지과" value="${esc(officialDept())}"
-                 aria-describedby="pmCmtNote">
-        </div>
-        <label class="sr-only" for="pmCmtBody">공무원 답글 내용</label>
-        <textarea id="pmCmtBody" class="form-textarea" maxlength="500"
-                  aria-describedby="pmCmtNote"
-                  placeholder="시민에게 공개되는 답글입니다. 500자까지 쓸 수 있습니다."></textarea>
-        <p class="cmt-write-note" id="pmCmtNote"><span aria-hidden="true">⚠</span>
-          <b>시민에게 그대로 공개됩니다.</b> 부서명만 적고 <b>담당자 이름·연락처는 넣지 마세요</b> —
-          누가 썼는지는 시스템이 따로 기록합니다. 대표번호로 안내해 주세요.</p>
-        <div class="cmt-write-actions">
-          <button id="pmCmtCancel" class="mini-btn" type="button" hidden>답글 대상 지우기</button>
-          <button id="pmCmtSend" class="top-btn solid" type="button">댓글 올리기</button>
-        </div>
-      </div>`}
+      <!-- ⭐⭐ 이 안내문이 «정본»입니다(2026-08-25). 세 앱이 «글자 단위로» 같아야 합니다
+           (디자인_규격서.md 18절 · 「공무원앱이 기준」 2026-08-24). PC앱도 이 글자로 맞춥니다.
+           ⛔ 「공무원이 여기에 글을 쓰지 않는다」는 한 줄을 빼지 마세요 — 그것이 이 개정의 요지입니다.
+           🧪 테스트 모드(게스트)에는 감추기·삭제 단추가 없으므로 그 문장도 빼고 보여 줍니다. -->
+      <p class="cmt-read-note" id="pmCmtNote"><span aria-hidden="true">ⓘ</span>
+        이 자리는 <b>시민들끼리 나눈 의견을 읽는 곳</b>입니다. 공무원은 여기에 글을 쓰지 않습니다.
+        시민에게 하는 답은 아래 <b>「담당부서 답변」 한 통</b>으로 보내 주세요.${IS_GUEST ? "" :
+        ` 신고되었거나 부적절한 글은 각 댓글의 <b>「감추기」</b>로 시민 화면에서 가릴 수 있습니다.`}</p>
     </div>
     <div class="field">
       <label class="field-label" for="pmStatus">진행 상태 변경</label>
@@ -3856,40 +3856,33 @@ async function openProposal(r) {
            · 아이콘은 인라인 SVG(규격서 §5 — 이모지 금지). -->
     <div class="modal-actions">
       <button id="pmDelete" class="nav-btn danger" type="button" aria-label="이 정책제안 삭제"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>
-      <button id="pmPrint" class="nav-btn ghostish" type="button">🖨 인쇄</button>
-      <button id="pmSave" class="nav-btn" type="button">💾 저장</button>
+      <button id="pmPrint" class="nav-btn ghostish" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 9V4h10v5"/><path d="M7 18H5v-6h14v6h-2"/><path d="M7 14h10v6H7z"/></svg><span>인쇄</span></button>
+      <button id="pmSave" class="nav-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>
     </div>`;
 
   if (reps) loadReportDetail(r.id);
   // 💬 시민 댓글 — 기다리지 않고(await 없이) 띄운다. 못 불러와도 검토 화면은 그대로 돈다.
   P_CMT_ROWS = []; P_CMT_REPORTS = {};        // 앞서 열어 둔 제안의 댓글이 남아 있지 않게 비운다
-  PC_MODE = { kind: "new", parentId: null, editId: null };
   loadProposalComments(r.id).catch(() => {});
-  /* ✍ 공무원 답글 쓰기 단추 — 게스트에서는 상자 자체가 없으므로 null 검사를 함께 둔다.
-     ⚠ 「답글 대상 지우기」는 답글·고치기 모드를 풀고 «새 댓글»로 되돌린다 —
-        엉뚱한 댓글에 답글이 달리는 사고를 되돌릴 길을 늘 열어 둔다. */
-  const cmtSend = $("#pmCmtSend");
-  if (cmtSend) cmtSend.onclick = submitOfficialComment;
-  const cmtCancel = $("#pmCmtCancel");
-  if (cmtCancel) cmtCancel.onclick = () => {
-    const ta = $("#pmCmtBody");
-    if (PC_MODE.kind === "edit" && ta) ta.value = "";   // 고치던 내용은 «올리지 않고» 버린다
-    setCommentMode({ kind: "new" });
-    announce("답글 대상을 지웠습니다. 이제 이 제안에 새 댓글을 답니다.");
-  };
+  /* ⛔ 2026-08-25 — 여기 있던 「댓글 올리기」·「답글 대상 지우기」 연결을 없앴다
+        (공무원 댓글 쓰기 폐지 · 양호창님). 단추도 함께 사라졌다.
+
+     ♻ 미뤄 둔 실시간 갱신 흘려보내기 — 예전에는 setCommentMode() 가 «새 글» 상태로 돌아올 때
+        흘려보냈다. 그 함수가 사라졌으므로 이제 «초점이 댓글 목록을 떠날 때» 흘려보낸다.
+        ⛔ 이 연결을 지우지 마세요 — 지우면 목록을 읽는 «동안» 도착한 새 댓글이
+           다음 실시간 알림이 올 때까지 영영 화면에 안 나타난다(pcmtBusy 머리말 ①).
+        ⚠ 목록 «안에서» 단추 사이를 오갈 때는 흘려보내지 않는다 — 다시 그리면 초점을 잃는다.
+        ⚠ #pmComments 는 모달을 열 때마다 innerHTML 로 새로 만들어지므로 처리기가 쌓이지 않는다. */
+  const cmtBox = $("#pmComments");
+  if (cmtBox) cmtBox.addEventListener("focusout", () => {
+    setTimeout(() => {
+      if (cmtBox.isConnected && !cmtBox.contains(document.activeElement)) {
+        try { flushPCommentRefresh(); } catch (e) { /* 무시 */ }
+      }
+    }, 0);
+  });
   // 📝 처리메모 — 목록에 없는 칸이라 «이 한 건»만 따로 읽어 온다(위 textarea 주석 참조).
   if (P_MEMO_OK) loadProposalMemo(r.id).catch(() => {});
-
-  // 📋 접수번호 복사 — 신청접수(#amCopyRc)와 «같은 동작·같은 말». 성공을 «글자»로 알린다.
-  const cpn = $("#pmCopyNo");
-  if (cpn) cpn.onclick = async () => {
-    const ok = await copyText(r.proposal_no, `접수번호 ${r.proposal_no} 를 복사했습니다.`);
-    const lab = $("#pmCopyLab");
-    if (lab && ok) {
-      lab.textContent = "복사됨";
-      setTimeout(() => { if (lab.isConnected) lab.textContent = "복사"; }, 1600);
-    }
-  };
 
   /* 💬 상용구 — 누르면 답변 칸에 «덧붙는다»(이미 쓴 글을 지우지 않는다).
      ⚠ 신청접수와 달리 글자 수 상한이 없다(proposals.admin_reply 에 maxlength 가 없다) —
@@ -4444,25 +4437,47 @@ function renderApplications() {
        ⚠ 이 칸을 누르는 것은 «줄 열기»가 아니다 → 아래에서 클릭·키 이벤트를 반드시 멈춘다.
        ⚠ 낭독기에는 접수번호(없으면 사업명)로 «무엇을 고르는지» 밝힌다. */
     const pickName = r.receipt_no || r.benefit_name || "이 접수";
-    card.innerHTML = `<span class="pick-wrap">` +
+    /* ⚠ <span> 이 아니라 <label> 이다 — 체크상자는 보이는 크기가 20x20 이라 손가락 규격(44px)에
+       모자란데, <input> 에는 ::after 가 «생기지 않아»(대체 요소) 투명 확장판을 못 붙인다.
+       label 로 감싸면 그 44x44 판 어디를 눌러도 브라우저가 체크상자를 대신 눌러 준다(JS 불필요).
+       ⚠ 보이는 체크상자 크기·칸 폭(26px)은 그대로다 — 확장판은 style.css .pick-wrap::after. */
+    card.innerHTML = `<label class="pick-wrap">` +
         `<input type="checkbox" class="row-pick" data-id="${esc(rid)}"` +
-        ` aria-label="${esc(pickName)} 선택"${A_SEL.has(rid) ? " checked" : ""}></span>` +
+        ` aria-label="${esc(pickName)} 선택"${A_SEL.has(rid) ? " checked" : ""}></label>` +
       `<div class="pcard-main">
+        <!-- ⭐⭐ 배지 «차례» 규약 (2026-08-25 개정 · 세 앱 공통)
+                상태 → (경과) → (안내 공개중) → 분류(담당팀)
+             ⭐ 2026-08-25 양호창님 — 「접수번호 배지가 과도하게 자리를 많이 차지한다. 제거해 줘」
+                그래서 «목록 카드»에서 🧾 접수번호 배지(.rc-tag)를 뺐다.
+                ⛔ 되살리지 마세요. 접수번호가 필요한 자리는 이미 셋 다 살아 있습니다 —
+                   ① 접수 처리 창(openApplication) 맨 위 🧾 배지 · ② 검색창(접수번호로 찾기)
+                   · ③ 카드 aria-label(낭독기가 「접수번호 …」로 읽는다).
+             ⚠ 배지 줄은 «한 줄»로 못 박혀 있다(style.css .pcard-top{flex-wrap:nowrap}).
+                좁은 폭에서 다 못 담으면 «맨 뒤»가 …로 줄어든다.
+                그래서 뒤로 갈수록 «없어도 덜 아쉬운 것»을 둔다 —
+                담당팀은 접수 처리 창과 title 속성에서 온전히 볼 수 있고,
+                상태·경과는 목록에서 «그 자리에서» 판단해야 하는 값이라 앞에 둔다.
+             ⛔ 담당팀을 앞으로 옮기지 마세요 — 그러면 「⏳ N일 경과」가 대신 잘립니다. -->
         <div class="pcard-top">
           <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
           ${od ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${od}일 경과</span>` : ""}
-          ${r.team ? `<span class="cat-tag">${esc(r.team)}</span>` : ""}
-          ${r.receipt_no ? `<span class="rc-tag"><span aria-hidden="true">🧾</span> ${esc(r.receipt_no)}</span>` : ""}
-          ${r.citizen_reply ? `<span class="cr-tag"><span aria-hidden="true">💬</span> 시민 안내문 공개중</span>` : ""}
+          ${r.citizen_reply ? `<span class="cr-tag" title="시민 안내문 공개중"><span aria-hidden="true">💬</span> <span>시민 안내문 공개중</span></span>` : ""}
+          ${r.team ? `<span class="cat-tag" title="${esc(r.team)}"><span>${esc(r.team)}</span></span>` : ""}
         </div>
-        <div class="pcard-title">${esc(r.benefit_name || "(사업명 없음)")}</div>
+        <!-- ⚠ title 속성 — 제목은 «두 줄»에서 …로 잘린다. 온전한 사업명을 여기에 남겨
+             마우스를 올리거나 낭독기로 읽을 때 전문이 나오게 한다(2026-08-25). -->
+        <div class="pcard-title" title="${esc(r.benefit_name || "")}">${esc(r.benefit_name || "(사업명 없음)")}</div>
         <div class="pcard-meta">
           <span><span aria-hidden="true">🙍</span> ${esc(r.applicant_name || "")}</span>
           ${r.phone ? `<span><span aria-hidden="true">📞</span> ${esc(r.phone)}</span>` : ""}
           <span class="rg-meta"><span aria-hidden="true">📍</span> ${esc(regionLabel(r.region))}</span>
           <span><span aria-hidden="true">🗓</span> ${esc(fmtDateTime(r.created_at))}</span>
         </div>
-        ${r.memo ? `<div class="pcard-memo"><span aria-hidden="true">💬</span> ${esc(r.memo)}</div>` : ""}
+        <!-- ⭐ 처리메모 — «있고 없고»에 따라 카드가 19.5px 씩 달라지던 것을 막는다.
+             없으면 빈 자리만 둔다(보이지 않고 낭독기도 읽지 않는다 · style.css .pcard-memo.is-empty).
+             ⛔ 이 빈 칸을 지우지 마세요 — 지우면 카드 높이가 다시 갈립니다. -->
+        ${r.memo ? `<div class="pcard-memo"><span aria-hidden="true">💬</span> ${esc(r.memo)}</div>`
+                 : `<div class="pcard-memo is-empty" aria-hidden="true"></div>`}
       </div>`;
     const openIt = () => openApplication(r);
     card.onclick = (ev) => {
@@ -4522,9 +4537,9 @@ async function openApplication(r) {
     <div class="pcard-top mb-10">
       <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
       ${overdueDays(r) ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${overdueDays(r)}일 경과</span>` : ""}
+      <!-- 🧾 접수번호 «글자»는 그대로 둔다. 2026-08-25 에 없앤 것은 옆의 「📋 복사」 단추뿐이다
+           (양호창님 「불필요해 보인다」 · 정책제안 모달과 «같이» 뺐다). 번호를 지우지 말 것. -->
       ${r.receipt_no ? `<span class="rc-tag"><span aria-hidden="true">🧾</span> ${esc(r.receipt_no)}</span>` : ""}
-      ${r.receipt_no ? `<button id="amCopyRc" class="mini-btn" type="button"
-          aria-label="접수번호 ${esc(r.receipt_no)} 복사"><span aria-hidden="true">📋</span> <span id="amCopyLab">복사</span></button>` : ""}
     </div>
     <!-- 🖨 인쇄 전용 안내 — 화면에는 보이지 않고 «종이에만» 찍힌다(style.css .print-only).
          개인정보가 종이로 나가는 순간이라 목적 외 이용을 못 박는다(개인정보보호법 §19). -->
@@ -4586,26 +4601,14 @@ async function openApplication(r) {
     </div>
     <!-- 규격서 §0 «한 화면 버튼 3개 상한» — 삭제·인쇄·저장 정확히 셋. 여기에 더 늘리지 말 것. -->
     <div class="modal-actions">
-      <button id="amDelete" class="nav-btn danger" type="button">🗑 삭제</button>
-      <button id="amPrint" class="nav-btn ghostish" type="button">🖨 인쇄</button>
-      <button id="amSave" class="nav-btn" type="button">💾 저장</button>
+      <button id="amDelete" class="nav-btn danger" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>
+      <button id="amPrint" class="nav-btn ghostish" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 9V4h10v5"/><path d="M7 18H5v-6h14v6h-2"/><path d="M7 14h10v6H7z"/></svg><span>인쇄</span></button>
+      <button id="amSave" class="nav-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>
     </div>`;
 
   // 📎 첨부 목록 — 있을 때만 나타난다. 어떤 이유로 실패해도 접수 처리 화면은 멀쩡해야 하므로
   //    기다리지 않고(await 없이) 띄우되, 남은 오류도 삼켜 «처리되지 않은 거부»가 나지 않게 한다.
   renderApplicationFiles(r).catch(() => {});
-
-  // 📋 접수번호 복사 — 전화 응대·엑셀 붙여넣기 때 숫자를 눈으로 옮겨 적던 수고를 없앤다.
-  //    성공을 «글자»로 알린다: 단추 라벨이 잠깐 「복사됨」 으로 바뀌고 낭독기에도 안내가 간다.
-  const cp = $("#amCopyRc");
-  if (cp) cp.onclick = async () => {
-    const ok = await copyText(r.receipt_no, `접수번호 ${r.receipt_no} 를 복사했습니다.`);
-    const lab = $("#amCopyLab");
-    if (lab && ok) {
-      lab.textContent = "복사됨";
-      setTimeout(() => { if (lab.isConnected) lab.textContent = "복사"; }, 1600);
-    }
-  };
 
   // 💬 상용구 — 누르면 안내문 칸에 «덧붙는다»(이미 쓴 글을 지우지 않는다).
   //    300자를 넘게 되면 넣지 않고 그 사실을 알린다(칸의 상한을 몰래 넘기지 않는다).
@@ -4771,10 +4774,32 @@ function afSetStatus(msg, isErr) {
   if (msg) announce(msg);
 }
 
-// 확장자만 뽑는다(감사기록에 «파일명 대신» 남길 값)
+/* 확장자만 뽑는다 — 감사기록(admin_audit)에 «파일명 대신» 남길 값.
+   🩷 2026-08-25 자물쇠 — 「모양 검사」를 「닫힌 목록」으로 바꿨습니다.
+   ⛔ 앞선 판(점 유무만 보기 / `^[a-z0-9]{1,6}$` 모양 검사)에는 구멍이 남습니다:
+        "이름.1234" → 「1234」 · "메모.txt2" → 「txt2」
+      점 뒤가 우연히 영숫자면 «시민이 지은 글자»가 그대로 기록에 실립니다.
+      정규식은 「어떤 모양이 위험한가」를 계속 맞혀야 합니다 — 맞히는 일을 없앱니다.
+   ⇒ 목록에서 «고르면» 출력이 아래 낱말 아니면 「기타」뿐이라,
+      파일명에서 온 글자가 기록에 닿는 일이 «구조적으로» 불가능합니다.
+   ★ 이 목록은 PC앱 audit_cloud.ATTACH_EXTS 와 «글자 그대로» 같아야 합니다
+     — 두 앱 기록을 한 표로 대조하려면 같은 낱말을 써야 합니다.
+   ★ 서버(supabase/신청첨부.sql:388)가 애초에 이 확장자들만 받으므로 잃는 것이 없습니다
+     (2026-08-25 실측 — 실제 첨부 57건 전부 이 안에 듭니다. 「기타」로 떨어진 것 0건).
+   ⚠ 이 함수는 목록 화면의 「PDF 파일」 표시에도 쓰입니다. 모르는 확장자는 이제
+     「기타 파일」로 보입니다 — «의도된 변화»입니다. 파일명 전체는 그 옆에 그대로 보이므로
+     정보 손실이 아닙니다.
+   ⛔ 정규식으로 되돌리거나 목록을 넓히지 마세요. 목록을 한 글자라도 바꾸면 파이썬과 갈립니다. */
+const ATTACH_EXTS = new Set([
+  "hwp", "hwpx", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "jpg", "jpeg", "png", "gif", "heic", "zip", "txt",
+]);
+
 function attachExt(name) {
-  const e = String(name || "").split(".").pop();
-  return (e && e.length <= 6) ? e.toLowerCase() : "기타";
+  const s = String(name || "");
+  if (s.indexOf(".") < 0) return "기타";        // 점이 없으면 확장자가 아니라 «파일명 전체»다
+  const e = s.slice(s.lastIndexOf(".") + 1).trim().toLowerCase();
+  return ATTACH_EXTS.has(e) ? e : "기타";
 }
 
 /* 🔒 접속기록(개인정보보호법 §29) — 업무를 멈추지는 않지만 «조용히» 넘기지도 않는다.

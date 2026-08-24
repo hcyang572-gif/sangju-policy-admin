@@ -150,12 +150,32 @@
      ⚠ 개인정보는 만지지 않는다 — 사업명(benefit_name)·담당팀(team) 두 칸만 본다.
      기간은 «전체»다(도넛은 이달 기준). 그래서 카드마다 «전체 접수 N건»을 글로 밝혀 둔다. */
 
+  /* 🏢 집계용 담당팀 — «지금» 담당팀으로 센다 (2026-08-25 · 🟢곳간 원인분석)
+     ① 사업명으로 찾은 지금 담당팀(data.json programs) → ② 접수의 team 스냅샷 → ③ 미지정
+     ⚠ ②(폴백)를 빼면 «멀쩡한 접수»가 새로 미지정이 된다 — 사업명이 바뀐 뒤 접수에만 옛 이름이
+        남은 경우(「출산축하 해피박스 지원」 2건)가 실제로 그렇다.
+     ⚠ 이 순위표의 용도는 「지금 어느 팀에 일이 몰려 있나」다. 접수 당시 팀으로 세면
+        폐지된 팀 이름이 순위에 오르고, 한 팀이 표기 차이로 여러 줄로 갈라진다.
+     ⛔ 접수 «상세보기»의 담당팀은 스냅샷 그대로 둔다(app.js) — 여기는 집계뿐이다. */
+  function teamForRank(r) {
+    var api = window.sjBenefits;
+    var cur = "";
+    try { if (api && api.ready && typeof api.teamOf === "function") cur = api.teamOf(r && r.benefit_name); }
+    catch (e) { cur = ""; }
+    if (cur) return cur;
+    var snap = (r && r.team != null) ? String(r.team).trim() : "";
+    return snap || "담당팀 미지정";
+  }
+
   // 한 칸을 기준으로 묶어 센 뒤 «많은 순 → 이름 순»으로 늘어놓는다
+  // key 는 «칸 이름»이거나 «행 하나를 받아 묶음 이름을 돌려주는 함수»다.
   function tally(all, key, blank) {
     var map = Object.create(null), names = [];
+    var fn = (typeof key === "function") ? key : null;
     for (var i = 0; i < all.length; i++) {
       var r = all[i];
-      var k = (r && r[key] != null) ? String(r[key]).trim() : "";
+      var k = fn ? String(fn(r) || "").trim()
+                 : ((r && r[key] != null) ? String(r[key]).trim() : "");
       if (!k) k = blank;
       if (!(k in map)) { map[k] = 0; names.push(k); }
       map[k] += 1;
@@ -396,7 +416,7 @@
     /* 도넛 옆 요약 카드 두 장 — «전체 접수» 기준. 이달 접수가 0건이어도 그려 둔다
        (도넛만 감추고 옆자리가 비면 예전 결함으로 되돌아간다). */
     renderRank("aTopBizList", "aTopBizSub", tally(all, "benefit_name", "(사업명 없음)"), all.length, "사업", "개");
-    renderRank("aTopTeamList", "aTopTeamSub", tally(all, "team", "담당팀 미지정"), all.length, "담당팀", "곳");
+    renderRank("aTopTeamList", "aTopTeamSub", tally(all, teamForRank, "담당팀 미지정"), all.length, "담당팀", "곳");
     renderRegions(all);          // 📍 읍·면·동별 신청 현황(같은 자리·같은 모양)
 
     // 이달 ↔ 지난달 견주기 + 오늘 처리 건수
@@ -415,15 +435,18 @@
     var wrapEl = fig.querySelector(".donut-wrap");
     fig.hidden = false;
     if (wrapEl) wrapEl.hidden = !total;
-    var capEl = fig.querySelector(".stats-cap");
-    if (capEl) capEl.hidden = !total;
+    /* ★ 2026-08-24 — 이달 접수가 0건이어도 제목(.stats-cap)은 «감추지 않는다».
+       제목 줄이 곧 «접기 단추»가 되었기 때문이다 — 감추면 접었다 펴는 손잡이까지 사라진다.
+       (예전에는 제목만 감췄다. 그때도 아래 「오늘 처리 N건」 줄은 남아 있었으므로,
+        제목이 없는 채로 글만 떠 있는 것보다 「이달의 접수 0건 · 상태별」이 오히려 분명하다) */
+    var totEl0 = $("aStatsTotal");
+    if (totEl0) totEl0.textContent = String(total);     // 0건일 때도 «0» 이라고 정직하게 적는다
     if (!total) return;
 
     /* 가운데 합계 — SVG <text> 는 role="img"(title/desc) 안이라 따로 낭독되지 않는다.
        그래서 여기서는 «보이는 숫자»만 세어 올려도 낭독 정보가 어긋나지 않는다.
        도넛 조각은 style.css 의 transition(.8s)이 시계방향으로 채워 준다. */
-    var numEl = $("aStatsNum"), totEl = $("aStatsTotal");
-    if (totEl) totEl.textContent = String(total);
+    var numEl = $("aStatsNum");        // 제목의 총계(#aStatsTotal)는 위에서 이미 넣었다
     if (numEl) countText(numEl, total);
 
     // 조각 그리기 — stroke-dasharray 로 «칠할 길이 / 남길 길이», dashoffset 으로 시작 위치
@@ -526,7 +549,117 @@
     } catch (e) { /* 아주 오래된 브라우저 — 첫 그림 그대로 둔다 */ }
   }
 
-  function start() { watch(); watchWidth(); draw(); }
+  /* ── ▾ 접기 «한 벌» (2026-08-24 · 양호창님 지시) ──────────────────────────────
+     요약 패널의 네 구역 — 이달의 접수 · 접수 많은 사업 · 담당팀별 접수 · 읍·면·동별 신청 현황.
+     ⛔ 구역마다 접기를 따로 만들지 마세요. 여기 한 곳이 넷을 모두 맡습니다.
+        다섯 번째 구역이 생겨도 index.html 에 «단추 + .fold-body» 두 줄만 흉내 내면
+        이 코드가 알아서 이어 줍니다(선택자가 .fold-btn[aria-controls] 하나뿐이라서).
+
+     ❓ 왜 <details>/<summary> 를 쓰지 않았나 (그랬다면 JS 가 없어도 됐다)
+       ① 어차피 JS 가 필요하다 — 「접어 둔 것을 다음에도 접힌 채로」(localStorage) 는
+          details 로도 toggle 이벤트를 받아 저장해야 한다. 공짜로 얻는 것은 키보드·펼침상태뿐이다.
+       ② 「이달의 접수」는 <figure>+<figcaption> 이다. 그 사이에 <details><summary> 를 끼우면
+          그림(도넛)과 그 설명글의 짝이 끊어진다 — 낭독기에서 도넛의 캡션이 사라진다.
+       ③ 제목 앞 «색 표식»과 오른쪽 ▾ 표를 브라우저마다 다른 ::marker /
+          ::-webkit-details-marker 와 겹치지 않게 다루기가 까다롭다(사파리·크롬이 다르다).
+       그래서 단추로 만들되, details 가 공짜로 주던 것을 «손으로 전부» 갖췄다 —
+       <button> 이라 Tab·Enter·Space 가 기본으로 동작하고, aria-expanded 로 펼침 상태를 알리며,
+       접힌 알맹이는 [hidden] 이라 낭독기·Tab 순서에서도 함께 빠진다.
+
+     ⚠ 다시 그리기(실시간 반영 포함)와 부딪히지 않는다 —
+       draw() 는 .fold-body «안쪽»의 <li>·도넛만 갈아 끼울 뿐 .fold-body 의 hidden 을 만지지 않는다.
+       (도넛의 .donut-wrap 은 .fold-body «안»에 있어 서로 겹치지 않는다)
+       그래서 실시간 신호로 목록이 다시 그려져도 접어 둔 카드는 접힌 채로 남는다.
+
+     ❓ 왜 상태를 기억하나(localStorage) — 공무원은 하루에도 몇 번씩 이 화면을 새로 연다
+       (실시간 반영·재로그인·탭 이동). 「읍·면·동은 접어 둔다」고 정한 사람이 그때마다 다시
+       접어야 하면 접기 기능이 오히려 짐이 된다. 공용 PC 에서 «남의 설정»이 남을 수는 있으나
+       ① 저장된 값이 없으면 «펼침»이 기본이고 ② 접혀 있어도 제목 줄에 요약(전체 접수 N건 …)이
+       그대로 보이며 ③ 접기 단추가 늘 같은 자리에 있어, 잃는 것보다 얻는 것이 큽니다.
+     ⚠ 키 이름은 다른 앱과 섞이지 않게 앱 고유 접두사 sangju_admin_ 를 쓴다(app.js 의 다른 키들과 같다). */
+  var FOLD_KEY = "sangju_admin_fold";
+
+  function foldRead() {
+    try {
+      var o = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}");
+      return (o && typeof o === "object") ? o : {};
+    } catch (e) { return {}; }        // 못 읽어도 «기본 펼침»은 지킨다
+  }
+  function foldWrite(map) {
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify(map)); } catch (e) { /* 못 기억해도 그만 */ }
+  }
+
+  // 한 구역의 펼침/접힘을 «한 곳»에서 맞춘다 — 단추(aria-expanded) · 알맹이(hidden) · 기억.
+  function setFold(btn, open, remember) {
+    var body = document.getElementById(btn.getAttribute("aria-controls"));
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (body) body.hidden = !open;
+    /* ⚠ 접힌 카드가 «옆 카드 높이만큼 늘어나던» 결함 (2026-08-24 실측에서 잡음).
+       요약 패널(.sum-row)은 align-items:stretch 라 한 줄에 선 카드들이 «같은 키»가 된다.
+       그래서 세 장이 한 줄에 서는 1024px 이상에서 한 장만 접으면, 접힌 카드가 그대로
+       287px 짜리 «빈 흰 상자»로 남았다. 접힌 카드만 위로 붙여 제 키만 쓰게 한다.
+       ⚠ .fold-body 의 부모가 곧 그 카드다(figure#aStats / section.rank-card) — 네 구역 모두.
+       ⚠ :has() 선택자로도 되지만, 켜고 끄는 자리를 이 함수 «한 곳»으로 모으려고 클래스를 쓴다. */
+    /* ⚠ .fold-collapsed 는 «요약 카드»(figure#aStats · section.rank-card)에만 쓸모가 있다.
+       분야 칩의 .fold-body 부모는 탭 <section> 이라 align-self 가 아무 일도 하지 않지만,
+       엉뚱한 곳에 클래스가 붙어 있으면 다음 사람이 «왜 붙었지?» 하고 헤맨다 → 카드일 때만 붙인다. */
+    if (body && body.parentElement && /(^|\s)(rank-card|stats-card|region-card)(\s|$)/.test(body.parentElement.className || "")
+        || (body && body.parentElement && body.parentElement.tagName === "FIGURE")) {
+      if (open) body.parentElement.classList.remove("fold-collapsed");
+      else body.parentElement.classList.add("fold-collapsed");
+    }
+    /* ⭐⭐ 2026-08-25 — 「접었더니 격자에 구멍이 생긴다」 (양호창님 「접기가 이상하게 안 된다」)
+       요약 패널(.sum-row)에 «접힌 카드가 하나라도 있는가»를 줄 자체에 표시해 둔다.
+       그래야 style.css 가 「접힌 카드는 제 줄을 통째로 쓴다 + 도넛도 남는 자리를 채운다」를
+       걸 수 있다(그 블록의 긴 주석 참고).
+       ⚠ :has() 대신 클래스를 쓰는 까닭 — 접기 상태를 다루는 자리를 이 함수 «한 곳»으로 모으고,
+          :has() 를 모르는 브라우저에서 구멍이 조용히 되살아나지 않게 하기 위해서다.
+       ⚠ 어느 카드 하나가 아니라 «줄 전체»를 보고 판단한다 — 넷 중 무엇을 접든 같은 결과가 나온다. */
+    syncRowGaps();
+    /* ♿ 접는 «순간» 초점이 알맹이 안에 있으면(칩을 Tab 으로 훑다가 접기를 누른 경우 등)
+       그 초점이 «사라진 요소»에 남아 body 로 튕긴다 — 키보드 사용자는 화면 맨 처음으로 돌아간다.
+       → 접기 단추로 옮겨 준다. 방금 누른 그 단추라 «내가 있던 자리»가 그대로 유지된다.
+       ⚠ remember 가 true 일 때(=사람이 눌렀을 때)만 옮긴다. 첫 그림에서 옮기면 초점을 훔친다. */
+    if (!open && remember && body && document.activeElement && body.contains(document.activeElement)) {
+      try { btn.focus(); } catch (e) { /* 무시 */ }
+    }
+    if (remember) {
+      var map = foldRead();
+      // 펼침(기본)은 굳이 적어 두지 않는다 — 저장값이 지저분해지지 않게
+      if (open) delete map[body ? body.id : ""]; else map[body ? body.id : ""] = 1;
+      foldWrite(map);
+    }
+  }
+
+  /* 접힌 카드가 하나라도 있으면 요약 줄에 .has-collapsed 를 건다(구멍 막기 · 위 setFold 주석).
+     ⚠ 요약 패널이 아직 없거나(hidden) 접기가 없는 화면에서도 조용히 아무 일도 하지 않는다. */
+  function syncRowGaps() {
+    var row = document.getElementById("aSummary");
+    if (!row) return;
+    var any = !!row.querySelector(".fold-collapsed");
+    if (any) row.classList.add("has-collapsed");
+    else row.classList.remove("has-collapsed");
+  }
+
+  function initFolds() {
+    var btns = document.querySelectorAll(".fold-btn[aria-controls]");
+    if (!btns.length) return;
+    var saved = foldRead();
+    for (var i = 0; i < btns.length; i++) {
+      (function (btn) {
+        var id = btn.getAttribute("aria-controls");
+        /* ★★ 기본은 «모두 펼침» — 저장된 값이 «없으면 예외 없이» 펼친다(2026-08-25 양호창님 확정).
+           ⛔ 「자리를 아끼자」며 처음부터 접힌 채로 두지 말 것.
+           ★ 기억하는 것은 «사람이 손으로 접은 것»뿐이다 — 펴면 저장값을 지운다(setFold 참조). */
+        setFold(btn, !saved[id], false);
+        btn.addEventListener("click", function () {
+          setFold(btn, btn.getAttribute("aria-expanded") !== "true", true);
+        });
+      })(btns[i]);
+    }
+  }
+
+  function start() { initFolds(); watch(); watchWidth(); draw(); }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);
