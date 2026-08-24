@@ -20,9 +20,25 @@
 
   var R = 54;                       // 도넛 반지름(index.html 의 <circle r>)
   var C = 2 * Math.PI * R;          // 둘레 ≈ 339.292
-  // 조각 색과 «모양»(범례)의 짝 — 색만으로 알리지 않기 위해 모양도 함께 쓴다(style.css .dn-mk)
-  var ORDER = ["승인", "심사중", "접수", "반려"];
-  var SHAPE = { "승인": "원", "심사중": "둥근 사각", "접수": "각진 사각", "반려": "마름모" };
+  /* 조각 색과 «모양»(범례)의 짝 — 색만으로 알리지 않기 위해 모양도 함께 쓴다(style.css .dn-mk).
+
+     ★★ ORDER 의 «차례»는 곧 도넛을 도는 차례다 (A-04 2차 · 2026-08-24) ★★★★★★★★★★★★★
+     ⛔ 함부로 바꾸지 마세요. 이 차례는 «붉은 계열 둘이 맞닿지 않게» 고른 것입니다.
+        상태색을 KPI 카드와 통일하면서 접수 #B84A1C(주홍)와 반려 #A52714(붉은색)가
+        생겼는데, 이 둘이 이웃하면 경계가 흐려집니다.
+        예전 차례 [승인·심사중·접수·반려] 는 «접수 다음이 반려»라 한가운데서 맞닿았습니다.
+        지금 차례 [승인·접수·심사중·반려] 의 네 경계는 이렇습니다 —
+          승인(초록)↔접수(주홍) · 접수(주홍)↔심사중(갈금) · 심사중(갈금)↔반려(붉은) ·
+          반려(붉은)↔승인(초록, «고리가 이어지는 자리»)
+        ⚠ 고리라서 «마지막 조각과 첫 조각도 이웃»입니다 — 차례를 손볼 때 그 한 쌍을 잊지 마세요.
+           (제안받은 [접수·승인·심사중·반려] 는 반려 다음이 다시 접수라 붉은 둘이 맞닿습니다)
+     ⚠ index.html 의 범례 <li> 차례·aLgN1~4 아이디도 «이 차례»와 같아야 합니다.
+        조각과 범례는 아래 for 문에서 «같은 k» 로 짝지어집니다.
+     ⚠ 모양(원·각진 사각·둥근 사각·마름모)은 상태에 붙박이입니다 — 차례가 바뀌어도
+        「승인은 원」 그대로여야 합니다. 그래서 범례 표식 클래스는 순번(m1)이 아니라
+        상태 이름(k-ok·k-recv·k-rev·k-no)으로 되어 있습니다. */
+  var ORDER = ["승인", "접수", "심사중", "반려"];
+  var SHAPE = { "승인": "원", "접수": "각진 사각", "심사중": "둥근 사각", "반려": "마름모" };
 
   function $(id) { return document.getElementById(id); }
 
@@ -186,6 +202,10 @@
       var pct = total ? Math.round((it.n / total) * 100) : 0;
 
       var li = document.createElement("li");
+      /* 🥇 1위 한 줄만 카드의 강조색으로 채운다(A-04 · 색 규칙은 style.css .rank-bar 한 곳).
+         ⚠ 0건이면 «1위»가 아니다 — 아무도 신청하지 않은 사업을 색으로 세우면 거짓말이 된다.
+         ⚠ 색은 «덤»이다. 순위는 이미 «위에서부터»라는 자리와 건수 글자가 말하고 있다. */
+      if (i === 0 && it.n > 0) li.className = "rank-top";
       var nm = document.createElement("span");
       nm.className = "rank-nm";
       nm.textContent = it.name;
@@ -267,7 +287,13 @@
       var pct = total ? Math.round((it.n / total) * 100) : 0;
       var li = document.createElement("li");
       // 0건인 줄과 「미기재」 줄은 «글자»로 이미 구분된다. 클래스는 막대·여백 손질에만 쓴다.
-      li.className = (it.n ? "" : "rank-zero") + (it.name === api.unknown ? " rank-unknown" : "");
+      /* 🥇 rank-top — 접수가 «가장 많은» 읍·면·동 한 줄만 강조색(A-04).
+         ⚠ 여기 순서는 «늘 같은 순서»(달마다 견주기 위함)라 첫 줄이 1위가 아니다 → 건수로 고른다.
+         ⚠ 「미기재」는 지역이 아니므로 1위가 될 수 없다(max 계산에서도 이미 빠져 있다).
+         ⚠ 동점이면 둘 다 세운다 — 한쪽만 고르면 «없는 순위»를 지어내는 셈이다. */
+      var isTop = it.n > 0 && it.n === max && it.name !== api.unknown;
+      li.className = (it.n ? "" : "rank-zero") + (it.name === api.unknown ? " rank-unknown" : "")
+                   + (isTop ? " rank-top" : "");
 
       var nm = document.createElement("span");
       nm.className = "rank-nm";
@@ -401,6 +427,19 @@
     if (numEl) countText(numEl, total);
 
     // 조각 그리기 — stroke-dasharray 로 «칠할 길이 / 남길 길이», dashoffset 으로 시작 위치
+    /* ── 조각 사이 틈 (A-04 · 2026-08-24) ────────────────────────────────────────
+       조각 색을 KPI 카드와 «같은 상태색»으로 맞추면서 접수 #B84A1C 와 반려 #A52714 가
+       이웃하게 됐다. 둘 다 붉은 계열이라 맞닿으면 경계가 흐리다 →
+       칠하는 길이만 GAP 만큼 줄여 그 사이로 트랙(--line, 크림빛)이 비쳐 보이게 한다.
+       ⚠ 시작 위치(used)는 «줄이기 전» 길이로 누적한다 — 안 그러면 조각이 조금씩 앞으로 밀려
+          한 바퀴를 다 돌지 못한다.
+       ⚠ 조각이 하나뿐이면(한 상태만 있는 달) 틈을 두지 않는다 — 다 찬 고리에 난 «흠집»으로 보인다.
+       ⚠ 아주 작은 조각(1건)이 틈에 먹혀 «사라지지» 않도록 최소 1.5 는 남긴다. */
+    var GAP = 2;                                   // 둘레 339.3 중 2 ≈ 0.6% — 눈에는 «가는 흰 선»
+    var filled = 0;
+    for (var g = 0; g < ORDER.length; g++) if (cnt[ORDER[g]] > 0) filled += 1;
+    var gap = filled > 1 ? GAP : 0;
+
     var svg = fig.querySelector(".donut");
     var segs = svg ? svg.querySelectorAll(".dn-seg circle") : [];
     var used = 0;                 // 여기까지 칠한 길이(누적)
@@ -410,9 +449,10 @@
       var n = cnt[name];
       var pct = Math.round((n / total) * 100);
       var len = total ? (C * n) / total : 0;
+      var draw = n > 0 ? Math.max(1.5, len - gap) : 0;
 
       if (segs[k]) {
-        segs[k].setAttribute("stroke-dasharray", len.toFixed(1) + " " + (C - len).toFixed(1));
+        segs[k].setAttribute("stroke-dasharray", draw.toFixed(1) + " " + (C - draw).toFixed(1));
         segs[k].setAttribute("stroke-dashoffset", (-used).toFixed(1));
       }
       used += len;

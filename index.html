@@ -26,15 +26,15 @@
 
 <!-- PWA: 홈 화면에 별도 앱으로 설치 (시민앱과 분리된 정체성) -->
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="assets/icon-admin-192.png">
+<link rel="apple-touch-icon" href="assets/icon-admin-192-v3.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="상주정책(공무원용)">
 <meta name="application-name" content="상주정책(공무원용)">
 
-<link rel="stylesheet" href="style.css?v=0.5.4">
-<link rel="icon" href="assets/icon-admin-192.png">
+<link rel="stylesheet" href="style.css?v=0.6.0">
+<link rel="icon" href="assets/icon-admin-192-v3.png">
 </head>
 <body>
 
@@ -174,6 +174,15 @@
     <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg>
     <p class="guest-notice-text"><strong>테스트 모드</strong> — 로그인 없이 둘러보는 중입니다. 관리자 전용 기능(계정 관리·비밀번호 변경)은 잠겨 있습니다.</p>
   </div>
+  <!-- ★ 2026-08-24 «헤더 고정» — 양호창님 「스크롤하면 제목까지 같이 올라간다」.
+       헤더(.topbar)와 그 아래 경계선(.topline)을 «한 상자»(.topdock)로 묶어 통째로
+       position:sticky 시킨다. 시민앱(모바일웹 .topbar)과 같은 방식이다.
+       ⚠ 왜 .topbar 하나만 sticky 하지 않았나 — .topline 은 형제(sibling)라 함께 붙지 않는다.
+         둘 다 top:0 으로 붙이면 서로 겹쳐 경계선이 헤더 «뒤»로 숨는다. 그래서 묶었다.
+       ⚠ 이 <div> 를 없애지 말 것. 없애면 스크롤할 때 헤더 밑에서 2px 선만 따로 흘러간다.
+       ⛔ 탭 줄(.tabbar)은 «일부러» 이 상자 밖에 둔다. 함께 붙이면 폰 세로 화면에서
+          고정 높이가 130px 을 넘어 본문이 볼 자리를 잃는다(320px 폰 기준 실측). -->
+  <div class="topdock">
   <header class="topbar">
     <img src="assets/sangsang1.png" class="brand-logo" alt="상상주도 로고">
     <div class="brand-text">
@@ -182,7 +191,7 @@
            브랜드 표기 규약: 「시민 참여형」(작게) + 「상주시 정책플랫폼」(크게) + 배지 「공무원용」(뒤). -->
       <span class="brand-eyebrow">시민 참여형</span>
       <h1 class="brand-title">상주시 정책플랫폼<span class="brand-tag">공무원용</span></h1>
-      <div class="brand-sub" id="dbInfo">사업 관리 (실시간)</div>
+      <div class="brand-sub" id="dbInfo">진행사업 현황 (실시간)</div>
     </div>
     <!-- 2026 시정구호 — ★ 2026-08-19: 제목 블록(.brand-text) «안»에서 «밖»으로 꺼냈다.
          안에 두면 블록 요소라 제목·부제 아래로 줄바꿈되어 «제목에 매달린» 모양이 됐다(양호창님 지적).
@@ -198,7 +207,7 @@
            되살리지 마세요 — 좁은 폰에서 이 알약 때문에 계정 버튼이 제목 아래 줄로 밀려
            헤더가 두 줄이 됐습니다(실제 화면 확인).
            연결 상태는 사라지지 않았습니다. app.js setRealtimeDot() 이
-             ① 헤더 부제(#dbInfo)를 「사업 N건 · 실시간」 ↔ 「사업 N건 · 실시간 연결 끊김」 으로 바꾸고
+             ① 헤더 부제(#dbInfo)를 「진행사업 N건 · 실시간」 ↔ 「진행사업 N건 · 실시간 연결 끊김」 으로 바꾸고
              ② 상태가 «바뀌는 순간»에만 #liveStatus(낭독기 전용)로 알립니다.
            → 색에 기대지 않고 «글자»로만 알리므로 KWCAG 5.4.1 도 그대로 지켜집니다. -->
       <!-- 계정 메뉴 — 비밀번호 변경·로그아웃을 «하나»로 접었다(규격서 0절: 한 화면 버튼 3개 상한).
@@ -214,25 +223,45 @@
                계정은 시스템 담당자가 만들어 임시 비밀번호를 알려 주므로, 그 값을 계속 쓰면
                «본인만 아는 비밀번호»가 되지 못한다(개인정보의 안전성 확보조치 기준). -->
           <button class="top-btn ghost" id="btnChangePw" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="14" r="4"/><path d="m11.2 10.8 8.8-8.8M17 5l2.4 2.4M14.2 7.8l2.4 2.4"/></svg><span>비밀번호 변경</span></button>
-          <!-- 🔔 새 접수 소리 알림 — ⛔ «기본은 꺼짐». 시연 중 저절로 울리는 일이 없어야 한다.
-               · 켜는 순간이 «사용자 몸짓»이라, 그때 AudioContext 를 만들어 둔다(브라우저 자동재생 정책).
-               · 색·아이콘만으로 알리지 않는다 — 라벨 글자가 「켜짐/꺼짐」을 직접 말한다(KWCAG 5.4.1).
-               · role="menuitemcheckbox" + aria-checked 로 낭독기에도 «켜짐/꺼짐»이 전해진다.
-               · 소리 파일을 받아 오지 않는다(WebAudio 로 짧은 «띵» 두 음). CSP 에 걸릴 외부 자원이 없다. -->
-          <button class="top-btn ghost" id="btnSound" type="button" role="menuitemcheckbox" aria-checked="false"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg><span id="btnSoundLab">새 접수 소리 꺼짐</span></button>
+          <!-- 🔔 새 접수 소리 알림 — ★ 2026-08-24 양호창님 확정으로 «기본 켜짐» 이다.
+               · 사업신청·정책제안 «둘 다» 울린다(app.js subscribeApplicationsRealtime /
+                 subscribeProposalsRealtime). 예전에는 사업신청에만 걸려 있었다(A-12).
+               · 좌우 토글 스위치 — 예전엔 「새 접수 소리 꺼짐」이라는 «글자만» 있어서
+                 그것이 «지금 상태»인지 «누르면 그렇게 된다»인지 갈리지 않았다.
+               · 색만으로 알리지 않는다(KWCAG 5.4.1) — ①손잡이 위치 ②「켜짐/꺼짐」 글자 ③색,
+                 세 겹으로 전한다. 스위치 그림(.sw)은 장식이라 aria-hidden.
+               · ⛔ role 을 "switch" 로 바꾸지 마세요 — 이 버튼은 role="menu" 안에 있습니다.
+                 menu 가 품을 수 있는 역할은 menuitem / menuitemcheckbox / menuitemradio 뿐이라
+                 switch 를 넣으면 메뉴 구조가 깨져 낭독기가 항목 수조차 못 셉니다.
+                 menuitemcheckbox 는 «메뉴 안의 스위치»에 해당하는 역할이고, aria-checked 로
+                 «켜짐/꺼짐»이 그대로 전해집니다. <button> 이라 스페이스·엔터도 그대로 됩니다.
+               · 소리 파일을 받아 오지 않는다(WebAudio 로 짧은 «띵» 두 음). CSP 에 걸릴 외부 자원이 없다.
+               · #btnSoundWarn — 브라우저가 자동재생을 막아 «켜 놨는데 안 울리는» 상황을 글로 알린다. -->
+          <button class="top-btn ghost sound-toggle" id="btnSound" type="button" role="menuitemcheckbox" aria-checked="true"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg><span class="sound-lab">새 접수 소리</span><span class="sw" aria-hidden="true"><i></i></span><span class="sound-state" id="btnSoundLab">켜짐</span><span class="sound-warn" id="btnSoundWarn" hidden>브라우저가 소리를 막았습니다. 화면을 한 번 누르면 울립니다.</span></button>
           <button class="top-btn ghost" id="btnLogout" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 17l5-5-5-5"/><path d="M20 12H9"/><path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6"/></svg><span>로그아웃</span></button>
         </div>
       </div>
     </div>
   </header>
   <div class="topline"></div>
+  </div><!-- /.topdock -->
 
-  <!-- 상단 탭 3개(설계안 확정): 접수 처리 ↔ 사업 ↔ 시민 제안.
-       접수 처리 = 공무원 1순위 업무 → 첫 탭(= 히스토리 루트). -->
+  <!-- ★★ 상단 탭 3개 — 이름·차례 확정 (A-02·A-03 · 2026-08-24 🟠단장 확정) ★★★★★★★★★★★★
+         차례  ① 신청사업 현황  ② 정책제안 현황  ③ 진행사업 현황
+         ⚠ 이 문구는 PC앱 P-01 과 «글자 단위로» 같아야 합니다.
+            띄어쓰기 `신청사업 현황`·`정책제안 현황`·`진행사업 현황`(4+2). 중점·괄호 없음.
+            한쪽만 고치면 같은 화면을 두 이름으로 부르게 됩니다.
+         ⛔ 내부 키(id·aria-controls·app.js 의 applications/benefits/proposals)는 «한 글자도»
+            바꾸지 않았습니다. 히스토리·저장된 상태·20곳 넘는 호출부가 그 키로 이어져 있습니다.
+            바뀐 것은 «보이는 글자»와 «DOM 차례» 뿐입니다.
+         ⚠ 차례를 바꾸면 화살표(←→) 이동도 따라와야 합니다 — app.js bindProposalsUI() 의
+            TABS 는 이제 querySelectorAll 로 «DOM 차례»를 읽습니다(예전엔 손으로 적은 배열이라
+            DOM 만 바꾸면 화살표가 엉뚱한 탭으로 갔습니다. 2026-08-24 실측 확인).
+         ⚠ 화면 안 제목(h2.sr-only)·안내문(.hint-tab)도 «같은 글자»여야 합니다. 아래 각 섹션 참조. -->
   <nav class="tabbar" role="tablist" aria-label="관리 화면 전환">
-    <button id="tabApplications" class="tab-btn on" type="button" role="tab" aria-selected="true" aria-controls="secApplications" tabindex="0"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>접수 처리</span></button>
-    <button id="tabBenefits" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secBenefits" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>사업</span></button>
-    <button id="tabProposals" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secProposals" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>시민 제안</span></button>
+    <button id="tabApplications" class="tab-btn on" type="button" role="tab" aria-selected="true" aria-controls="secApplications" tabindex="0"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span>신청사업 현황</span></button>
+    <button id="tabProposals" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secProposals" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span>정책제안 현황</span></button>
+    <button id="tabBenefits" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="secBenefits" tabindex="-1"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>진행사업 현황</span></button>
   </nav>
 
   <!-- ⚠ main 은 문서에 하나만 둘 수 있다(보이는 main 중복 금지, main 에 tabpanel 역할 부여 불가)
@@ -241,10 +270,10 @@
   <main id="main" tabindex="-1">
   <!-- 섹션 0: 신청 접수 (신규·공무원 1순위) — 시민앱 신청이 Supabase 로 실시간 도착 -->
   <section id="secApplications" class="content" role="tabpanel" aria-labelledby="tabApplications">
-    <!-- ⚠ 제목·안내문의 «이름»은 탭 이름(접수 처리)과 «글자 그대로» 같아야 한다.
+    <!-- ⚠ 제목·안내문의 «이름»은 탭 이름(신청사업 현황)과 «글자 그대로» 같아야 한다.
          예전엔 탭은 「접수 처리」, 화면 제목은 「신청 접수」로 달라 지금 어느 탭인지 이어지지 않았다. -->
-    <h2 class="sr-only">접수 처리</h2>
-    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span><b class="hint-tab">접수 처리</b> — 시민 신청을 실시간으로 처리합니다. 바꾼 내용은 곧바로 반영됩니다.</span></p>
+    <h2 class="sr-only">신청사업 현황</h2>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16l2 8v6H2v-6z"/><path d="M2 13h5l1.5 3h7L17 13h5"/></svg><span><b class="hint-tab">신청사업 현황</b> — 시민 신청을 실시간으로 처리합니다. 바꾼 내용은 곧바로 반영됩니다.</span></p>
 
     <!-- 📊 이달의 접수 현황(도넛) — 확정 시안 A 의 도넛을 그대로 옮긴 «현황» 자리.
          수치·조각 길이는 stats.js 가 실제 접수 목록에서 «이번 달»만 골라 채운다(app.js 는 손대지 않는다).
@@ -265,7 +294,10 @@
            다시 «보여주기 전용» <div> 입니다 — 클릭·호버·커서·role·tabindex·키보드 처리가 없습니다.
            되살리지 마세요(style.css 의 button.kpi 규칙과 app.js 의 카드 클릭 연결도 함께 지웠습니다).
            · 세는 기준(오늘/심사중/이달 승인/이달 반려)은 여전히 stats.js 의 window.sjScopes 한 곳뿐입니다.
-           · 카드마다 «성격에 맞는 색»(블루·앰버·그린·레드)이 입혀 있습니다 — style.css 의 --kpi-* 참조.
+           · ★ 2026-08-24(A-05) — 카드 «모양»을 사업·시민 제안 탭의 요약 띠(.sum-mini)와 통일했습니다.
+             흰 바탕 + 위쪽 6px 상태색 띠 + 그림자 --e3 (규격서 §19-3 «C안 세움»).
+             예전의 «연한 틴트 + 왼쪽 5px 선»은 이 탭에만 걸려 있어 탭마다 카드가 달라 보였습니다.
+             색 값은 style.css :root 의 --st-* 한 곳뿐이고, 도넛 조각도 «같은 값»을 씁니다.
              색만으로 알리지 않으며, 라벨 글자가 무엇을 센 수인지 그대로 말합니다. -->
       <section class="kpis" aria-label="접수 현황 요약">
         <div class="kpi k-now"><b id="kpiToday"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>오늘 접수</span></div>
@@ -281,20 +313,26 @@
           <title id="aStatsT">이달의 접수 상태별 비중</title>
           <desc id="aStatsD">아직 자료를 불러오지 않았습니다.</desc>
           <circle class="dn-track" cx="70" cy="70" r="54"></circle>
+          <!-- ⚠ 이 네 줄의 «차례»는 stats.js ORDER 와 «반드시» 같아야 한다(같은 k 로 짝지어진다).
+               ⚠ 클래스 이름은 순번(d1~d4)이 아니라 «상태»다 — 차례를 바꿔도 색이 따라오지 않고
+                  제자리에 남도록(2026-08-24 A-04 2차). 차례를 바꾸려면 stats.js 의 머리말을 먼저 읽을 것. -->
           <g class="dn-seg">
-            <circle class="d1" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
-            <circle class="d2" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
-            <circle class="d3" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
-            <circle class="d4" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+            <circle class="s-ok"   cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+            <circle class="s-recv" cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+            <circle class="s-rev"  cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
+            <circle class="s-no"   cx="70" cy="70" r="54" stroke-dasharray="0 339.3" stroke-dashoffset="0"></circle>
           </g>
           <text class="dn-num" id="aStatsNum" x="70" y="72" text-anchor="middle">0</text>
           <text class="dn-lab" x="70" y="89" text-anchor="middle">이달의 접수(건)</text>
         </svg>
+        <!-- ⚠ 범례 차례 = 도넛 조각 차례 = stats.js ORDER (승인·접수·심사중·반려).
+             ⚠ aLgN«번호» 는 «차례»를 따르고, 표식 클래스 k-«상태» 는 «상태»를 따른다.
+                그래서 차례를 바꿔도 「승인은 원, 반려는 마름모」가 그대로 남는다. -->
         <ul class="donut-legend">
-          <li><span class="dn-mk m1" aria-hidden="true"></span>승인<b id="aLgN1">0</b><em id="aLgP1">0%</em></li>
-          <li><span class="dn-mk m2" aria-hidden="true"></span>심사중<b id="aLgN2">0</b><em id="aLgP2">0%</em></li>
-          <li><span class="dn-mk m3" aria-hidden="true"></span>접수<b id="aLgN3">0</b><em id="aLgP3">0%</em></li>
-          <li><span class="dn-mk m4" aria-hidden="true"></span>반려<b id="aLgN4">0</b><em id="aLgP4">0%</em></li>
+          <li><span class="dn-mk k-ok"   aria-hidden="true"></span>승인<b id="aLgN1">0</b><em id="aLgP1">0%</em></li>
+          <li><span class="dn-mk k-recv" aria-hidden="true"></span>접수<b id="aLgN2">0</b><em id="aLgP2">0%</em></li>
+          <li><span class="dn-mk k-rev"  aria-hidden="true"></span>심사중<b id="aLgN3">0</b><em id="aLgP3">0%</em></li>
+          <li><span class="dn-mk k-no"   aria-hidden="true"></span>반려<b id="aLgN4">0</b><em id="aLgP4">0%</em></li>
           </ul>
         </div>
         <!-- 이달 ↔ 지난달 견주기 — stats.js 가 created_at 만 세어 채운다(글자만, 색 의존 없음) -->
@@ -391,8 +429,8 @@
   <!-- 섹션 1: 사업 관리 (기존) — 기본 탭이 신청 접수로 바뀌어 초기엔 숨김 -->
   <section id="secBenefits" class="content hidden" role="tabpanel" aria-labelledby="tabBenefits" hidden>
     <!-- 화면에는 탭 버튼이 제목 역할을 하므로 heading 은 보조기기 전용으로만 둔다 -->
-    <h2 class="sr-only">사업</h2>
-    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span><b class="hint-tab">사업</b> — 사업을 찾아 고치거나 새로 올립니다.</span></p>
+    <h2 class="sr-only">진행사업 현황</h2>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span><b class="hint-tab">진행사업 현황</b> — 사업을 찾아 고치거나 새로 올립니다.</span></p>
     <!-- 요약 띠 — 값은 app.js renderBSummary() 가 채운다(실제로 세는 수만 둔다). -->
     <div id="bSummary" class="sum-mini" hidden>
       <div class="kpi k-now"><b id="kpiBAll"><span class="kpi-sr sr-only">0</span><span class="kpi-vis" aria-hidden="true">0</span></b><span>전체 사업</span></div>
@@ -407,10 +445,14 @@
       <label for="search" class="sr-only">사업명 · 내용 · 담당팀 검색</label>
       <span class="search-wrap"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="search" class="search-input wide" type="search" placeholder="사업명 · 내용 · 담당팀 검색" aria-label="사업명 · 내용 · 담당팀 검색"></span>
       <label for="sortSel" class="sr-only">정렬 기준</label>
-      <!-- 정렬 — 말투는 시민 제안 탭(#pSortSel «최신순/공감순»)과 맞춘다.
+      <!-- 정렬 — 말투는 정책제안 현황 탭(#pSortSel «최신순/공감순»)과 맞춘다.
            «최신순» = 마지막으로 «고친» 시각(updated_at) 기준. 방금 손본 사업이 맨 위로 온다.
            updated_at 이 없는 옛 행은 created_at → id 순으로 안전하게 떨어진다(app.js benefitTime). -->
-      <select id="sortSel" class="sort-select" aria-label="정렬 기준"><option value="seq">기본순</option><option value="new">최신순</option><option value="name">사업명순</option></select>
+      <!-- ★ 정렬 차례·값·이름 확정 (A-11 · 2026-08-24 · 시민앱 C-11 사양 그대로)
+             ① default 기본순 (항상)   ② new 최신순 (등록일이 «하나라도» 있을 때만 · app.js syncSortOptions)
+             ③ team 팀별순 (항상)      ④ name 사업명순 (원래 있던 것 — 그 뒤에 붙인다)
+           ⚠ value 는 시민앱과 «글자 단위로» 같아야 합니다. 한쪽만 고치지 마세요. -->
+      <select id="sortSel" class="sort-select" aria-label="정렬 기준"><option value="default">기본순</option><option value="new">최신순</option><option value="team">팀별순</option><option value="name">사업명순</option></select>
       <span id="count" class="count" role="status" aria-live="polite"></span>
       <!-- 설계안: «새 사업 올리기»는 상단이 아니라 사업 목록 바로 위에 둔다.
            ⚠ id(btnAdd)는 그대로 — app.js bindUI() 가 이 id 로 연결한다. -->
@@ -429,8 +471,8 @@
 
   <!-- 섹션 2: 정책제안 관리 (신규) — 비활성 패널은 class 와 hidden 속성을 함께 걸어 보조기기에도 확실히 숨긴다 -->
   <section id="secProposals" class="content hidden" role="tabpanel" aria-labelledby="tabProposals" hidden>
-    <h2 class="sr-only">시민 제안</h2>
-    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span><b class="hint-tab">시민 제안</b> — 시민 제안을 검토하고 답변합니다. 블라인드 글도 여기서는 보입니다.</span></p>
+    <h2 class="sr-only">정책제안 현황</h2>
+    <p class="search-hint"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/></svg><span><b class="hint-tab">정책제안 현황</b> — 시민 제안을 검토하고 답변합니다. 블라인드 글도 여기서는 보입니다.</span></p>
     <!-- 요약 띠 — 설계안 «통계는 각 탭 상단 요약 띠». 값은 app.js renderPSummary() 가 채운다.
          ⚠ 최종값은 .kpi-sr 에 먼저 넣고 .kpi-vis 만 카운트업한다(규격서 §14). -->
     <div id="pSummary" class="sum-mini" hidden>
@@ -575,9 +617,10 @@
       <ul class="pp-list">
         <li><strong>관리자(공무원) 계정</strong>: 로그인 이메일, 비밀번호(암호화 저장)</li>
         <li><strong>사업 정보</strong>: 사업명, 담당팀, 담당 연락처, 담당자 이메일, 지원대상·내용 등(업무용 연락처)</li>
-        <li><strong>시민 지원사업 신청</strong>: 신청자 성명, 연락처(휴대전화), 문의사항, 신청 사업명, 접수번호, 처리상태·처리메모, 시민 안내문, 확인 번호
+        <li><strong>시민 지원사업 신청</strong>: 신청자 성명, 연락처(휴대전화), 문의사항, 신청 사업명, <strong>(첨부 시) 증빙서류 파일</strong>, 접수번호, 처리상태·처리메모, 시민 안내문, 확인 번호
           <br><span class="pp-sub">※ <strong>처리메모</strong>는 부서 내부 기록으로 신청자에게 보이지 않으며, <strong>시민 안내문</strong>은 신청자가 「내 신청 현황」에서 그대로 읽습니다.
-          <strong>확인 번호</strong>는 신청자 휴대폰에서 만들어진 무작위 값(개인정보 아님)으로, 본인 신청의 상태 확인에만 쓰입니다.</span></li>
+          <strong>확인 번호</strong>는 신청자 휴대폰에서 만들어진 무작위 값(개인정보 아님)으로, 본인 신청의 상태 확인에만 쓰입니다.<br>
+          ※ 시민은 신청 시 <strong>증빙서류를 첨부</strong>할 수 있습니다(선택). 첨부된 파일은 최대 5개·1개당 10MB 까지이며, <strong>담당 부서가 신청 내용을 확인하는 목적으로만 이용합니다.</strong> 첨부파일은 <strong>비공개 저장소</strong>에 보관되어 <strong>로그인한 담당 공무원만</strong> 열람할 수 있고, 인터넷 주소만으로는 누구도 열 수 없습니다. 파일 이름은 접수대장의 「첨부서류」 칸에 함께 기록되며(본 도구의 신청 상세 화면에 그 이름이 표시됩니다), <strong>신청 건이 파기될 때 첨부파일도 함께 파기</strong>합니다(아래 <strong>4절</strong>).</span></li>
         <li><strong>시민 정책제안</strong>: 제목·내용, 닉네임(익명), 지역, 공감/신고 내역(작성 시 실명·전화·주민번호 등 민감정보 미수집 원칙)</li>
       </ul>
 
@@ -585,27 +628,73 @@
       <p class="pp-p">지원사업 정보 관리, <strong>시민 지원사업 신청 접수·처리 및 결과 안내(신청자 연락)</strong>, 시민 정책제안 검토·답변·상태관리, 부적절 게시물(블라인드) 처리 등 행정 업무 수행.</p>
 
       <h2 class="pp-h">3. 보유·이용 기간</h2>
-      <p class="pp-p">관련 법령 및 상주시 기록물 관리 기준에 따라 보유합니다. 구체적인 보유기간: <strong>운영 개시 시 확정</strong></p>
+      <p class="pp-p">관련 법령 및 상주시 기록물 관리 기준에 따라 보유하며, 기간이 지나면 파기합니다. 구체적인 보유기간: <strong>운영 개시 시 확정</strong></p>
+      <p class="pp-p">파기 절차·방법은 아래 <strong>4절 「개인정보 파기 절차 및 방법」</strong>에 한 곳으로 모아 적었습니다.</p>
+      <!-- ⛔ 파기 규칙을 여기에 다시 쓰지 말 것 — 4절이 «유일한» 자리다.
+           두 곳에 두면 언젠가 한쪽만 고쳐지고, 둘이 어긋나는 순간 어느 쪽이 맞는지
+           아무도 모르게 된다(개인정보보호법 §30 고지사항이라 «틀린 고지»가 된다).
+           PC앱 webui/index.html 도 오늘 같은 이유로 §3 에 쓰던 것을 §8 한 곳으로 모았다. -->
 
-      <h2 class="pp-h">4. 처리 위탁 및 국외 이전</h2>
+      <h2 class="pp-h">4. 개인정보 파기 절차 및 방법</h2>
+      <!-- ★ 2026-08-24 (🔴살핌 최종검수) — 이 절이 «통째로» 없었다. 개인정보보호법 §30 의
+           필수 기재사항이라, 없으면 그 자체로 배포 불가다. 시민앱은 §4, PC앱은 §8 에 있었고
+           공무원앱에만 빠져 있었다.
+           ⚠ 위 «§30» 은 «법 조문 번호»다 — 이 문서의 절 번호가 아니다(이 문서에서는 4절).
+           ⚠ 내용은 PC앱 webui/index.html «8절» · 시민앱 모바일웹/index.html «4절» 과
+             같아야 한다 — 법적 고지다. 한쪽만 고치지 말 것.
+             ⚠ 다만 «글자 단위로 같지는 않다». 실제로 다음이 다르다(🔴살핌 3자 대조, 2026-08-24):
+               · 마크업 — webui 는 <p> 2개, 여기는 <ul><li> (시민앱과 같은 꼴로 맞췄다)
+               · 여기에만 있는 두 줄 — 「불편신고 메일함 파기」(webui 는 8절이 아니라 3절에 있다) ·
+                 「다른 법령 보존」(시민앱 4절에서 가져왔다)
+             ⇒ 정보는 세 앱에 «모두» 있고 «어느 절에 있는가»만 다르다. 대조할 때 이 점을 알고 볼 것.
+             (자리를 보유기간 «바로 뒤»로 잡은 것은 시민앱 모바일웹/index.html 과 같은 차례를
+              따른 것이다: 1 항목 → 2 목적 → 3 보유 → 4 파기 → 5 위탁)
+           ⛔ 첨부파일 파기 문장을 빼지 말 것 — 보관만 고지하고 파기를 적지 않으면 미비다. -->
       <ul class="pp-list">
-        <li><strong>Supabase</strong>: 데이터 저장·실시간 동기화(클라우드 DB·인증). 서버 위치에 따라 국외 이전이 발생할 수 있어 검토 중입니다. 국외 이전 여부·국가·보호조치: <strong>운영 개시 시 확정</strong></li>
-        <li><strong>Web3Forms</strong>: 시민 신청 메일 전달 처리(시민앱 연동). 위탁계약 체결 여부·내용: <strong>운영 개시 시 확정</strong></li>
+        <li><strong>파기 절차</strong> — 보유기간이 지나거나 처리 목적이 달성된 개인정보는 담당 부서가 확인해 지체 없이 파기합니다.</li>
+        <li><strong>파기 방법</strong> — 전자적 파일은 <strong>복구가 불가능한 방법으로 영구 삭제</strong>하고, 출력물은 <strong>분쇄 또는 소각</strong>합니다.</li>
+        <li>신청에 <strong>증빙서류가 첨부된 경우, 신청 건이 파기될 때 첨부파일도 함께 파기</strong>합니다. 클라우드 데이터베이스·비공개 저장소의 자료는 담당자가 관리 화면에서 삭제하여 복구할 수 없도록 파기하고, 부서 내부에 내려받아 보관한 파일(접수대장 등)도 같은 방법으로 영구 삭제합니다.</li>
+        <li>시민이 보내 주신 <strong>「불편신고」</strong>는 담당 부서 메일함에 남으므로, 응대가 끝나면 함께 파기 대상으로 관리합니다.</li>
+        <li>다른 법령에 따라 보존해야 하는 자료는 그 기간 동안 다른 자료와 분리하여 보관한 뒤 파기합니다.</li>
       </ul>
 
-      <h2 class="pp-h">5. 정보주체의 권리</h2>
+      <h2 class="pp-h">5. 처리 위탁 및 국외 이전</h2>
+      <ul class="pp-list">
+        <li>시민이 제출한 신청서는 <strong>아래 Supabase에 접수 자료로 저장</strong>되며, 담당 부서는 이 관리 도구에서 그 자료를 확인·처리합니다. <strong>신청 내용을 외부 메일로 전송하지 않습니다.</strong></li>
+        <li><strong>Supabase</strong>(클라우드 데이터베이스·파일 저장소): <strong>지원사업 신청 내역(이름·연락처·문의사항·접수번호·처리상태·처리메모)</strong>, <strong>신청 시 첨부된 증빙서류 파일</strong>, 정책제안 데이터의 저장·실시간 동기화 및 <strong>관리자 로그인 인증</strong> 업무를 위탁합니다. 서버 위치에 따라 국외 이전이 발생할 수 있어 검토 중입니다. 국외 이전 여부·국가·보호조치: <strong>운영 개시 시 확정</strong></li>
+        <li><strong>Web3Forms</strong>(폼메일 서비스): <strong>시민앱에서 「불편신고」로 보내 주신 내용에 한하여</strong> 담당 부서 메일로 <strong>전달</strong>하는 업무를 위탁합니다. <strong>지원사업 신청 내역은 이 서비스로 전달되지 않습니다.</strong> 본 관리 도구는 이 서비스를 호출하지 않으며, 이 화면의 「불편신고」는 담당 부서 메일 주소로 곧바로 보내집니다. 위탁계약 체결 여부·내용: <strong>운영 개시 시 확정</strong></li>
+        <li>수탁자는 위 <strong>2곳</strong>이며, 위탁 업무 외의 목적으로 개인정보를 이용할 수 없도록 관리·감독합니다. 위 위탁 목적 외의 제3자에게 개인정보를 제공하지 않습니다.</li>
+      </ul>
+
+      <h2 class="pp-h">6. 정보주체의 권리</h2>
       <p class="pp-p">정보주체는 자신의 개인정보에 대한 열람·정정·삭제·처리정지를 요구할 수 있으며, 아래 보호책임자에게 요청할 수 있습니다.</p>
 
-      <h2 class="pp-h">6. 개인정보 보호책임자</h2>
+      <h2 class="pp-h">7. 개인정보 보호책임자</h2>
       <p class="pp-p">성명·직위·부서: <strong>운영 개시 시 확정</strong> / 연락처: <strong>hcyang572@korea.kr</strong></p>
 
-      <h2 class="pp-h">7. 안전성 확보 조치</h2>
+      <h2 class="pp-h">8. 안전성 확보 조치</h2>
       <p class="pp-p">본 도구는 <strong>HTTPS 암호화 통신</strong>으로 제공되며, <strong>관리자 로그인 인증(로그인 없이는 어떤 자료도 조회되지 않음)</strong>과 행 수준 접근제어(RLS)로 데이터 접근을 통제합니다. 로그아웃하면 화면의 자료는 즉시 사라집니다. 세션이 만료되면 자료의 조회·저장이 차단되어 다시 로그인해야 하며, 작성 중이던 내용이 사라지지 않도록 화면은 그대로 둡니다.</p>
 
       <p class="pp-foot">※ 본 처리방침의 시행일: <strong>운영 개시일</strong></p>
       <!-- ⚠ 「운영 개시 시 확정」 항목: 1) 보유·이용 기간 2) Supabase 국외 이전 여부·국가·보호조치
            3) Web3Forms 위탁계약 4) 보호책임자 성명/직위/부서 5) 시행일(=운영 개시일)
-           표현은 시민앱(모바일웹/index.html)과 «같아야» 한다. 한쪽만 고치지 말 것. -->
+
+           ★ 「개인정보보호법 §26(업무위탁)」에 따른 고지다.
+             ⚠ 여기 «§26» 은 «법 조문 번호»다 — 이 문서의 절 번호가 아니다.
+               이 문서에서 위탁은 «5절»이고, 절이 밀려도 법 조문 §26 은 그대로다.
+               (같은 주석의 §30 도 마찬가지로 법 조문 번호다. 파기 조항 = 이 문서 4절)
+             그 고지의 «사실»(누구에게·무엇을·왜)은 시민앱(모바일웹/index.html «5절»)·
+             PC앱(webui/index.html)과 «같은 내용»이어야 한다. 한쪽만 고치지 말 것.
+             ⚠ «같은 내용»이지 «글자 단위로 같은 것»은 아니다 — 읽는 사람이 달라 시점을 바꾼다
+               (시민앱 「신청서를 제출하면」 → 여기는 「시민이 제출한 신청서는」).
+               다만 위탁 사실을 이루는 문장 자체는 되도록 그대로 옮긴다.
+           ★ 2026-08-24 사실관계(고칠 때 반드시 확인):
+             · 시민 신청은 Supabase 로 «직접» 들어온다. 신청 메일 발송은 «없어졌다»
+               (apply_client.js 머리말 참조) — 「Web3Forms: 시민 신청 메일 전달」로 적으면 «거짓 고지»다.
+             · Web3Forms 는 시민앱의 «불편신고»에만 남아 있다 → 위탁 사실로 «반드시» 밝혀야 한다.
+               「Web3Forms 를 쓰지 않는다」고만 적어도 «거짓 고지»가 된다.
+             · 이 공무원앱 자체는 Web3Forms 를 호출하지 않는다(맨 위 CSP 의 connect-src 에 없다).
+               푸터 「불편신고」는 mailto: 링크라 공무원 PC 의 메일 프로그램이 열릴 뿐이다. -->
     </div>
   </div>
 </div>
@@ -651,13 +740,13 @@
         integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- 공통 버전·개선사항 단일 소스(앱 스크립트보다 먼저 로드) -->
-<script src="version.js?v=0.5.4"></script>
-<script src="config.js?v=0.5.4"></script>
+<script src="version.js?v=0.6.0"></script>
+<script src="config.js?v=0.6.0"></script>
 <!-- 서식 스토리지 공용 헬퍼(세 앱 공통). app.js 보다 먼저 로드 -->
-<script src="forms.js?v=0.5.4"></script>
+<script src="forms.js?v=0.6.0"></script>
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
-<script src="apply_client.js?v=0.5.4"></script>
-<script src="app.js?v=0.5.4"></script>
+<script src="apply_client.js?v=0.6.0"></script>
+<script src="app.js?v=0.6.0"></script>
 <!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
      CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.
        · tap.js   — 버튼 눌림 파동 + 햅틱(진동). 화면에 무엇을 그리지는 않는다.
@@ -666,13 +755,13 @@
        · icons.js — app.js 가 «만들어 내는» 화면의 이모지를 인라인 SVG 로 바꿔 끼운다.
          (app.js 를 고치지 않고 «그려진 뒤의 글자»만 바꾼다 — 세 앱이 글자 단위로 같아야 하는
           문자열까지 원본을 건드리지 않고 다룰 수 있다) -->
-<script src="tap.js?v=0.5.4"></script>
-<script src="icons.js?v=0.5.4"></script>
-<script src="stats.js?v=0.5.4"></script>
-<script src="a2hs.js?v=0.5.4"></script>
+<script src="tap.js?v=0.6.0"></script>
+<script src="icons.js?v=0.6.0"></script>
+<script src="stats.js?v=0.6.0"></script>
+<script src="a2hs.js?v=0.6.0"></script>
 
 <!-- PWA 서비스워커 등록 (상대경로 → /admin/ 하위에서만 동작, 시민앱과 분리) -->
 <!-- 서비스워커 등록 — CSP 적용을 위해 인라인 대신 별도 파일(sw-register.js)로 둔다 -->
-<script src="sw-register.js?v=0.5.4"></script>
+<script src="sw-register.js?v=0.6.0"></script>
 </body>
 </html>

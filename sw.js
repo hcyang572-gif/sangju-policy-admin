@@ -25,7 +25,7 @@
 // 배포 버전 — 버전정보.json 의 "version" 및 version.js 의 APP_VERSION 과 항상 같은 값.
 // ⚠ 손으로 고치지 말고 루트의 `py -3 자원버전_동기화.py` 를 돌리면
 //    이 값과 index.html 의 ?v= 쿼리가 한 번에 맞춰진다.
-const ASSET_V = "0.5.0";
+const ASSET_V = "0.6.0";
 
 // v26 사유 (2026-08-19, 🔵손길) — index.html·style.css·app.js 를 «셋 다» 고쳤다.
 //   ① 폰(≤599px) «가로 띠» 로그인 배경을 낮춰 아이브로 대비를 4.45 → 5.90:1 로 올림 (style.css)
@@ -106,7 +106,11 @@ const ASSET_V = "0.5.0";
 //      「이달의 접수」 요약 패널에 «읍·면·동별 신청 현황» 막대를 더했다.
 //      ★ 25개 지역 목록은 JS 에 베끼지 않고 data.json 에서 받는다(build_data.py 196행 규약).
 //        → OPTIONAL 에 data.json 이 새로 들어갔다. 이것이 캐시 이름을 올리는 «직접적인» 이유다.
-const CACHE = "sangju-admin-v39";   // v39: 테스트 모드 «로그인 없이 둘러보기»(2026-08-21, 📱모바일).
+const CACHE = "sangju-admin-v41";   // v41: 0.6.0 — 헤더 고정(sticky)·정책제안 삭제·25분야, 댓글 실시간 반영,
+                                     //   처리방침 §30 파기 조항 신설 등 반영(app.js·stats.js·forms.js·
+                                     //   apply_client.js·index.html 변경, 2026-08-24 21시 배포).
+                                     // v40: 앱 아이콘 A안 교체 — icon-admin-*-v3.png(2026-08-24, 🔵손길).
+//                                    v39: 테스트 모드 «로그인 없이 둘러보기»(2026-08-21, 📱모바일).
 // (v38: data.js 사본 프리캐시 — 행정망 .json 차단 대비, 2026-08-21, 📱모바일)
 //                                    v37: 요약 카드 색 토큰 + 클릭 좁혀보기 되돌리기(2026-08-21, 🔴검수).
 //                <button data-scope>→<div> 로 되돌아가 클릭 바인딩(toggleAScope)이 사라졌다 —
@@ -152,9 +156,9 @@ const ESSENTIAL = [
 ];
 // 없어도 화면 골격은 뜨는 자원(그림). 실패해도 설치를 막지 않는다.
 const OPTIONAL = [
-  "assets/icon-admin-192.png",
-  "assets/icon-admin-512.png",
-  "assets/icon-admin-maskable-512.png",  // 안드로이드 «잘리는» 아이콘용(안전영역 안쪽에만 그림)
+  "assets/icon-admin-192-v3.png",
+  "assets/icon-admin-512-v3.png",
+  "assets/icon-admin-maskable-512-v3.png",  // 안드로이드 «잘리는» 아이콘용(안전영역 안쪽에만 그림)
   "assets/sangsang1.png",
   "assets/gotgam.png",
   "assets/slogan-stack.png",   // 2026 시정구호(2줄형 원본)
