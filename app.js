@@ -1286,6 +1286,15 @@ const GUEST_WRITE_MSG =
   "테스트 모드(로그인 없이 둘러보기)에서는 저장·수정·삭제를 할 수 없습니다. "
   + "실제 처리는 담당자 계정으로 로그인한 뒤 이용해 주세요.";
 
+/* 🧪 둘러보기가 «불러도 되는» RPC — 읽기 전용인 것만 이름으로 적는다.
+   ⛔ 목록에 없는 RPC 는 전부 막힌다(닫힌 쪽이 기본값).
+     · demo_applications — 둘러보기 예시 신청 10건. 표를 하나도 읽지 않는 고정 목록이라
+       구조적으로 개인정보가 샐 수 없다(supabase/둘러보기_예시자료_260825.sql).
+   ⚠ 새 «읽기» RPC 를 쓰게 되면 여기에 이름을 더한다. 목록을 없애고 전부 여는 쪽으로
+     되돌리지 말 것 — 댓글 감추기(set_comment_hidden)·삭제(delete_comment_admin) 가
+     «같은 통로»를 쓰므로, 열면 지우는 길이 함께 열린다. */
+const GUEST_RPC_ALLOW = ["demo_applications"];
+
 function guestAllowed() {
   try { return typeof TEST_MODE_ALLOW_GUEST !== "undefined" && TEST_MODE_ALLOW_GUEST === true; }
   catch (e) { return false; }
@@ -1342,6 +1351,21 @@ function installGuestReadOnlyGuard() {
       });
       return b;
     };
+    /* 📞 RPC — sb.from() 과 «같은 쓰기 통로»다. 여기를 비워 두면 표 쓰기를 막아 놓고
+       «함수로 지우는» 길만 열린 채 남는다(댓글 감추기·삭제가 정확히 그 길이다).
+       ⚠ 서버는 이미 막고 있다 — set_comment_hidden·delete_comment_admin 은 anon·public 에서
+         execute 를 회수했고(supabase/권한정리_260824.sql [1] · 실행 완료), 함수 본문에도
+         「auth.role() <> 'authenticated' → raise」 가 있다. 여기서 한 번 더 막는 까닭은
+         sb.from 과 «같다» — 서버가 돌려주는 영어 권한 오류 대신 우리 말로 알려 주기 위해서다.
+       ⚠ 읽기 전용 RPC(GUEST_RPC_ALLOW)는 통과시킨다 — 안 그러면 둘러보기 예시 목록이
+         통째로 깨진다(apply_client.js 의 demo_applications). */
+    if (typeof sb.rpc === "function") {
+      const origRpc = sb.rpc.bind(sb);
+      sb.rpc = function (fn, args, opts) {
+        if (GUEST_RPC_ALLOW.indexOf(String(fn)) >= 0) return origRpc(fn, args, opts);
+        return _guestBlocked();
+      };
+    }
     if (sb.storage && typeof sb.storage.from === "function") {
       const origStorage = sb.storage.from.bind(sb.storage);
       sb.storage.from = function (bucket) {
@@ -2753,7 +2777,12 @@ function openEdit(r) {
      ⚠ 삭제는 «맨 끝» — 되돌릴 수 없는 단추를 먼저 닿는 자리에 두지 않는다
         (정책제안 모달 #pmSave → #pmDelete 와 같은 차례). */
   html += `<div class="modal-actions"><button id="mSave" class="top-btn solid"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>` +
-    (r ? `<button id="mDel" class="top-btn danger"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>` : ``) + `</div>`;
+    /* 🧪 둘러보기(게스트)에게는 «삭제»를 아예 내보내지 않는다 (2026-08-25 양호창님 지시).
+       ⚠ 저장(#mSave)은 남긴다 — 이번 지시는 «지우는 일»만 막는 것이다.
+       ※ 서버는 이미 막혀 있다(anon 의 benefits DELETE 회수 · 권한정리_260824.sql [2]).
+         그래도 단추를 지우는 까닭은 이 저장소 규약 —
+         「눌러 봐야 실패할 조작을 남기지 않는다」(#btnAcct·#btnSyncLog 와 같은 규약). */
+    (r && !IS_GUEST ? `<button id="mDel" class="top-btn danger"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>` : ``) + `</div>`;
   $("#mBody").innerHTML = html;
 
   // 분야 칩 채우기.
@@ -2870,7 +2899,7 @@ function openEdit(r) {
     await loadBenefits();
   }
   // 🔒 연타 방어(bindOnce) — 확인창을 두 번 띄우거나 delete 를 두 번 보내지 않는다.
-  if (r) bindOnce($("#mDel"), async () => {
+  if (r && !IS_GUEST) bindOnce($("#mDel"), async () => {
     // 되돌릴 수 없는 삭제 — 초점은 «취소»에 놓인다(askConfirm 규약).
     const ok = await askConfirm({
       title: "이 사업을 삭제할까요?",
@@ -2923,7 +2952,7 @@ async function refreshFormsList(r) {
       : `<span class="forms-item-name">📄 ${esc(nm)}</span>`;
     return `<li class="forms-item" data-id="${esc(String(row.id))}">
         <span class="forms-item-main">${nameHtml}<span class="forms-item-meta" aria-hidden="true">${esc(meta)}</span></span>
-        <button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>
+        ${IS_GUEST ? "" : `<button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>`}
       </li>`;
   }).join("");
   // 삭제 버튼 바인딩(행 데이터는 클로저로 잡아둔다)
@@ -3433,9 +3462,11 @@ async function onCommentAction(ev) {
     const hide = act === "hide";
     /* ⚠ «감추기»는 되돌릴 수 있어 확인창을 두지 않는다(다시 보이기 단추가 바로 옆에 있다).
        되돌릴 수 없는 «삭제»만 묻는다 — 확인 강도를 위험에 맞춘다. */
+    /* ⌨ 네번째 인자 = 다시 그린 뒤 초점을 되돌릴 댓글 — 감추기·다시 보이기는
+       그 댓글이 그대로 있으므로 «같은 댓글»의 단추로 돌아간다(pCmtRefocus 머리말). */
     await callCommentRpc("set_comment_hidden", { p_id: id, p_hidden: hide },
       hide ? "이 댓글을 감췄습니다. 시민 화면에서 보이지 않습니다."
-           : "이 댓글을 다시 보이게 했습니다.");
+           : "이 댓글을 다시 보이게 했습니다.", id);
     return;
   }
   if (act === "del") {
@@ -3448,24 +3479,55 @@ async function onCommentAction(ev) {
       okText: "삭제"
     });
     if (!ok) return;
+    // ⌨ 삭제는 돌아갈 단추가 «없다» — 댓글 id 를 넘기지 않아 목록 상자로 돌려보낸다.
     await callCommentRpc("delete_comment_admin", { p_id: id }, "댓글을 삭제했습니다.");
   }
 }
 
 /* RPC 를 부르고, 끝나면 목록을 다시 그린다. 실패는 «우리 말»로 알린다.
    ⚠ 성공/실패 어느 쪽이든 화면 안내(announce) 가 함께 간다 — 색·움직임만으로 알리지 않는다. */
-async function callCommentRpc(fn, args, doneMsg) {
+async function callCommentRpc(fn, args, doneMsg, focusId) {
   markSelfWrite();                    // 🤫 내 글이 되돌아와 «새 제안» 소리를 내지 않게
   try {
     const { error } = await sb.rpc(fn, args);
     if (error) throw error;
   } catch (e) {
+    /* ⚠ 실패하면 목록을 다시 그리지 «않는다» = 방금 누른 단추가 그대로 있다.
+       초점은 askAlert 이 닫힐 때 그 단추로 스스로 되돌아간다(askDone 의 ASK_LASTFOCUS).
+       → 여기서 따로 손대지 않는다. 두 번 옮기면 오히려 자리를 흔든다. */
     const m = writeErrMsg(e, "처리");
     announce(m); askAlert(m); return false;
   }
   announce(doneMsg);
   if (P_CMT_PID) await loadProposalComments(P_CMT_PID);
+  pCmtRefocus(focusId);
   return true;
+}
+
+/* ⌨ 목록을 다시 그리면 방금 누른 단추가 «사라진다» — 초점이 <body> 로 떨어져
+   키보드만 쓰는 이용자가 있던 자리를 잃는다(KWCAG 2.2 «초점 이동»).
+     · 감추기·다시 보이기 → 그 댓글은 그대로 있다. 같은 댓글의 단추로 초점을 되돌린다
+       (「감추기」가 「다시 보이기」로 바뀌어 있으므로 무엇이 됐는지 손끝으로도 안다).
+     · 삭제              → 돌아갈 단추가 없다. 목록 상자(#pmComments · tabindex="0")로 옮긴다.
+   ★ PC앱 webui/proposals.js 의 «같은 이름» 함수를 그대로 본뜬 것이다(2026-08-25 · 세 앱 패리티).
+     ⛔ 한쪽만 고치지 말 것 — 둘이 같은 결이어야 한다.
+   ★ 핵심 — 초점이 «댓글 목록 안»이거나 «이미 잃어버린(body)» 때만 개입한다.
+     담당자가 그 사이 다른 칸(처리메모·담당부서 답변)을 만지고 있으면 빼앗지 않는다.
+     초점을 함부로 옮기는 것이 안 옮기는 것보다 나쁠 때가 많다.
+   ⚠ 통지(announce)와는 별개의 일이다 — 「무슨 일이 있었나」는 #liveStatus 가,
+     「초점이 어디로 가나」는 이 함수가 맡는다. 부르는 차례가 announce → 다시 그리기 →
+     초점이라 낭독이 겹치지 않는다(같은 말을 두 번 하지 않는다). */
+function pCmtRefocus(commentId) {
+  try {
+    const box = $("#pmComments");
+    if (!box || !box.isConnected) return;
+    const cur = document.activeElement;
+    if (cur && cur !== document.body && box !== cur && !box.contains(cur)) return;
+    const back = commentId
+      ? box.querySelector('button[data-id="' + String(commentId).replace(/"/g, '\\"') + '"]')
+      : null;
+    (back || box).focus();
+  } catch (e) { /* 초점 되돌리기는 «거들 뿐» — 실패해도 처리 결과에 영향이 없다 */ }
 }
 
 /* ⛔⛔ 2026-08-25 — 여기 있던 공무원 «쓰기» 코드 두 덩이를 없앴습니다(양호창님 결정).
@@ -4619,9 +4681,10 @@ async function openApplication(r) {
                 placeholder="예) 서류 확인이 끝났습니다. 8월 25일까지 심사 결과를 문자로 안내드리겠습니다.">${esc(r.citizen_reply || "")}</textarea>
       <p id="amReplyLimit" class="field-hint">300자까지 쓸 수 있습니다. 안내에 필요한 내용만 간단히 적어 주세요.</p>
     </div>
-    <!-- 규격서 §0 «한 화면 버튼 3개 상한» — 삭제·인쇄·저장 정확히 셋. 여기에 더 늘리지 말 것. -->
+    <!-- 규격서 §0 «한 화면 버튼 3개 상한» — 삭제·인쇄·저장 정확히 셋. 여기에 더 늘리지 말 것.
+         ※ 둘러보기(게스트)는 «삭제»가 빠져 둘이다 — 상한 아래라 규격에 어긋나지 않는다. -->
     <div class="modal-actions">
-      <button id="amDelete" class="nav-btn danger" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>
+      ${IS_GUEST ? "" : `<button id="amDelete" class="nav-btn danger" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>`}
       <button id="amPrint" class="nav-btn ghostish" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 9V4h10v5"/><path d="M7 18H5v-6h14v6h-2"/><path d="M7 14h10v6H7z"/></svg><span>인쇄</span></button>
       <button id="amSave" class="nav-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>
     </div>`;
