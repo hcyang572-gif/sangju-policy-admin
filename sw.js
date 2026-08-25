@@ -116,7 +116,11 @@ const ASSET_V = "0.7.6";
 //     받지만, 서비스워커가 «없는» 브라우저(첫 방문·SW 미지원)는 ?v= 가 그대로면 최대 10분 동안
 //     옛 a2hs.js 를 씁니다. ?v= 는 버전정보.json 이 단일 출처라 이 작업 범위(cloudui 전용)에서
 //     손대지 않았습니다 — version.js 는 세 앱이 글자 단위로 같아야 하기 때문입니다.
-const CACHE = "sangju-admin-v56";   // v56: 시연 전용 계정을 «실제로» 연결(config.js 값 채움) —
+const CACHE = "sangju-admin-v57";   // v57: version.js 의 changelog v0.7.6 date 를 8/25→8/26 로
+                                     //   바로잡음(문서 표지 정합) — ESSENTIAL 프리캐시 대상이라
+                                     //   이름을 안 올리면 옛 날짜가 「개선사항」 화면에 계속 뜬다.
+                                     //   (2026-08-26, 🟣나루)
+                                     // v56: 시연 전용 계정을 «실제로» 연결(config.js 값 채움) —
                                      //   둘러보기가 그 계정으로 로그인해 저장까지 되고, 삭제는
                                      //   서버 정책(_guest_no_delete)과 화면 가드가 이중으로 막는다.
                                      //   ⚠ config.js 가 바뀌었다(ESSENTIAL 프리캐시) — 이름을 안 올리면
