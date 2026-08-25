@@ -196,24 +196,52 @@ window.SangjuApply = (function () {
   // 🔒 「시민 안내문 공개」 감사기록 — supabase/application_status_2.sql 의 admin_audit
   //    ⛔ 본문은 절대 보내지 않는다. 누가·언제는 서버가 채운다(actor_uid=auth.uid()).
   //    ⛔ 기록 실패로 업무(저장)를 멈추지 않는다 — PC앱 access_log.py 와 같은 원칙.
+  //
+  //  ⭐ 반환 true = 남겼다(또는 남길 것이 없었다) / false = 남기지 못했다 (2026-08-25 B-6)
+  //     예전에는 `catch (e) { /* 조용히 */ }` 로 «통째로» 삼켜, admin_audit 이 0행인데도
+  //     아무도 몰랐다. 같은 앱의 auditAttachment·auditBulkStatus 는 2026-08-20 에 이미
+  //     화면에 알리도록 고쳤는데 이 한 곳만 옛 방식으로 남아 있었다.
+  //  ⚠ supabase-js 의 insert 는 실패해도 «예외를 던지지 않는다» — {data,error} 로 돌려줄 뿐이다.
+  //     그래서 try/catch 만으로는 실패를 «한 번도» 잡지 못한다. 반드시 res.error 를 본다.
   async function _auditReply(sb, receiptNo, prevReply, newReply) {
     var was = String(prevReply || "").trim(), now = String(newReply || "").trim();
-    if (was === now) return;                       // 같은 값 재저장은 남기지 않는다
+    if (was === now) return true;                  // 같은 값 재저장은 남기지 «않는 것이 정상»
     var detail = !now ? "안내문 공개 취소(내용 지움)"
                : was  ? ("공개중인 안내문 수정(" + now.length + "자)")
                       : ("안내문 신규 공개(" + now.length + "자)");
     try {
-      await sb.from("admin_audit").insert({
+      var res = await sb.from("admin_audit").insert({
         action: "PUBLISH_CITIZEN_REPLY",
         target: receiptNo || "",                   // ★ 접수번호만. 이름·연락처 금지
         target_type: "접수(공무원앱)",
         detail: detail,                            // ★ 길이만. 본문 금지
         result: "성공"
       });
-    } catch (e) { /* 기록 실패는 조용히 넘어간다 */ }
+      if (res && res.error) throw res.error;
+      return true;
+    } catch (e) {
+      // 업무(저장)는 이미 끝났다 — 멈추지 않되, «조용히»도 넘어가지 않는다.
+      // 호출부(updateApplication → app.js)가 화면에 한 줄로 알린다.
+      try { console.warn("[감사기록] 시민 안내문 공개 기록을 남기지 못했습니다:", e); } catch (e2) {}
+      return false;
+    }
   }
 
-  async function updateApplication(id, patch) {
+  /* ⭐ 낙관적 잠금(optimistic lock) — 2026-08-25
+       세 번째 인자 expectUpdatedAt 을 주면 «내가 화면을 연 그 순간의 값»일 때만 저장한다.
+       두 담당자가 같은 접수를 열어 두고 차례로 저장하면, 예전에는 나중 사람이 앞사람의
+       처리·시민 안내문을 «말없이» 덮었다(PC앱이 방금 남긴 처리도 마찬가지였다).
+     ★ 새로 설계한 것이 아니라 «같은 앱 안에 이미 있던» 사업 수정의 규약을 그대로 옮긴 것이다
+       (app.js saveBenefit 의 .eq("id", …).eq("updated_at", …) → 0행이면 충돌).
+     반환 —
+       · 성공  : 저장된 행(예전과 같다). 비열거 속성 _auditOk 가 얹혀 온다.
+       · 충돌  : { ok:false, kind:"conflict" }   ← 행에는 kind 가 없으므로 구별된다.
+     ⚠ expectUpdatedAt 을 «주지 않으면» 예전처럼 조건 없이 저장한다.
+        일괄 상태 변경(applyBulkStatus)이 일부러 그 길로 부른다 — 여러 건을 훑는 작업에서
+        조건을 걸면 남이 건드린 한 건 때문에 20건이 통째로 멈춘다(PC앱도 같은 판단).
+     ⚠ updated_at 은 «서버 트리거»(trg_applications_updated)가 채운다. 클라이언트가 넣으면
+        조건으로 쓸 값을 스스로 덮어 잠금이 성립하지 않는다 — 절대 patch 에 넣지 말 것. */
+  async function updateApplication(id, patch, expectUpdatedAt) {
     var sb = client();
     if (!sb) throw new Error("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
     patch = patch || {};
@@ -229,14 +257,39 @@ window.SangjuApply = (function () {
       var pre = await sb.from(TABLE).select("citizen_reply,receipt_no").eq("id", id).single();
       if (!pre.error && pre.data) { prevReply = pre.data.citizen_reply; receiptNo = pre.data.receipt_no || ""; }
     }
-    var res = await sb.from(TABLE).update(upd).eq("id", id).select().single();
+    var q = sb.from(TABLE).update(upd).eq("id", id);
+    if (expectUpdatedAt) q = q.eq("updated_at", expectUpdatedAt);
+    /* ⚠ .single() 을 쓰지 «않는다» — 조건이 안 맞아 0행이면 .single() 은 오류(PGRST116)를 던져
+       「충돌」과 「진짜 오류」가 뒤섞인다. 배열로 받아 길이로 가른다. */
+    var res = await q.select();
     if (res.error) throw res.error;
+    var rows = res.data || [];
+    if (!rows.length) {
+      // 조건을 걸고 0행 = 내가 연 뒤 누군가 먼저 저장했다. 업무 오류가 아니므로 던지지 않는다.
+      if (expectUpdatedAt) return { ok: false, kind: "conflict" };
+      throw new Error("저장할 접수를 찾지 못했습니다. 목록을 새로 고친 뒤 다시 시도해 주세요.");
+    }
+    res = { data: rows[0] };
     // ② 저장이 «성공한 뒤에» 남긴다
     //    admin_audit 테이블은 아직 Supabase 에 없을 수 있다(양호창님 대시보드 실행 전).
-    //    없어도 위 저장은 이미 끝났고, _auditReply 가 실패를 삼키므로 업무는 멈추지 않는다.
+    //    없어도 위 저장은 이미 끝났고, 기록 실패가 업무를 멈추지는 않는다.
+    var auditOk = true;
     if (patch.citizen_reply !== undefined) {
-      await _auditReply(sb, receiptNo, prevReply, res.data && res.data.citizen_reply);
+      auditOk = await _auditReply(sb, receiptNo, prevReply, res.data && res.data.citizen_reply);
     }
+    /* 🔒 «기록을 남겼는지»를 저장된 행에 얹어 돌려준다 (2026-08-25 B-6).
+       ⚠ enumerable:false — JSON.stringify·전개(...)·Object.keys 어디에도 끼지 않는다.
+          그래야 이 행을 그대로 다시 서버로 보내는 코드가 생겨도 «없는 칸» 오류가 안 난다.
+       호출부(app.js #amSave)가 `out && out._auditOk === false` 로 보고 화면에 한 줄 알린다.
+       ⛔ 이 값을 «예외»로 바꾸지 마세요 — 저장은 이미 성공했으므로, 던지면 담당자가
+          「저장이 실패했다」고 오해해 같은 저장을 되풀이합니다. */
+    try {
+      if (res.data && typeof res.data === "object") {
+        Object.defineProperty(res.data, "_auditOk", {
+          value: auditOk, enumerable: false, configurable: true, writable: true
+        });
+      }
+    } catch (e) { /* 얹지 못해도 저장 결과는 그대로 돌려준다 */ }
     return res.data;
   }
 

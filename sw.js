@@ -25,7 +25,7 @@
 // 배포 버전 — 버전정보.json 의 "version" 및 version.js 의 APP_VERSION 과 항상 같은 값.
 // ⚠ 손으로 고치지 말고 루트의 `py -3 자원버전_동기화.py` 를 돌리면
 //    이 값과 index.html 의 ?v= 쿼리가 한 번에 맞춰진다.
-const ASSET_V = "0.7.5";
+const ASSET_V = "0.7.6";
 
 // v26 사유 (2026-08-19, 🔵손길) — index.html·style.css·app.js 를 «셋 다» 고쳤다.
 //   ① 폰(≤599px) «가로 띠» 로그인 배경을 낮춰 아이브로 대비를 4.45 → 5.90:1 로 올림 (style.css)
@@ -116,7 +116,31 @@ const ASSET_V = "0.7.5";
 //     받지만, 서비스워커가 «없는» 브라우저(첫 방문·SW 미지원)는 ?v= 가 그대로면 최대 10분 동안
 //     옛 a2hs.js 를 씁니다. ?v= 는 버전정보.json 이 단일 출처라 이 작업 범위(cloudui 전용)에서
 //     손대지 않았습니다 — version.js 는 세 앱이 글자 단위로 같아야 하기 때문입니다.
-const CACHE = "sangju-admin-v51";   // v51: 접기 간격 — 접힌 요약 카드의 안쪽 여백을 14/16 → 10/10px 로
+const CACHE = "sangju-admin-v56";   // v56: 시연 전용 계정을 «실제로» 연결(config.js 값 채움) —
+                                     //   둘러보기가 그 계정으로 로그인해 저장까지 되고, 삭제는
+                                     //   서버 정책(_guest_no_delete)과 화면 가드가 이중으로 막는다.
+                                     //   ⚠ config.js 가 바뀌었다(ESSENTIAL 프리캐시) — 이름을 안 올리면
+                                     //   이미 설치된 공무원앱이 «계정 없는» 옛 config 를 계속 쓴다.
+                                     // v55: 둘러보기 «시연 전용 계정» 로그인 통로 준비 —
+                                     //   계정이 없거나 로그인이 실패하면 «조용히» anon 둘러보기로
+                                     //   내려앉는다(양호창님 「비로그인 접속은 그대로 잘 돌아가야 해」).
+                                     //   스위치는 config.js GUEST_LOGIN_EMAIL/PASSWORD — 지금은 비어 있다.
+                                     // v54: 동시저장 방어 — 접수·정책제안 저장에 낙관적 잠금
+                                     //   (.eq("updated_at", …) · 0행이면 「다른 담당자가 먼저」).
+                                     //   사업 수정에만 있던 규약을 세 곳으로 넓혔다. 문구는
+                                     //   announceSaveConflict() 한 곳. 게스트 정책 반전·문구 통일·
+                                     //   한글 낱말끊김·처리방침도 모두 이 판에 들어 있다.
+                                     // v53: 게스트 정책 반전(삭제만 막고 나머지 개방 · config 스위치)
+                                     //   + 한글 낱말 중간 끊김(.card-title·.pcard-title word-break)
+                                     //   + 처리방침에 «읍·면·동»·«지역별 정책 수요 분석» 기재.
+                                     //   app.js·config.js·index.html·style.css 가 모두 바뀌었다.
+                                     // v52: 프리캐시 목록 수정 — data.json·data.js 를 ?v= 붙인 키로
+                                     //   담고(B-3, 그동안 «영원한 캐시 미스»였다), 안 쓰는
+                                     //   slogan-stack.png 를 뺐다. 게스트 잠금(A-1·A-2)·세션 띠
+                                     //   자리(B-1)·푸터 버전(B-2)까지 app.js·index.html·style.css·
+                                     //   icons.js·apply_client.js 가 모두 바뀌었으므로 이름을
+                                     //   올리지 않으면 이미 설치된 공무원앱이 옛 파일을 계속 쓴다.
+                                     // v51: 접기 간격 — 접힌 요약 카드의 안쪽 여백을 14/16 → 10/10px 로
                                      //   줄여 «보이는 높이»를 57 → 47px 로(PC앱과 같은 값), 카드 아래
                                      //   간격은 14 → 12px(style.css, 2026-08-25 양호창님 「간격 공백이 좀 커」).
                                      //   ⚠ style.css 는 ESSENTIAL 프리캐시라 이름을 안 올리면 이미 설치된
@@ -162,8 +186,11 @@ const CACHE = "sangju-admin-v51";   // v51: 접기 간격 — 접힌 요약 카�
 //      결함을 시민앱과 대칭으로 수정(루트 문서일 때만 루트 키에 저장). 지금은 하위 페이지가
 //      없지만 나중에 생기면 그대로 터지는 잠재 결함이라 미리 막는다.
 
-// scope(예: https://hcyang572-gif.github.io/sangju-policy-mobile/admin/)를 기준으로
+// scope(예: https://hcyang572-gif.github.io/sangju-policy-admin/)를 기준으로
 // 절대 URL을 만들어 둔다. (서브경로에서도 안전)
+// ⚠ 2026-08-25 — 예시가 옛 주소(…/sangju-policy-mobile/admin/)로 남아 있어 바로잡았다.
+//    공무원앱은 2026-08-21 에 sangju-policy-admin 저장소로 «분리»됐다(manifest.json id 참조).
+//    이 줄은 주석이라 동작에는 영향이 없지만, 틀린 예시는 다음 사람을 엉뚱한 곳으로 보낸다.
 const SCOPE = self.registration.scope;
 const u = (p) => new URL(p, SCOPE).toString();
 // 버전 쿼리를 붙인 경로 — index.html 의 참조와 반드시 같은 문자열이어야 한다.
@@ -194,15 +221,26 @@ const OPTIONAL = [
   "assets/icon-admin-maskable-512-v4.png",  // 안드로이드 «잘리는» 아이콘용(안전영역 안쪽에만 그림)
   "assets/sangsang1.png",
   "assets/gotgam.png",
-  "assets/slogan-stack.png",   // 2026 시정구호(2줄형 원본)
+  // ⚠ 2026-08-25 — 여기 있던 "assets/slogan-stack.png"(2줄형 원본)을 뺐다.
+  //    화면 어디에서도 쓰지 않는다(헤더·로그인 카드는 slogan-wide.png). 파일은 남아 있다 —
+  //    make_slogan_white.py 의 «원본»이라 지우지 않는다. 안 쓰는 것을 캐시하지 않을 뿐이다.
   "assets/slogan-wide.png",    // 2026 시정구호(1줄형 · 앱 헤더 + 로그인 폼 면, 둘 다 원색 그대로)
   // 📍 읍·면·동 목록(regions·region_groups·region_etc). 이것이 없으면 «차트만» 빠지고
   //    목록·상세·저장은 그대로 돈다 → ESSENTIAL 이 아니라 여기(OPTIONAL)에 둔다.
   //    ⚠ 이 파일은 시민앱 build_data.py 가 cloudui 에도 «같은 내용»으로 써 준다. 손으로 고치지 말 것.
-  "data.json",
+  //  ⭐⭐ 2026-08-25 (B-3) — «쿼리 없는 키»로 담던 것을 vq() 로 바꿨다.
+  //    앱은 `data.json?v=0.7.5` 로 부르는데(app.js loadRegionMeta) 여기는 `data.json` 으로
+  //    담아, cacheFirst() 가 «영원히» 캐시 미스였다. 326KB 를 받아 두고 한 번도 쓰지 못한 셈이고,
+  //    오프라인에서는 「읍·면·동별 신청 현황」이 통째로 사라졌다.
+  //    ⛔ 다시 쿼리를 떼지 마세요 — cacheFirst() 에는 ignoreSearch 가 없어 «글자 단위로» 같아야 한다.
+  //       (ignoreSearch 를 켜는 쪽은 고르지 않았다. 그러면 옛 버전 캐시가 새 요청에 걸려
+  //        「배포했는데 옛 자료가 나온다」는 정반대 결함이 생긴다 — ?v= 를 붙인 까닭 그 자체다.)
+  vq("data.json"),
   // data.json 과 «같은 내용»의 사본. 행정망(업무망) 프록시가 .json 을 막을 때 app.js 가 대신 읽는다.
   // build_data.py 가 둘을 함께 쓰므로 갈라지지 않는다.
-  "data.js",
+  // ⚠ app.js 는 이 사본을 `data.js?v=…&nc=<시각>` 으로 부른다(캐시 우회용 nc). 그래서 이 키가
+  //    그대로 맞아떨어지지는 않지만, «폴백의 폴백»이라 받아 두는 값은 그대로 둔다.
+  vq("data.js"),
   // ⚠ assets/slogan-white.png(흰 단색본)은 2026-08-19 화면에서 폐기됐다 — 안 쓰는 파일은 캐시하지 않는다.
   //   공식 상징물의 색을 바꾼 것이라 되살리지 말 것(규격서 §18). 파일·생성기는 남아 있다.
   // 🟣나루 — 이 목록이 바뀌었으니 배포 때 CACHE 이름(버전)을 한 칸 올려 주세요.

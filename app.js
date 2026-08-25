@@ -11,10 +11,21 @@ const $ = (s) => document.querySelector(s);
 //    쓰이던 값이라, 이름만 맞췄을 뿐 정렬 동작은 한 줄도 바뀌지 않았다.
 let ALL = [], CATS = [], SELCATS = new Set(), sortKey = "default", page = 0;
 const PAGE = 12;
-// ⛔ IS_GUEST(로그인 없이 입장)는 2026-08-04 «영구 제거»했습니다.
-//    이 앱은 시민 신청자의 개인정보(성명·연락처·문의내용)를 다루므로
-//    «세션이 있어야만» 화면에 들어갈 수 있습니다. 우회 플래그를 되살리지 마세요.
+/* 🧪 «로그인 없이 둘러보기»(IS_GUEST)는 2026-08-25 에 «되살아났습니다».
+   ⚠ 예전 이 자리에는 「2026-08-04 영구 제거 — 되살리지 마세요」 라고 적혀 있었으나,
+      코드와 어긋난 주석이었습니다(선언은 1300행 부근에 살아 있습니다).
+      지금 규약은 이렇습니다 —
+        · 스위치는 config.js 의 TEST_MODE_ALLOW_GUEST «한 곳»뿐이다(기본 꺼짐).
+        · 게스트는 시민 개인정보(applications)를 «읽지 않는다» — demo_applications() 예시만 본다.
+        · 쓰기는 화면(paintGuestLocks)·헬퍼(installGuestReadOnlyGuard)·서버(RLS) 세 겹으로 막는다.
+      자세한 사연은 아래 「🧪 테스트 모드」 덩어리 머리말에 있습니다. */
 let LOGGING_OUT = false;   // 로그아웃 진행 중(onAuthStateChange 중복 처리 방지)
+/* 🔁 showApp() 재진입 방어 (B-7 · 2026-08-25)
+   getSession() 이 늦게 풀리는 동안 로그인이 성공하면 진입 관문과 login() 이 «둘 다»
+   showApp() 을 불러, addEventListener 가 겹치고 실시간 채널 3개가 중복 구독된다
+   (알림 띠가 한 건에 2씩 오르던 증상). bindRtRecovery() 의 _rtRecoveryBound 와 같은 규약.
+   ⚠ 로그아웃·「로그인 화면으로」는 location.reload() 라 이 값이 저절로 false 로 돌아온다. */
+let APP_STARTED = false;
 // 🔑 비밀번호 변경 진행 중. 이 동안에는 «본인 확인용 재로그인»과 «비밀번호 저장» 때문에
 //    세션이 잠깐 갈릴 수 있어, 세션 만료 안내(showSessionExpired)가 끼어들지 않도록 막는다.
 //    (LOGGING_OUT 과 같은 자리에서 선언 — onAuthStateChange 콜백이 먼저 실행돼도 TDZ 오류가 없도록)
@@ -1273,18 +1284,64 @@ function renderChangelog() {
 }
 
 /* ── 🧪 테스트 모드 «로그인 없이 둘러보기» ──────────────────────────────
-   ★ 스위치는 «한 곳»뿐이다 — config.js 의 TEST_MODE_ALLOW_GUEST.
-     화면은 그 값을 읽어 버튼을 내보낼 뿐, 스스로 판단하지 않는다.
-     그 값이 없는 옛 config.js 에서는 undefined → 버튼이 «안 보인다»(닫힌 쪽이 안전).
-   ★ 화면에서 감추는 것은 «안내»이지 «방어»가 아니다.
-     실제 차단은 Supabase RLS 가 한다 — 로그인하지 않은 접속(anon)은
-     applications(시민 개인정보)를 읽지도 쓰지도 못하고, benefits 도 쓰지 못한다.
-     그래서 이 모드에서 «되는 것»은 사업 조회와 시민 정책제안 열람뿐이다.
+   ★ 스위치는 «두 곳»뿐이다 — 둘 다 config.js 에 있다.
+       ① TEST_MODE_ALLOW_GUEST     — 둘러보기로 «들어올 수» 있는가
+       ② TEST_MODE_GUEST_CAN_WRITE — 들어온 사람이 «저장할 수» 있는가
+     화면은 그 값을 읽어 단추를 내보낼 뿐, 스스로 판단하지 않는다.
+     값이 없는 옛 config.js 에서는 undefined → 둘 다 «안 된다»(닫힌 쪽이 안전).
+
+   ⭐⭐ 2026-08-25 정책 변경 (양호창님)
+       「시연 및 테스트를 위해서 비로그인으로 접속하더라도 **삭제기능들을 제외하고는**
+        대부분의 기능을 모두 둘러볼 수 있어야 해.」
+     → 예전 기준(모든 쓰기 차단)에서 **«지우는 것만» 차단**으로 좁혔다.
+       · 열린 것 : 새 사업 올리기 · 사업/제안/접수 저장 · 서식 등록 · 일괄 상태 변경 · 댓글 감추기
+       · 막은 것 : 삭제 «전부»(사업·접수·제안·서식·댓글) + 계정 관리·비밀번호 변경
+         ⚠ 비밀번호 변경을 막은 채로 두는 까닭 — 로그인 화면의 둘러보기 설명이
+           「계정 관리·비밀번호 변경 같은 관리자 기능은 잠깁니다」라고 이미 약속하고 있다.
+           화면이 한 약속과 어긋나지 않는 쪽을 골랐다.
+         ⚠ «되돌릴 수 있는가»가 기준이다 — 댓글 «감추기»는 옆에 「다시 보이기」가 있으므로 열고,
+           «삭제»는 되돌릴 수 없으므로 막는다.
+
+   ⛔⛔ 아주 중요 — ②가 «기본 꺼짐»인 까닭 (2026-08-25 실측)
+     이 앱은 브라우저에서 **anon 키**로 서버에 말한다. 그런데 지금 서버는 anon 의 쓰기를
+     표마다 «전부» 회수해 두었다. 실제 응답으로 확인한 것이다(문서가 아니라 응답을 믿는다) —
+         benefits   INSERT/UPDATE/DELETE → 401 · 42501
+         proposals  INSERT/UPDATE/DELETE → 401 · 42501
+         applications      UPDATE/DELETE → 401 · 42501  (INSERT 는 RLS 로 시민 신청만 허용)
+         proposal_comments UPDATE/DELETE → 401 · 42501
+         admin_audit       INSERT        → 401 · 42501
+     즉 «단추만» 열면 게스트가 저장을 누를 때마다 서버가 영어 권한 오류로 거절한다.
+     그것은 이 저장소가 가장 경계하는 「눌러 봐야 실패하는 단추」다 — 방향만 반대일 뿐 같은 사고다.
+     그래서 서버에 GRANT 가 들어가기 «전»에는 단추를 내보내지 않고, 왜 없는지를 글자로 말한다.
+     ⇒ 서버 쪽이 열리면 config.js 의 TEST_MODE_GUEST_CAN_WRITE 를 true 로 «한 줄» 바꾸면 된다.
+       (PC앱은 파이썬이 관리자 전용 키(service-role)로 말해 RLS 를 지나가므로 이 제약이 없다 — 그래서
+        같은 지시라도 PC앱 쪽은 곧바로 열리고 이 앱만 서버 작업을 기다린다.)
+
+   ★ 화면에서 감추는 것은 «안내»이지 «방어»가 아니다. 실제 차단은 Supabase RLS·권한이 한다.
    ⚠ PC앱(webui/app.js) 의 같은 덩어리와 문구·구조를 맞춰 두었다. 한쪽만 고치지 말 것. */
 let IS_GUEST = false;
 const GUEST_WRITE_MSG =
   "테스트 모드(로그인 없이 둘러보기)에서는 저장·수정·삭제를 할 수 없습니다. "
   + "실제 처리는 담당자 계정으로 로그인한 뒤 이용해 주세요.";
+/* ⭐ 문구는 PC앱(webui)과 «글자 단위로» 같다 (2026-08-25 · 🟠단장 통일안). 한쪽만 고치지 말 것.
+   ① 화면에 남기는 한 줄(.guest-ro) — 사업·접수·제안·서식 네 자리 전부 이 문장 하나다. */
+const GUEST_RO_LINE =
+  "둘러보기(테스트) 중에는 지울 수만 없습니다. 저장·수정은 그대로 해 보실 수 있습니다.";
+
+/* ② 통로를 직접 부른 경우(콘솔 등) 돌려주는 차단 문구 — «무엇을» 못 하는지 이름을 넣는다. */
+const GUEST_FEATURE_NAME = {
+  benefits: "지원사업 삭제",
+  applications: "접수 삭제",
+  proposals: "정책제안 삭제",
+  proposal_comments: "댓글 삭제",
+  submissions: "첨부파일 파기",
+};
+function guestDeleteMsg(what) {
+  return "둘러보기(테스트) 중에는 «" + (what || "삭제") + "» 기능을 쓸 수 없습니다.\n"
+       + "지울 수만 없습니다. 저장·수정은 그대로 해 보실 수 있습니다.\n"
+       + "지우려면 담당자 계정으로 로그인해 주세요.";
+}
+const GUEST_DELETE_MSG = guestDeleteMsg("삭제");
 
 /* 🧪 둘러보기가 «불러도 되는» RPC — 읽기 전용인 것만 이름으로 적는다.
    ⛔ 목록에 없는 RPC 는 전부 막힌다(닫힌 쪽이 기본값).
@@ -1295,30 +1352,112 @@ const GUEST_WRITE_MSG =
      «같은 통로»를 쓰므로, 열면 지우는 길이 함께 열린다. */
 const GUEST_RPC_ALLOW = ["demo_applications"];
 
+/* 🗑 «지우는» RPC — 둘러보기에게 «언제나» 막는다. 쓰기가 열려 있어도 이 목록은 그대로다.
+   ⛔ 표(sb.from)의 delete 를 막아 놓고 여기를 비워 두면, «함수로 지우는» 길만 열린 채 남는다.
+     delete_comment_admin 이 정확히 그 길이다(시민 댓글을 답글까지 함께 영영 지운다).
+   ⚠ 새 «지우는» RPC 를 만들면 반드시 여기에 이름을 더할 것. */
+const GUEST_DELETE_RPC = ["delete_comment_admin"];
+
+/* 🔎 «지우는 효과를 내는 통로» 전수 확인 (2026-08-25 · 🟠단장 요청)
+     이 앱에서 삭제로 이어지는 길을 모두 훑어 다음과 같이 갈랐다.
+       막는다 : benefits/applications/proposals/proposal_comments 의 delete()
+              · storage(submissions) 의 remove()
+              · delete_comment_admin RPC
+              · proposal_comments.is_deleted 를 켜는 update(소프트 삭제)
+       연다   : 저장·수정 계열 전부 · 일괄 «상태» 변경 · 댓글 감추기(set_comment_hidden)
+     ⭐ PC앱의 «홈페이지 연동»(#btnSync)은 이름과 달리 «중복·만료 사업을 지우고 클라우드에서도
+        지우고 시민앱 배포까지» 나가므로 삭제 계열로 취급해 막는다 — 그런데
+        ⛔ 이 앱(공무원앱)에는 그 기능이 «없다». app.js·index.html 어디에도 #btnSync 가 없고,
+           prune·만료정리·중복제거 같은 «대량 정리» 통로도 없다(2026-08-25 grep 확인).
+           → 여기서 따로 막을 것이 없다. 나중에 이 앱에 연동을 옮겨 오면 그때
+             GUEST_DELETE_* 목록에 반드시 함께 넣을 것.
+     ⚠ 일괄 «상태» 변경(applyBulkStatus)은 열어 둔다 — 결과가 삭제가 아니라 상태값 수정이고,
+        되돌릴 수 있다(다시 상태를 바꾸면 된다). 「되돌릴 수 있는가」가 이 앱의 잣대다. */
+
+/* 🗑 «update 로 지우는» 칸 — 소프트 삭제. 겉모습은 수정이지만 결과는 삭제다.
+   · proposal_comments.is_deleted — 본인이 지웠으나 답글이 달려 «자리만» 남은 상태
+     (supabase/제안댓글_260824.sql:170). 이 칸을 켜는 것은 «지우는 일»이다.
+   ⚠ 새 소프트 삭제 칸이 생기면 여기에 더할 것. */
+const GUEST_DELETE_FIELDS = ["is_deleted"];
+
 function guestAllowed() {
   try { return typeof TEST_MODE_ALLOW_GUEST !== "undefined" && TEST_MODE_ALLOW_GUEST === true; }
   catch (e) { return false; }
+}
+
+/* ⭐ 둘러보기 판정은 «이 세 함수»가 정본이다 — 화면 어디서도 IS_GUEST 를 직접 보고
+   저장 단추를 감추지 말 것. 기준이 또 바뀌면 여기만 고치면 된다(2026-08-25).
+     guestCanWrite()  — 서버가 게스트의 쓰기를 허락하는가(config 스위치)
+     guestSaveBlockedByServer()   — «저장» 단추를 감춰야 하는가
+     guestNoDelete()  — «삭제» 단추를 감춰야 하는가 (게스트면 언제나 참) */
+function guestCanWrite() {
+  try { return typeof TEST_MODE_GUEST_CAN_WRITE !== "undefined" && TEST_MODE_GUEST_CAN_WRITE === true; }
+  catch (e) { return false; }
+}
+/* ⚠⚠ 이름을 «guestNoWrite» 로 되돌리지 마세요 (2026-08-25 · 🟠단장 지적).
+     「못 쓴다」로만 읽히는 이름이 남으면, 다음 사람이 정책을 잘못 읽고
+     저장 단추를 다시 감춥니다. 이 함수가 참인 까닭은 «정책»이 아니라
+     «서버가 아직 anon 쓰기를 허락하지 않아서»뿐입니다 — 이름이 그것을 말해야 합니다.
+   ⛔ 서버가 열리고 config 스위치를 켜면 이 함수는 «언제나 거짓»이 되어
+     저장 단추가 담당자와 똑같이 보입니다. 그때 이 함수를 지워도 됩니다. */
+function guestSaveBlockedByServer() { return IS_GUEST && !guestCanWrite(); }
+/* 🗑 «지우는 일»은 정책상 언제나 막힌다 — 서버 상태와 무관하다. */
+function guestNoDelete() { return IS_GUEST; }
+/* 🧪 지금 «예시 목록»을 보고 있는가 = anon 둘러보기인가.
+   시연 계정으로 로그인한 둘러보기는 «진짜 표»를 읽으므로 예시가 아니다.
+   ⛔ 이 구분을 빼면 화면이 진짜 접수를 두고 「예시 자료입니다」라고 거짓말한다. */
+function guestUsesDemoList() { return IS_GUEST && !GUEST_SIGNED_IN; }
+
+/* 🧪 둘러보기가 «무엇을 못 하는지» 한 문장 — 정책이 바뀌면 여기만 고친다.
+   ⛔ index.html 에 글자를 박아 두지 않는다. 스위치(TEST_MODE_GUEST_CAN_WRITE)에 따라
+      사실이 달라지므로, 화면이 «지금 사실»과 어긋나면 그것이 곧 결함이다. */
+function guestLimitText() {
+  return guestCanWrite()
+    ? "지우는 일(삭제)과 계정 관리·비밀번호 변경은 잠깁니다. 저장·수정은 그대로 해 보실 수 있습니다."
+    : "저장·삭제와 계정 관리·비밀번호 변경은 잠깁니다.";
 }
 
 // 로그인 카드의 «둘러보기» 덩어리 — 스위치가 켜져 있을 때만 보인다.
 function paintGuestGate() {
   const box = $("#guestWrap");
   if (box) box.classList.toggle("hidden", !guestAllowed());
+  const hint = $("#guestGateHint");
+  if (hint) hint.textContent = "담당자 권한으로만 둘러볼 수 있고, " + guestLimitText()
+    + " 접속기록에는 «게스트»로 남습니다.";
 }
 
 // 본문 맨 위 «테스트 모드» 띠 — 게스트로 들어와 있는 동안에만 보인다.
 function paintGuestNotice() {
   const box = $("#guestNotice");
   if (box) box.classList.toggle("hidden", !IS_GUEST);
+  const what = $("#guestNoticeWhat");
+  if (what) what.textContent = guestLimitText();
 }
 
-/* 관리자 전용 기능 잠금 — 계정 관리·비밀번호 변경을 «아예 내보내지 않는다».
+/* 관리자 전용·«쓰는» 기능 잠금 — 아예 내보내지 않는다.
    ⚠ 눌러 봐야 세션이 없어 실패할 조작을 남겨 두지 않는다(막다른 길 금지).
-     로그아웃은 남긴다 — 테스트 모드를 빠져나가 로그인 화면으로 가는 유일한 길이다. */
+     로그아웃은 남긴다 — 테스트 모드를 빠져나가 로그인 화면으로 가는 유일한 길이다.
+
+   ⭐⭐ «양방향» 이어야 한다 (A-2 · 2026-08-25)
+     예전에는 `if (!IS_GUEST) return;` 로 시작해 «잠그는 갈래»만 있었다.
+     지금은 로그아웃이 location.reload() 라 우연히 안전할 뿐, 그 한 줄을 빼는 순간
+     정상 담당자의 화면에도 잠금이 그대로 남아 «저장·삭제가 조용히 사라진다».
+     그래서 값을 «지정»한다 — `hidden = IS_GUEST` 는 게스트면 감추고 담당자면 되돌린다.
+     ⛔ `if (!IS_GUEST) return;` 로 되돌리지 마세요. 「보안을 조이다 정상 이용자를 막는」
+        것이 이 저장소에서 가장 흔한 사고입니다.
+   ⚠ 여기서 다루는 것은 index.html 에 «항상 있는» 요소뿐이다.
+     모달 안 단추(#mSave·#pmSave·#amSave·#formsUpload)는 열 때마다 새로 그려지므로
+     각 openXxx() 가 «그리지 않는» 방식으로 막는다(삭제 단추와 같은 방식). */
 function paintGuestLocks() {
-  if (!IS_GUEST) return;
+  /* 🔑 계정 관리·비밀번호 변경 — 게스트면 «언제나» 잠근다(쓰기가 열려 있어도).
+     로그인 화면의 둘러보기 설명이 그렇게 약속하고 있다(위 머리말 참조). */
   const pw = $("#btnChangePw");
-  if (pw) pw.hidden = true;
+  if (pw) pw.hidden = guestNoDelete();
+  /* ➕ 새 사업 올리기 · ☑ 일괄 상태 변경 — «저장» 계열이므로 쓰기 개방 여부를 따른다. */
+  const add = $("#btnAdd");
+  if (add) add.hidden = guestSaveBlockedByServer();
+  const bulk = $("#aBulkApply");
+  if (bulk) bulk.hidden = guestSaveBlockedByServer();
 }
 
 /* 쓰기 차단 — «한 곳»에서 막는다.
@@ -1327,8 +1466,11 @@ function paintGuestLocks() {
    ⚠ 예외를 던지지 «않고» supabase-js 와 같은 모양({data,error})으로 돌려준다 —
      기존 호출부의 오류 처리(res.error 검사)가 그대로 동작해야 하기 때문이다.
    ⚠ .insert(...).select() 처럼 이어 부르는 곳이 있으므로 체인 메서드도 흉내 낸다. */
-function _guestBlocked() {
-  const payload = { data: null, error: { message: GUEST_WRITE_MSG, code: "GUEST_READONLY" } };
+function _guestBlocked(msg) {
+  const payload = {
+    data: null,
+    error: { message: msg || GUEST_WRITE_MSG, code: "GUEST_READONLY" }
+  };
   const stub = {
     then: (ok, no) => Promise.resolve(payload).then(ok, no),
     catch: (f) => Promise.resolve(payload).catch(f),
@@ -1339,16 +1481,51 @@ function _guestBlocked() {
   return stub;
 }
 
+/* 🔓 되돌리기용 원본 보관 (A-2 ② · 2026-08-25)
+   ⛔ 예전에는 sb.from·sb.rpc·sb.storage.from 을 «영구히» 덮어써 되돌릴 길이 없었다.
+      로그아웃이 location.reload() 라서만 안전했을 뿐이라, 그 한 줄이 사라지면
+      정상 담당자의 모든 저장·삭제가 「테스트 모드에서는…」 안내와 함께 조용히 막힌다.
+   ⚠ «bind 하기 전»의 원본 함수를 그대로 담아 둔다 — 되돌릴 때 identity 까지 원래대로. */
+let _GUEST_GUARD_ORIG = null;
+
 function installGuestReadOnlyGuard() {
   if (installGuestReadOnlyGuard._on) return;
   installGuestReadOnlyGuard._on = true;
   try {
-    const origFrom = sb.from.bind(sb);
+    const rawFrom = sb.from;
+    const rawRpc = (typeof sb.rpc === "function") ? sb.rpc : null;
+    const rawStorageFrom = (sb.storage && typeof sb.storage.from === "function") ? sb.storage.from : null;
+    _GUEST_GUARD_ORIG = { from: rawFrom, rpc: rawRpc, storageFrom: rawStorageFrom };
+    /* ⭐ 차단 «범위»는 여기 세 줄이 정한다 (2026-08-25 정책 변경).
+         · 쓰기가 열려 있으면(guestCanWrite) → «지우는 것»만 막는다.
+         · 아직 닫혀 있으면              → 예전처럼 쓰기를 통째로 막는다.
+       ⛔ 어느 쪽이든 delete 는 «반드시» 목록에 있다. 빼지 마세요. */
+    const canWrite = guestCanWrite();
+    const TABLE_BLOCK = canWrite ? ["delete"] : ["insert", "update", "upsert", "delete"];
+    const STORE_BLOCK = canWrite ? ["remove"] : ["upload", "remove", "move", "copy"];
+    const WHY = canWrite ? GUEST_DELETE_MSG : GUEST_WRITE_MSG;
+
+    const origFrom = rawFrom.bind(sb);
     sb.from = function (table) {
       const b = origFrom(table);
-      ["insert", "update", "upsert", "delete"].forEach((m) => {
-        if (typeof b[m] === "function") b[m] = () => _guestBlocked();
+      const feat = GUEST_FEATURE_NAME[String(table)] || "삭제";
+      TABLE_BLOCK.forEach((m) => {
+        if (typeof b[m] === "function") {
+          b[m] = () => _guestBlocked(m === "delete" ? guestDeleteMsg(feat) : WHY);
+        }
       });
+      /* 🗑 «update 로 지우는» 길 — 소프트 삭제(GUEST_DELETE_FIELDS)를 막는다.
+         쓰기를 열어 주면 update 는 통과하는데, is_deleted=true 는 겉만 수정이고
+         결과는 삭제다. 그 한 칸이 실린 update 만 골라 돌려보낸다.
+         ⚠ 쓰기가 닫혀 있을 때는 위에서 update 자체가 이미 막혔으므로 이 갈래를 타지 않는다. */
+      if (canWrite && typeof b.update === "function") {
+        const origUpdate = b.update.bind(b);
+        b.update = function (patch) {
+          const hit = patch && typeof patch === "object" &&
+            GUEST_DELETE_FIELDS.some((k) => Object.prototype.hasOwnProperty.call(patch, k));
+          return hit ? _guestBlocked(guestDeleteMsg(feat)) : origUpdate(patch);
+        };
+      }
       return b;
     };
     /* 📞 RPC — sb.from() 과 «같은 쓰기 통로»다. 여기를 비워 두면 표 쓰기를 막아 놓고
@@ -1359,20 +1536,27 @@ function installGuestReadOnlyGuard() {
          sb.from 과 «같다» — 서버가 돌려주는 영어 권한 오류 대신 우리 말로 알려 주기 위해서다.
        ⚠ 읽기 전용 RPC(GUEST_RPC_ALLOW)는 통과시킨다 — 안 그러면 둘러보기 예시 목록이
          통째로 깨진다(apply_client.js 의 demo_applications). */
-    if (typeof sb.rpc === "function") {
-      const origRpc = sb.rpc.bind(sb);
+    if (rawRpc) {
+      const origRpc = rawRpc.bind(sb);
       sb.rpc = function (fn, args, opts) {
-        if (GUEST_RPC_ALLOW.indexOf(String(fn)) >= 0) return origRpc(fn, args, opts);
-        return _guestBlocked();
+        const name = String(fn);
+        // ① «지우는» 함수는 언제나 막는다 — 쓰기가 열려 있어도 예외가 없다.
+        if (GUEST_DELETE_RPC.indexOf(name) >= 0) return _guestBlocked(guestDeleteMsg("댓글 삭제"));
+        // ② 쓰기가 열려 있으면 나머지는 통과(댓글 감추기 set_comment_hidden 등).
+        if (canWrite) return origRpc(fn, args, opts);
+        // ③ 아직 닫혀 있으면 «읽기 전용»으로 이름을 적어 둔 것만 통과.
+        if (GUEST_RPC_ALLOW.indexOf(name) >= 0) return origRpc(fn, args, opts);
+        return _guestBlocked(GUEST_WRITE_MSG);
       };
     }
-    if (sb.storage && typeof sb.storage.from === "function") {
-      const origStorage = sb.storage.from.bind(sb.storage);
+    if (rawStorageFrom) {
+      const origStorage = rawStorageFrom.bind(sb.storage);
       sb.storage.from = function (bucket) {
         const s = origStorage(bucket);
-        ["upload", "remove", "move", "copy"].forEach((m) => {
+        STORE_BLOCK.forEach((m) => {
           if (typeof s[m] === "function") {
-            s[m] = () => Promise.resolve({ data: null, error: { message: GUEST_WRITE_MSG } });
+            const why = (m === "remove") ? guestDeleteMsg(GUEST_FEATURE_NAME[String(bucket)] || "첨부파일 파기") : WHY;
+            s[m] = () => Promise.resolve({ data: null, error: { message: why } });
           }
         });
         return s;
@@ -1384,6 +1568,72 @@ function installGuestReadOnlyGuard() {
   }
 }
 
+/* 🔓 쓰기 차단 해제 — «정상 담당자로 로그인했을 때만» 부른다 (A-2 ② · 2026-08-25).
+   ⛔ 이 함수를 지우지 마세요. 이것이 없으면 게스트 잠금이 «단방향»이 되어,
+      로그아웃이 새로고침을 그만두는 순간 담당자의 저장·삭제가 통째로 막힙니다.
+   ⚠ 설치한 적이 없으면 아무 일도 하지 않는다(멱등). */
+function uninstallGuestReadOnlyGuard() {
+  if (!installGuestReadOnlyGuard._on) return;
+  try {
+    const o = _GUEST_GUARD_ORIG;
+    if (o) {
+      if (o.from) sb.from = o.from;
+      if (o.rpc) sb.rpc = o.rpc;
+      if (o.storageFrom && sb.storage) sb.storage.from = o.storageFrom;
+    }
+  } catch (e) {
+    console.warn("[테스트 모드] 쓰기 차단 해제 실패:", e);
+  }
+  _GUEST_GUARD_ORIG = null;
+  installGuestReadOnlyGuard._on = false;
+}
+
+/* 🧪 둘러보기가 «시연 전용 계정»으로 로그인해 들어왔는가.
+   · true  = 진짜 계정(authenticated). 서버가 RLS 로 판단하므로 진짜 접수 목록을 읽는다.
+   · false = anon. 예전 그대로 demo_applications() 예시 10건을 읽는다.
+   ⚠ 어느 쪽이든 IS_GUEST 는 true 고 화면 가드(guestNoDelete)도 그대로다 —
+     서버 차단은 «두 번째 그물»이지 첫 번째가 아니다(2026-08-25 🩷자물쇠 규약). */
+let GUEST_SIGNED_IN = false;
+
+/* 🔑 시연 계정 로그인 «시도» — 실패해도 절대 진입을 막지 않는다.
+   ⭐⭐ 이 함수의 존재 이유가 곧 그 «절대 조건»이다 (2026-08-25 양호창님)
+       「시연과 테스트를 위해서 게스트모드로 비로그인 접속은 그대로 잘 돌아가야 해.」
+     계정이 아직 없거나(값이 빈 문자열) · 비밀번호가 틀렸거나 · 서버가 답을 안 해도
+     조용히 false 를 돌려주고, 부르는 쪽은 «예전과 똑같은» anon 둘러보기로 이어 간다.
+   ⛔ 여기서 err.textContent 로 실패를 알리거나 return 으로 진입을 끊지 마세요.
+      로그인 실패 한 번에 시연이 통째로 멈춥니다.
+   ⚠ 값이 비어 있으면 «서버를 부르지도 않는다» — 헛된 왕복과 401 로그를 남기지 않는다. */
+async function tryGuestSignIn() {
+  let email = "", pw = "";
+  try { if (typeof GUEST_LOGIN_EMAIL !== "undefined") email = String(GUEST_LOGIN_EMAIL || "").trim(); } catch (e) {}
+  try { if (typeof GUEST_LOGIN_PASSWORD !== "undefined") pw = String(GUEST_LOGIN_PASSWORD || ""); } catch (e) {}
+  if (!email || !pw) return false;            // 아직 계정이 없다 — 정상 경로다(anon 으로 간다)
+  try {
+    const res = await sb.auth.signInWithPassword({ email: email, password: pw });
+    if (res && res.error) {
+      console.warn("[테스트 모드] 시연 계정 로그인 실패 — anon 둘러보기로 이어 갑니다:", res.error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn("[테스트 모드] 시연 계정 로그인 중 오류 — anon 둘러보기로 이어 갑니다:", e);
+    return false;
+  }
+}
+
+/* 🧪 지금 붙어 있는 세션이 «시연 둘러보기 계정»인가.
+   ⛔ 이 검사를 빼지 마세요 — 새로고침하면 진입 관문이 그 세션을 보고 앱을 여는데,
+      알아보지 못하면 «게스트가 정상 담당자 화면»으로 들어갑니다(삭제 단추까지 살아난 채로). */
+function isGuestSession(session) {
+  let email = "";
+  try { if (typeof GUEST_LOGIN_EMAIL !== "undefined") email = String(GUEST_LOGIN_EMAIL || "").trim(); } catch (e) {}
+  if (!email) return false;
+  try {
+    const who = session && session.user ? String(session.user.email || "") : "";
+    return who.toLowerCase() === email.toLowerCase();
+  } catch (e) { return false; }
+}
+
 async function doGuestLogin() {
   const err = $("#loginErr");
   if (!guestAllowed()) {
@@ -1391,6 +1641,8 @@ async function doGuestLogin() {
     return;
   }
   IS_GUEST = true;
+  // 🔑 계정이 준비돼 있으면 그것으로, 아니면 조용히 anon 으로. 어느 쪽이든 «들어간다».
+  GUEST_SIGNED_IN = await tryGuestSignIn();
   installGuestReadOnlyGuard();
   if (err) err.textContent = "";
   const pw = $("#pw"); if (pw) pw.value = "";
@@ -1409,7 +1661,16 @@ async function doGuestLogin() {
   } catch (e) {
     console.warn("[로그인] 세션 확인 실패 — 로그인 화면 유지:", e);
   }
-  if (session) { showApp(); return; }
+  if (session) {
+    /* 🧪 시연 둘러보기 계정으로 들어와 있다가 «새로고침»한 경우.
+       알아보지 못하면 게스트가 정상 담당자 화면으로 들어간다 — 반드시 되살린다. */
+    if (isGuestSession(session)) {
+      IS_GUEST = true;
+      GUEST_SIGNED_IN = true;
+      installGuestReadOnlyGuard();
+    }
+    showApp(); return;
+  }
   // 🧪 로그인 화면에 머무는 «지금»이 둘러보기 버튼을 내보낼 유일한 자리다.
   paintGuestGate();
   const gb = $("#guestBtn");
@@ -1452,6 +1713,17 @@ function showSessionBanner(text, opts) {
   $("#sessionExtend").hidden = !(opts && opts.extend);
   $("#sessionGoLogin").hidden = !(opts && opts.goLogin);
   box.hidden = false;
+  /* 👁 «보이게» 만든다 (B-1 · 2026-08-25).
+     이 띠는 고정 헤더(.topdock) «안»에 있어 목록을 한참 내려 본 상태에서도 화면에 남는다.
+     그래도 다음 두 가지를 덧댄다 —
+       ① scrollIntoView({block:"nearest"}) — 브라우저가 띠를 실제로 화면 안에 들여놓는다.
+          «nearest» 라 이미 보이면 «아무것도 하지 않는다»(읽던 자리를 흔들지 않는다).
+       ② announce() — 낭독기 이용자에게 즉시 알린다. #sessionBanner 는 role="alert" 이지만
+          «이미 있던 요소를 보이게» 하는 변화는 읽지 않는 낭독기가 있어 한 번 더 말한다.
+     ⚠ focus() 는 하지 않는다 — 글을 쓰던 담당자의 초점을 빼앗으면 입력이 끊긴다.
+        「작성 중인 내용을 지킨다」가 이 띠의 존재 이유이므로 그 반대로 가면 안 된다. */
+  try { box.scrollIntoView({ block: "nearest" }); } catch (e) { /* 구형 브라우저 — 그대로 넘어간다 */ }
+  try { announce(text); } catch (e) {}
 }
 function hideSessionBanner() {
   const box = $("#sessionBanner");
@@ -1484,7 +1756,12 @@ async function scheduleExpiryWarning() {
   hideSessionBanner();                       // 갱신됐으면 이전 경고는 지운다
   const msLeft = s.expires_at * 1000 - Date.now();
   const warnIn = msLeft - 2 * 60 * 1000;
-  if (warnIn <= 0) { showSessionExpiring(); return; }
+  /* ⏰ 이미 지난 세션에 «곧 만료됩니다(약 2분 뒤)» 를 띄우지 않는다 (B-8 · 2026-08-25).
+     예전에는 warnIn <= 0 이면 무조건 예고 문구를 띄워, 컴퓨터를 켜 둔 채 자리를 비웠다
+     돌아온 담당자에게 «이미 끝난 세션»을 두고 「연장하시겠어요?」 를 물었다.
+     연장 단추를 눌러 봐야 refreshSession 이 실패해 그때서야 만료를 알게 된다 —
+     사실과 다른 말을 먼저 하고 나중에 뒤집는 셈이라, 남은 시간으로 갈래를 나눈다. */
+  if (warnIn <= 0) { (msLeft <= 0 ? showSessionExpired : showSessionExpiring)(); return; }
   // setTimeout 은 약 24.8일이 상한이라 그보다 길면 예약하지 않는다(현실적으로 없음)
   if (warnIn < 2147483647) EXPIRY_TIMER = setTimeout(showSessionExpiring, warnIn);
 }
@@ -1624,6 +1901,13 @@ async function login() {
     $("#pw").focus();                             // 초점 유실 없이 다시 입력 가능
     return;
   }
+  /* 🔓 «정상 담당자»로 들어왔다 — 둘러보기 흔적을 반드시 걷어 낸다 (A-2 · 2026-08-25).
+     같은 탭에서 「둘러보기 → 로그인 화면으로 → 로그인」 으로 들어오는 길이 실제로 있다.
+     이 두 줄이 없으면 IS_GUEST 가 참인 채로, 쓰기 차단이 걸린 채로 앱이 열려
+     담당자의 저장·삭제가 「테스트 모드에서는…」 으로 조용히 막힌다. */
+  IS_GUEST = false;
+  uninstallGuestReadOnlyGuard();
+  try { SangjuApply.setGuestMode(false); } catch (e) { /* 옛 헬퍼면 그냥 넘어간다 */ }
   showApp();
 }
 
@@ -1642,7 +1926,28 @@ async function showApp() {
         둘러보기로 들어오든(true) 반드시 이 함수를 지나므로, 두 길이 갈리지 않는다.
      ⚠ 로그아웃은 location.reload() 라 값이 저절로 초기화된다(남는 상태가 없다).
      자세한 사연은 cloudui/apply_client.js 의 「🧪 둘러보기(게스트)」 주석. */
-  try { SangjuApply.setGuestMode(IS_GUEST); } catch (e) { /* 옛 헬퍼면 그냥 넘어간다 */ }
+  /* 🧪 «예시 자료로 갈아타라»고 알리는 자리 — anon 둘러보기일 때«만» 켠다.
+       · anon        : applications 를 읽을 권한이 아예 없다 → demo_applications() 예시 10건.
+       · 시연 계정   : 로그인한 상태라 진짜 표를 읽는다 → 예시로 갈아타면 안 된다.
+         (예시 행은 id 가 진짜 행과 달라, 상태 변경을 눌러도 0건이 되어
+          「눌러 봐야 실패하는 단추」가 된다 — 2026-08-25 🩷자물쇠 판단)
+     ⚠ 자료는 전부 «가상»이므로 시연 계정이 진짜 표를 보는 것은 감수할 만하다.
+     ⚠ 삭제 차단은 그대로다 — 목록을 진짜로 읽는 것과 지울 수 있는 것은 다른 문제다. */
+  try { SangjuApply.setGuestMode(guestUsesDemoList()); } catch (e) { /* 옛 헬퍼면 그냥 넘어간다 */ }
+
+  /* 🔁 재진입 방어 (B-7 · 2026-08-25) ─────────────────────────────────────
+     getSession() 이 늦게 풀리는 동안 로그인이 성공하면 «진입 관문»과 login() 이
+     둘 다 showApp() 을 부른다. 그러면 bindUI 의 addEventListener 가 겹치고,
+     실시간 채널 3개(benefits·proposals·applications)가 «중복 구독»되어
+     알림 띠가 한 건에 2씩 오른다. bindRtRecovery() 의 _rtRecoveryBound 와 같은 규약.
+     ⚠ 여기서 자르는 것은 «한 번만 해야 하는 일»(배선·구독·첫 적재)뿐이다.
+        위쪽 화면 칠하기(paintGuestNotice·paintGuestLocks·setGuestMode)는 «멱등»이라
+        일부러 이 줄보다 «앞»에 두었다 — 둘러보기로 들어와 있던 탭에서 담당자가
+        로그인했을 때 잠금이 확실히 «풀리도록» 해야 하기 때문이다.
+        ⛔ 이 줄을 함수 맨 앞으로 올리지 마세요(그 순간 잠금이 안 풀린다). */
+  if (APP_STARTED) return;
+  APP_STARTED = true;
+
   // ⬅ 히스토리 루트를 «첫 탭»으로 잡는다. 여기서 뒤로가기를 누르면 앱이 종료되는 것이 정상.
   //    (로그인 화면에서는 NAV_READY 가 거짓이라 히스토리를 전혀 건드리지 않는다)
   navReset({ type: "tab", tab: pCurrentTab });
@@ -1863,6 +2168,13 @@ function bindUI() {
   $("#btnLogout").onclick = async () => {
     LOGGING_OUT = true;                 // onAuthStateChange 가 중복으로 안내하지 않도록
     try { await sb.auth.signOut(); } catch (e) { /* 이미 끊겼어도 화면은 되돌린다 */ }
+    /* ⛔⛔ 이 한 줄(location.reload)을 빼지 마세요 — «게스트 잠금»이 남습니다.
+       새로고침이 IS_GUEST·APP_STARTED·쓰기 차단(installGuestReadOnlyGuard)을 통째로
+       초기 상태로 되돌립니다. 화면만 로그인 카드로 바꾸는 식으로 «가볍게» 고치면,
+       둘러보기 → 로그아웃 → 다른 계정 로그인 경로에서 담당자의 저장·삭제가
+       조용히 막힙니다(2026-08-25 A-2). 꼭 바꿔야 한다면 그 자리에서
+       IS_GUEST=false · uninstallGuestReadOnlyGuard() · APP_STARTED=false 를
+       «세 가지 모두» 되돌려 주세요. */
     location.reload();                  // 초기 상태(로그인 화면)로 — 열람하던 데이터도 사라짐
   };
   // C2: 닫기/바깥클릭은 closeModal로 통일(포커스 복귀). Esc는 _trapKeydown이 일괄 처리.
@@ -1904,7 +2216,21 @@ function bindUI() {
     const setAcct = (open) => {
       acctPop.hidden = !open;
       acctBtn.setAttribute("aria-expanded", open ? "true" : "false");
-      if (open) { const f = acctPop.querySelector("button"); if (f) f.focus(); }
+      /* 🎯 초점은 «실제로 보이는» 첫 단추로 (B-4 · 2026-08-25).
+         예전에는 querySelector("button") 로 «DOM 첫 단추»를 잡았는데, 둘러보기에서는
+         그것이 hidden 된 #btnChangePw 였다. display:none 요소의 focus() 는 «무동작»이라
+         메뉴를 열어도 초점이 들어가지 않아, 키보드·낭독기 이용자는 Tab 을 눌러야 겨우 들어갔다.
+         ⚠ [hidden] 뿐 아니라 offsetParent 로도 확인한다 — 조상이 감춰졌거나 CSS 로
+            숨겨진 경우까지 잡아야 «보이는 첫 단추»가 된다(position:fixed 는 이 앱에 없다). */
+      if (open) {
+        const btns = acctPop.querySelectorAll("button");
+        let f = null;
+        for (let i = 0; i < btns.length; i++) {
+          if (!btns[i].hidden && btns[i].offsetParent !== null) { f = btns[i]; break; }
+        }
+        if (!f) f = btns[0] || null;
+        if (f) f.focus();
+      }
     };
     acctBtn.onclick = (e) => { e.stopPropagation(); setAcct(acctPop.hidden); };
     document.addEventListener("click", (e) => {
@@ -2274,7 +2600,20 @@ function render() {
   else if (sortKey === "team") rows.sort(teamSortCmp);
   $("#count").textContent = `총 ${rows.length}건`;
   const list = $("#list");
-  if (!rows.length) { list.innerHTML = '<div class="empty">조건에 맞는 사업이 없습니다.</div>'; $("#pager").innerHTML = ""; return; }
+  /* 🈳 빈 화면 — «걸러서 0건»과 «원래 0건»을 가른다 (B-5 · 2026-08-25).
+     예전에는 어느 쪽이든 「조건에 맞는 사업이 없습니다」 였다. 필터를 하나도 안 건
+     담당자는 그 말을 보고 「내가 뭘 잘못 걸었나」 하고 칩·검색창을 헤맸다.
+     신청 접수 탭(renderApplications 의 빈 화면)과 «같은 결»로 나눈다. */
+  if (!rows.length) {
+    const narrowed = SELCATS.size > 0 || !!q;
+    list.innerHTML = narrowed
+      ? '<div class="empty">조건에 맞는 사업이 없습니다. 위 분야 칩을 끄거나 검색어를 지우면 모든 사업을 볼 수 있습니다.</div>'
+      : (guestSaveBlockedByServer()
+        ? '<div class="empty">아직 등록된 사업이 없습니다.</div>'
+        : '<div class="empty">아직 등록된 사업이 없습니다. 위 «새 사업 올리기»로 첫 사업을 등록해 보세요.</div>');
+    $("#pager").innerHTML = "";
+    return;
+  }
   const pages = Math.ceil(rows.length / PAGE); if (page >= pages) page = pages - 1; if (page < 0) page = 0;
   const slice = rows.slice(page * PAGE, page * PAGE + PAGE);
   list.innerHTML = "";
@@ -2696,6 +3035,22 @@ function writeErrMsg(error, verb) {
   return `${verb} 실패: ` + (error && error.message ? error.message : "알 수 없는 오류");
 }
 
+/* ⚠ «다른 담당자가 먼저 저장했다»를 알리는 자리 — 문구는 여기 «한 곳»뿐이다 (2026-08-25).
+ 사업·접수·정책제안 셋이 같은 말을 해야 담당자가 «같은 일»로 알아본다.
+ ⛔ 새 문구를 만들지 마세요. 대상 이름(what)만 갈아 끼웁니다.
+   ⚠ what 에는 «조사까지» 붙여 넘긴다 — 「이 접수를」·「이 사업을」·「이 정책제안을」.
+     「을(를)」 같은 표기를 쓰지 않는다. 받침에 따라 조사가 갈리는데 괄호로 미루면
+     읽는 사람에게 «기계가 쓴 글»로 보인다.
+ ⚠ askAlert 를 «기다린다» — 알림을 읽기도 전에 창이 닫히고 목록이 새로 그려지면
+   왜 내 수정이 사라졌는지 알 길이 없다(사업 수정에서 이미 그렇게 정해 두었다). */
+async function announceSaveConflict(what, modalSel, reload) {
+announce("다른 담당자가 먼저 수정했습니다. 새로고침합니다.");
+await askAlert("⚠️ 다른 담당자가 먼저 " + what + " 수정했습니다.\n"
+  + "최신 내용으로 새로고침하니, 다시 확인 후 수정해 주세요.");
+try { closeModal($(modalSel)); } catch (e) {}
+if (typeof reload === "function") await reload();
+}
+
 function openEdit(r) {
   $("#mTitle").textContent = r ? "✏ 사업 수정" : "➕ 새 사업 추가";
   let html = "";
@@ -2728,17 +3083,25 @@ function openEdit(r) {
            서로 같은 것을 말하는 두 칸은 붙어 있어야 한다.
         ⚠ FIELDS 의 차례를 바꿔 「필요 서류」가 마지막이 아니게 되면 이 자리도 함께 옮길 것. */
   if (window.SangjuForms) {
+    /* 🧪 둘러보기(게스트) — «이미 저장된 사업»의 서식 칸은 서버에 곧바로 쓰는 자리라
+       칸 자체를 그리지 않고 안내 한 줄로 갈음한다 (2026-08-25 A-1 · PC앱 webui 와 같은 판단).
+       ⚠ «새 사업»은 여기서 올리지 않는다 — 목록에 담아만 두었다가(PENDING_FORMS)
+         저장이 성공한 뒤에야 올라간다. 그 저장 단추가 이미 게스트에게 없으므로
+         (게스트에게는 「새 사업 올리기」 단추 자체가 없다) 여기서 또 막을 것이 없다.
+       ⚠ 칸을 안 그리면 #formsFile·#formsUpload 가 «없다». 배선(initFormsSection)은
+         이미 `if (!upBtn || !fileInput) return;` 으로 감싸여 있어 그대로 안전하다. */
+    const formsRO = !!r && guestSaveBlockedByServer();
     html += `<div class="forms-section" id="formsSection">
       <div class="field-label">📎 필요 서류 서식</div>
       <p class="field-hint">시민이 상세 화면에서 내려받을 서식 파일입니다. 허용: hwp·hwpx·pdf·doc(x)·xls(x)·ppt(x)·jpg·png·zip·txt · 최대 10MB.${
         r ? "" : "<br>새 사업은 <b>저장한 뒤에</b> 자동으로 함께 올라갑니다(사업명이 정해져야 파일을 이을 수 있습니다)."}</p>
       <ul class="forms-list" id="formsList" aria-live="polite"><li class="forms-empty">${r ? "불러오는 중…" : "아직 고른 서식이 없습니다."}</li></ul>
-      <div class="forms-upload">
+      ${formsRO ? `<p class="guest-ro"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8.2h.01"/></svg>${GUEST_RO_LINE}</p>` : `<div class="forms-upload">
         <input type="file" id="formsFile" class="forms-file"
           accept=".hwp,.hwpx,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip,.txt"
           aria-label="등록할 서식 파일 선택">
         <button type="button" id="formsUpload" class="top-btn solid">${r ? '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20V6"/><path d="M6 12l6-6 6 6"/><path d="M4 4h16"/></svg><span>서식 등록</span>' : '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg><span>목록에 담기</span>'}</button>
-      </div>
+      </div>`}
       <p class="forms-status" id="formsStatus" role="status" aria-live="polite"></p>
     </div>`;
   }
@@ -2776,13 +3139,23 @@ function openEdit(r) {
         «끝내는 단추»는 언제나 «채울 것이 다 끝난 뒤»에 온다.
      ⚠ 삭제는 «맨 끝» — 되돌릴 수 없는 단추를 먼저 닿는 자리에 두지 않는다
         (정책제안 모달 #pmSave → #pmDelete 와 같은 차례). */
-  html += `<div class="modal-actions"><button id="mSave" class="top-btn solid"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>` +
-    /* 🧪 둘러보기(게스트)에게는 «삭제»를 아예 내보내지 않는다 (2026-08-25 양호창님 지시).
-       ⚠ 저장(#mSave)은 남긴다 — 이번 지시는 «지우는 일»만 막는 것이다.
-       ※ 서버는 이미 막혀 있다(anon 의 benefits DELETE 회수 · 권한정리_260824.sql [2]).
-         그래도 단추를 지우는 까닭은 이 저장소 규약 —
-         「눌러 봐야 실패할 조작을 남기지 않는다」(#btnAcct·#btnSyncLog 와 같은 규약). */
-    (r && !IS_GUEST ? `<button id="mDel" class="top-btn danger"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>` : ``) + `</div>`;
+  /* 🧪 둘러보기(게스트)에게는 «저장·삭제»를 아예 내보내지 않는다 (2026-08-25 A-1).
+     ★ 왜 삭제만이 아니라 저장까지 감추나 — 저장도 «쓰기»라서 _guestBlocked() 에 걸린다.
+       예전에는 저장 단추만 남아 있어, 게스트가 긴 서식을 다 채우고 「저장」을 누른 뒤에야
+       「테스트 모드에서는…」 을 만났다. 확인창·입력을 다 지나온 뒤 만나는 실패는 막다른 길이다.
+       (수정으로 내용을 비우면 삭제와 다르지 않다는 점도 PC앱 webui 와 같은 판단이다.)
+     ⛔ 화면에서 감추는 것은 «안내»이지 «방어»가 아니다 — 실제 차단은 RLS 와
+        installGuestReadOnlyGuard 가 한다. 그래도 감추는 까닭은 이 저장소 규약 —
+        「눌러 봐야 실패할 조작을 남기지 않는다」(#btnAcct·#btnChangePw 와 같은 규약).
+     ⚠ 빈 자리만 남기지 않는다 — «왜 없는지»를 .guest-ro 한 줄로 말한다(규격서 §5).
+     ⚠ 아래 `$("#mSave").onclick = …` 은 반드시 «있을 때만» 건다. 안 감싸면
+        null.onclick 에서 예외가 나 사업 창이 통째로 죽는다. */
+  html += `<div class="modal-actions">` +
+    (guestSaveBlockedByServer() ? `` : `<button id="mSave" class="top-btn solid"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>`) +
+    (r && !guestNoDelete() ? `<button id="mDel" class="top-btn danger"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>` : ``) +
+    (IS_GUEST ? `<p class="guest-ro"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8.2h.01"/></svg>${guestCanWrite() ? GUEST_RO_LINE
+      : "둘러보기(테스트) 중에는 사업을 저장·삭제할 수 없습니다. 담당자 계정으로 로그인해 주세요."}</p>` : ``) +
+    `</div>`;
   $("#mBody").innerHTML = html;
 
   // 분야 칩 채우기.
@@ -2813,7 +3186,10 @@ function openEdit(r) {
       : "사업명·내용에서 알아볼 수 있는 분야가 없습니다. 직접 골라 주세요.");
   };
 
-  $("#mSave").onclick = async () => {
+  /* ⚠ 널가드 — 둘러보기(게스트)에서는 위에서 «저장 단추를 그리지 않았다».
+     감싸지 않으면 여기서 null.onclick 으로 예외가 나 사업 창이 그 자리에서 죽는다. */
+  const mSaveBtn = $("#mSave");
+  if (mSaveBtn) mSaveBtn.onclick = async () => {
     const saveBtn = $("#mSave");
     const obj = {};
     document.querySelectorAll("#mBody [data-k]").forEach((e) => { obj[e.dataset.k] = e.value; });
@@ -2844,7 +3220,7 @@ function openEdit(r) {
     }
   };
 
-  // 저장 본체 — 위 onclick 이 길어져 흐름이 안 보이게 되므로 따로 뺐다(동작은 그대로).
+// 저장 본체 — 위 onclick 이 길어져 흐름이 안 보이게 되므로 따로 뺐다(동작은 그대로).
   async function saveBenefit(r, obj) {
     if (r) {
       // 낙관적 잠금: 내가 연 이후 다른 담당자가 먼저 수정했는지 updated_at으로 확인
@@ -2865,12 +3241,7 @@ function openEdit(r) {
       }
       if (error) { announce(writeErrMsg(error, "저장")); askAlert(writeErrMsg(error, "저장")); return; }
       if (!data || !data.length) {
-        announce("다른 담당자가 먼저 수정했습니다. 새로고침합니다.");
-        // ⚠ 여기서는 «닫기까지 기다린다» — 알림을 읽기도 전에 편집 창이 닫히고
-        //    목록이 새로 그려지면, 왜 내 수정이 사라졌는지 알 수 없다.
-        await askAlert("⚠️ 다른 담당자가 먼저 이 사업을 수정했습니다.\n최신 내용으로 새로고침하니, 다시 확인 후 수정해 주세요.");
-        closeModal($("#modal"));
-        await loadBenefits();
+        await announceSaveConflict("이 사업을", "#modal", loadBenefits);
         return;
       }
     } else {
@@ -2899,7 +3270,7 @@ function openEdit(r) {
     await loadBenefits();
   }
   // 🔒 연타 방어(bindOnce) — 확인창을 두 번 띄우거나 delete 를 두 번 보내지 않는다.
-  if (r && !IS_GUEST) bindOnce($("#mDel"), async () => {
+  if (r && !guestNoDelete()) bindOnce($("#mDel"), async () => {
     // 되돌릴 수 없는 삭제 — 초점은 «취소»에 놓인다(askConfirm 규약).
     const ok = await askConfirm({
       title: "이 사업을 삭제할까요?",
@@ -2952,7 +3323,7 @@ async function refreshFormsList(r) {
       : `<span class="forms-item-name">📄 ${esc(nm)}</span>`;
     return `<li class="forms-item" data-id="${esc(String(row.id))}">
         <span class="forms-item-main">${nameHtml}<span class="forms-item-meta" aria-hidden="true">${esc(meta)}</span></span>
-        ${IS_GUEST ? "" : `<button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>`}
+        ${guestNoDelete() ? "" : `<button type="button" class="forms-del" aria-label="${esc(nm)} 서식 삭제"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>`}
       </li>`;
   }).join("");
   // 삭제 버튼 바인딩(행 데이터는 클로저로 잡아둔다)
@@ -3428,13 +3799,18 @@ function commentLi(c, isReply) {
      이 저장소 원칙: 「눌러 봐야 실패할 조작을 남기지 않는다」(paintGuestLocks 머리말).
      ⛔ 2026-08-25 — 「답글」·「수정」 단추를 없앴다(공무원이 댓글을 다는 기능 폐지, 양호창님).
         남은 둘은 «글을 쓰는 일»이 아니라 욕설·광고를 치우는 «관리»다. */
-  const acts = IS_GUEST ? "" : `
-      <div class="cmt-acts">
+  /* ⭐ 2026-08-25 — 둘러보기에게 «감추기»는 열고 «삭제»만 막는다.
+     기준은 「되돌릴 수 있는가」다 — 감춘 글은 바로 옆 「다시 보이기」로 되돌아오지만,
+     삭제는 답글까지 함께 영영 사라진다. */
+  const cmtHide = guestSaveBlockedByServer() ? "" : `
         <button type="button" class="mini-btn" data-act="${c.is_hidden ? "show" : "hide"}" data-id="${esc(c.id)}"
-            aria-label="${c.is_hidden ? "이 댓글 다시 보이기" : "이 댓글 감추기"}">${c.is_hidden ? "다시 보이기" : "감추기"}</button>
+            aria-label="${c.is_hidden ? "이 댓글 다시 보이기" : "이 댓글 감추기"}">${c.is_hidden ? "다시 보이기" : "감추기"}</button>`;
+  const cmtDel = guestNoDelete() ? "" : `
         <button type="button" class="mini-btn danger" data-act="del" data-id="${esc(c.id)}"
-            aria-label="이 댓글 삭제">삭제</button>
-      </div>`;
+            aria-label="이 댓글 삭제">삭제</button>`;
+  const acts = (cmtHide || cmtDel) ? `
+      <div class="cmt-acts">${cmtHide}${cmtDel}
+      </div>` : "";
   /* 배지 — 색만으로 «공무원 답변»·«숨김»을 알리지 않는다. 글자가 함께 말한다(KWCAG 5.4.1).
      ⚠ 공무원 답글에는 «부서명»만 붙는다(사람 이름·이메일 금지 — DB 주석 규약). */
   li.innerHTML = `
@@ -3701,7 +4077,17 @@ function renderProposals() {
 
   $("#pCount").textContent = `총 ${rows.length}건`;
   const list = $("#pList");
-  if (!rows.length) { list.innerHTML = '<div class="empty">조건에 맞는 제안이 없습니다.</div>'; $("#pPager").innerHTML = ""; return; }
+  /* 🈳 빈 화면 — «걸러서 0건»과 «원래 0건»을 가른다 (B-5 · 2026-08-25).
+     신청 접수 탭(renderApplications)과 «같은 결»이다. 아무 필터도 안 건 담당자에게
+     「조건에 맞는…」 이라고 말하면, 걸지도 않은 조건을 찾아 헤매게 된다. */
+  if (!rows.length) {
+    const narrowed = (P_STATUS !== "전체") || P_SELCAT.size > 0 || !!q;
+    list.innerHTML = narrowed
+      ? '<div class="empty">조건에 맞는 제안이 없습니다. 위 «전체»를 누르거나 검색어를 지우면 모든 제안을 볼 수 있습니다.</div>'
+      : '<div class="empty">아직 등록된 제안이 없습니다. 시민이 제안하면 이 자리에 바로 나타납니다.</div>';
+    $("#pPager").innerHTML = "";
+    return;
+  }
 
   const pages = Math.ceil(rows.length / PAGE);
   if (pPage >= pages) pPage = pages - 1; if (pPage < 0) pPage = 0;
@@ -3918,7 +4304,8 @@ async function openProposal(r) {
     <div class="modal-actions">
       <button id="pmDelete" class="nav-btn danger" type="button" aria-label="이 정책제안 삭제"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>
       <button id="pmPrint" class="nav-btn ghostish" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 9V4h10v5"/><path d="M7 18H5v-6h14v6h-2"/><path d="M7 14h10v6H7z"/></svg><span>인쇄</span></button>
-      <button id="pmSave" class="nav-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>
+      ${guestSaveBlockedByServer() ? `<p class="guest-ro"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8.2h.01"/></svg>둘러보기(테스트) 중에는 제안을 저장·삭제할 수 없습니다. 담당자 계정으로 로그인해 주세요.</p>`
+        : `<button id="pmSave" class="nav-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>`}
     </div>`;
 
   if (reps) loadReportDetail(r.id);
@@ -3975,7 +4362,9 @@ async function openProposal(r) {
     try { window.print(); } catch (e) { off(); }
   };
 
-  // 🔒 연타 방어(bindOnce) — 같은 제안에 update 가 두 번 나가지 않게.
+  /* 🔒 연타 방어(bindOnce) — 같은 제안에 update 가 두 번 나가지 않게.
+     ⚠ 둘러보기(게스트)에서는 위에서 «저장 단추를 그리지 않았다» → $("#pmSave") 가 null.
+        bindOnce 는 맨 앞에 `if (!btn) return;` 이 있어 그대로 안전하다(597행 부근). */
   bindOnce($("#pmSave"), async () => {
     const newStatus = $("#pmStatus").value;
     const reply = ($("#pmReply").value || "").trim();
@@ -3987,11 +4376,14 @@ async function openProposal(r) {
       $("#pmReply").focus();
       return;
     }
+    /* ⛔ updated_at 을 여기에 넣지 마세요 (2026-08-25).
+       예전에는 `updated_at: new Date().toISOString()` 로 «클라이언트 시계»를 실어 보냈다.
+       그러면 아래 낙관적 잠금이 조건으로 쓸 값을 스스로 덮어써 잠금이 성립하지 않는다.
+       서버 트리거(trg_proposals_updated · set_updated_at)가 채우는 것이 정본이다. */
     const patch = {
       status: newStatus,
       admin_reply: reply || null,
       is_hidden: isHidden,
-      updated_at: new Date().toISOString(),
     };
     /* 📝 처리메모 — 칸이 있을 때만 담는다(A-08 ①).
        ⚠ 칸이 없는 서버에 admin_memo 를 보내면 PGRST204 로 «저장 전체»가 실패한다 —
@@ -4004,12 +4396,21 @@ async function openProposal(r) {
     if (P_MEMO_OK && memoEl && memoEl.dataset.loaded === "1") {
       patch.admin_memo = (memoEl.value || "").trim() || null;
     }
-    let { error } = await sb.from("proposals").update(patch).eq("id", r.id);
+    /* 🔒 낙관적 잠금 — 사업 수정·접수 처리와 «같은 규약»(2026-08-25).
+       ⚠ .select("id") 를 반드시 붙인다. 안 붙이면 «몇 행이 바뀌었는지» 알 길이 없어
+          충돌을 감지할 수단이 구조적으로 없다(예전이 그랬다). */
+    const saveProposal = async () => await sb.from("proposals")
+      .update(patch).eq("id", r.id).eq("updated_at", r.updated_at).select("id");
+    let { data, error } = await saveProposal();
     if (error && isMissingProposalMemo(error) && "admin_memo" in patch) {
       P_MEMO_OK = false; delete patch.admin_memo;
-      ({ error } = await sb.from("proposals").update(patch).eq("id", r.id));
+      ({ data, error } = await saveProposal());
     }
     if (error) { announce(writeErrMsg(error, "저장")); askAlert(writeErrMsg(error, "저장")); return; }
+    if (!data || !data.length) {
+      await announceSaveConflict("이 정책제안을", "#pModal", loadProposals);
+      return;
+    }
     closeModal($("#pModal"));
     markJustChanged(r.id);
     const dt = doneText("저장했습니다");            // 🎉 「… · 오늘 N번째」
@@ -4025,11 +4426,11 @@ async function openProposal(r) {
         확인창까지 지나온 뒤 「할 수 없습니다」를 만나는 것은 막다른 길이다.
      ⚠ [hidden]{display:none !important} 가 style.css 에 있어 hidden 하나로 확실히 사라진다. */
   const pmDel = $("#pmDelete");
-  if (pmDel) pmDel.hidden = IS_GUEST;
+  if (pmDel) pmDel.hidden = guestNoDelete();
 
   // 🔒 연타 방어(bindOnce) — 확인창을 두 번 띄우거나 delete 를 두 번 보내지 않는다.
   //    (두 번째 delete 는 «이미 없는 행»이라 모달이 닫힌 뒤 엉뚱한 오류가 떴다)
-  if (pmDel && !IS_GUEST) bindOnce(pmDel, async () => {
+  if (pmDel && !guestNoDelete()) bindOnce(pmDel, async () => {
     // 되돌릴 수 없는 삭제 — 사업 삭제(#mDel)·신청 삭제(#amDelete)와 «같은» 확인창을 쓴다.
     // askConfirm 규약: 초점은 «취소»에 놓인다(엔터 연타로 지워지는 사고 방지).
     const ok = await askConfirm({
@@ -4167,7 +4568,10 @@ function renderBulkBar() {
   const bar = $("#aBulkBar"), cnt = $("#aBulkCount");
   if (!bar) return;
   const n = A_SEL.size;
-  bar.hidden = !n;
+  /* 🧪 둘러보기(게스트)에게는 띠 자체를 내보내지 않는다 (2026-08-25 A-1).
+     게스트에게는 «고르기 칸»이 없어 A_SEL 이 늘 비어 있지만, 다른 길로 값이 들어와도
+     「눌러 봐야 실패할 조작」이 화면에 나타나지 않도록 여기서 한 번 더 못 박는다. */
+  bar.hidden = !n || guestSaveBlockedByServer();
   if (cnt && n) cnt.textContent = `${n}건 선택됨`;
 }
 
@@ -4421,7 +4825,7 @@ function fmtDateTime(s) {
 function paintDemoNote() {
   const box = $("#aDemoNote");
   if (!box) return;
-  box.hidden = !(IS_GUEST && AALL.length > 0);
+  box.hidden = !(guestUsesDemoList() && AALL.length > 0);
 }
 
 function renderApplications() {
@@ -4454,7 +4858,7 @@ function renderApplications() {
        한 건도 오지 않는다. 그때 빈 화면으로 두면 「접수가 없구나」로 오해한다 →
        «0건»이 아니라 «여기서는 그것을 볼 수 없다»가 사실이므로 그렇게 적는다.
        ⚠ 붉은 오류판을 띄우지 않는다 — 게스트가 할 수 있는 일이 없고, 고장도 아니다. */
-    if (IS_GUEST && !AALL.length) {
+    if (guestUsesDemoList() && !AALL.length) {
       list.innerHTML =
         '<div class="empty">둘러보기 예시 자료가 아직 준비되지 않았습니다. '
         + '실제 신청 접수 내역은 시민의 이름·연락처가 담긴 개인정보라, 담당자 계정으로 로그인하셔야 열립니다.<br>'
@@ -4523,9 +4927,15 @@ function renderApplications() {
        모자란데, <input> 에는 ::after 가 «생기지 않아»(대체 요소) 투명 확장판을 못 붙인다.
        label 로 감싸면 그 44x44 판 어디를 눌러도 브라우저가 체크상자를 대신 눌러 준다(JS 불필요).
        ⚠ 보이는 체크상자 크기·칸 폭(26px)은 그대로다 — 확장판은 style.css .pick-wrap::after. */
-    card.innerHTML = `<label class="pick-wrap">` +
+    /* 🧪 둘러보기(게스트)에게는 «고르기 칸»을 아예 그리지 않는다 (2026-08-25 A-1).
+       고르는 목적이 「일괄 상태 바꾸기」 하나뿐인데, 그 저장이 게스트에게는 반드시 실패한다.
+       예전에는 20건을 고르고 확인창까지 다 지난 뒤에야 「20건 중 0건 성공」을 만났다 —
+       되돌릴 수 없는 조작에 붙은 확인창을 «헛되이» 지나게 하는 것은 막다른 길이다.
+       ⚠ 아래 `card.querySelector(".row-pick")` 는 이미 `if (chk)` 로 감싸여 있어 그대로 안전하다. */
+    card.innerHTML = (guestSaveBlockedByServer() ? `` :
+      `<label class="pick-wrap">` +
         `<input type="checkbox" class="row-pick" data-id="${esc(rid)}"` +
-        ` aria-label="${esc(pickName)} 선택"${A_SEL.has(rid) ? " checked" : ""}></label>` +
+        ` aria-label="${esc(pickName)} 선택"${A_SEL.has(rid) ? " checked" : ""}></label>`) +
       `<div class="pcard-main">
         <!-- ⭐⭐ 배지 «차례» 규약 (2026-08-25 개정 · 세 앱 공통)
                 상태 → (경과) → (안내 공개중) → 분류(담당팀)
@@ -4552,7 +4962,7 @@ function renderApplications() {
         <div class="pcard-meta">
           <span><span aria-hidden="true">🙍</span> ${esc(r.applicant_name || "")}</span>
           ${r.phone ? `<span><span aria-hidden="true">📞</span> ${esc(r.phone)}</span>` : ""}
-          <span class="rg-meta"><span aria-hidden="true">📍</span> ${esc(regionLabel(r.region))}</span>
+          <span><span aria-hidden="true">📍</span> ${esc(regionLabel(r.region))}</span>
           <span><span aria-hidden="true">🗓</span> ${esc(fmtDateTime(r.created_at))}</span>
         </div>
         <!-- ⭐ 처리메모 — «있고 없고»에 따라 카드가 19.5px 씩 달라지던 것을 막는다.
@@ -4682,11 +5092,14 @@ async function openApplication(r) {
       <p id="amReplyLimit" class="field-hint">300자까지 쓸 수 있습니다. 안내에 필요한 내용만 간단히 적어 주세요.</p>
     </div>
     <!-- 규격서 §0 «한 화면 버튼 3개 상한» — 삭제·인쇄·저장 정확히 셋. 여기에 더 늘리지 말 것.
-         ※ 둘러보기(게스트)는 «삭제»가 빠져 둘이다 — 상한 아래라 규격에 어긋나지 않는다. -->
+         ※ 둘러보기(게스트)는 «삭제·저장»이 빠져 「인쇄」 하나다(2026-08-25 A-1).
+           빈 자리만 남기지 않도록 그 자리에 .guest-ro 안내 한 줄을 둔다. -->
+
     <div class="modal-actions">
-      ${IS_GUEST ? "" : `<button id="amDelete" class="nav-btn danger" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>`}
+      ${guestNoDelete() ? "" : `<button id="amDelete" class="nav-btn danger" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg><span>삭제</span></button>`}
       <button id="amPrint" class="nav-btn ghostish" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 9V4h10v5"/><path d="M7 18H5v-6h14v6h-2"/><path d="M7 14h10v6H7z"/></svg><span>인쇄</span></button>
-      <button id="amSave" class="nav-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>
+      ${guestSaveBlockedByServer() ? `<p class="guest-ro"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8.2h.01"/></svg>둘러보기(테스트) 중에는 접수를 저장·삭제할 수 없습니다. 담당자 계정으로 로그인해 주세요.</p>`
+        : `<button id="amSave" class="nav-btn" type="button"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h7V4"/><path d="M8 20v-6h8v6"/></svg><span>저장</span></button>`}
     </div>`;
 
   // 📎 첨부 목록 — 있을 때만 나타난다. 어떤 이유로 실패해도 접수 처리 화면은 멀쩡해야 하므로
@@ -4779,19 +5192,41 @@ async function openApplication(r) {
     const patch = { status: newStatus, admin_memo: memo || null };
     if (reply !== prevReply) patch.citizen_reply = reply || null;
     markSelfWrite();                  // 🤫 이 저장이 실시간으로 되돌아와도 소리는 내지 않는다
+    /* 🔒 낙관적 잠금 — «내가 이 창을 열 때» 의 updated_at 을 함께 보낸다 (2026-08-25).
+       두 담당자가 같은 접수를 열어 두고 차례로 저장하면 예전에는 나중 사람이
+       앞사람의 처리·시민 안내문을 «말없이» 덮었다. 사업 수정(saveBenefit)이 이미
+       쓰던 규약을 그대로 옮긴 것이다 — 안내문·새로고침도 같은 함수를 쓴다.
+       ⚠ r 은 목록 캐시 행이라 r.updated_at 이 «창을 열 때의 값»이다. 그것이 바로 필요한 값이다. */
+    let saved = null;
     try {
-      await SangjuApply.updateApplication(r.id, patch);
+      saved = await SangjuApply.updateApplication(r.id, patch, r.updated_at);
     } catch (err) {
       const m = writeErrMsg(err, "저장");
       announce(m); askAlert(m); return;
+    }
+    if (saved && saved.kind === "conflict") {
+      await announceSaveConflict("이 접수를", "#aModal", loadApplications);
+      return;
     }
     closeModal($("#aModal"));
     markJustChanged(r.id);              // 다시 그릴 때 그 줄이 «방금 변경»으로 보이게
     const dt = doneText("저장했습니다");            // 🎉 「… · 오늘 N번째」
     showDoneCheck(dt);
+    /* 🔒 접속기록(개인정보보호법 §29) — 「아직 안 남겼다」와 「남기지 못했다」는 다르다.
+       시민 안내문 공개는 개인정보 처분이라 반드시 admin_audit 에 남아야 하는데,
+       그 기록만 실패하는 일이 있다(표 미설치·권한·일시적 통신 장애).
+       저장 자체는 이미 끝났으므로 «되돌리지도, 되풀이시키지도» 않고 사실만 알린다.
+       ⚠ 일괄 상태 변경(applyBulkStatus 의 auditNote)·첨부(auditAttachment)와 같은 문구 규약. */
+    const auditMissed = saved && saved._auditOk === false;
     announce((reply
       ? "신청 접수가 저장되었습니다. 시민 안내문은 신청자 화면에 그대로 공개됩니다."
-      : "신청 접수가 저장되었습니다.") + dt.replace("저장했습니다", ""));
+      : "신청 접수가 저장되었습니다.") + dt.replace("저장했습니다", "")
+      + (auditMissed ? " 다만 접속기록을 남기지 못했습니다." : ""));
+    if (auditMissed) {
+      askAlert("저장은 끝났습니다.\n\n"
+        + "※ 이 저장의 접속기록(§29)을 남기지 못했습니다 — 시스템 담당자에게 알려 주세요.\n"
+        + "다시 저장하실 필요는 없습니다.");
+    }
     await loadApplications();
   });
 
