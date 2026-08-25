@@ -1613,6 +1613,12 @@ async function showApp() {
   // 🧪 테스트 모드 — 띠를 올리고 관리자 전용 기능을 잠근다(게스트일 때만 동작).
   paintGuestNotice();
   paintGuestLocks();
+  /* 🧪 둘러보기면 «진짜 신청 자료를 아예 읽지 말라»고 조회 헬퍼에 못 박는다.
+     ⭐ 알려 주는 자리는 여기 «한 곳»뿐이다 — 로그인으로 들어오든(IS_GUEST=false)
+        둘러보기로 들어오든(true) 반드시 이 함수를 지나므로, 두 길이 갈리지 않는다.
+     ⚠ 로그아웃은 location.reload() 라 값이 저절로 초기화된다(남는 상태가 없다).
+     자세한 사연은 cloudui/apply_client.js 의 「🧪 둘러보기(게스트)」 주석. */
+  try { SangjuApply.setGuestMode(IS_GUEST); } catch (e) { /* 옛 헬퍼면 그냥 넘어간다 */ }
   // ⬅ 히스토리 루트를 «첫 탭»으로 잡는다. 여기서 뒤로가기를 누르면 앱이 종료되는 것이 정상.
   //    (로그인 화면에서는 NAV_READY 가 거짓이라 히스토리를 전혀 건드리지 않는다)
   navReset({ type: "tab", tab: pCurrentTab });
@@ -4303,6 +4309,12 @@ async function loadApplications() {
 function subscribeApplicationsRealtime() {
   // 시민앱에서 신청하면 즉시 여기로 온다 → 화면을 갈아엎지 않고 «N건» 알림 띠만 올린다.
   if (!window.SangjuApply) return;
+  /* 🧪 둘러보기는 «구독하지 않는다» (2026-08-25)
+     ① 게스트 목록은 고정 예시라 새 접수가 와도 바뀔 것이 없다 — 「새 접수 N건」 띠를
+        올려 놓고 눌러도 목록이 그대로면 그것이야말로 «그럴듯한 거짓말»이다.
+     ② 실시간 방송에는 시민의 이름·연락처가 그대로 실린다. 쓰지도 않을 개인정보를
+        게스트 브라우저로 흘려보낼 이유가 없다(안 받는 것이 가장 확실한 차단이다). */
+  if (IS_GUEST) return;
   SangjuApply.subscribeApplications(() => {
     if (A_LOADED) {
       ART_PENDING += 1; syncRtBanners(); rtAutoApply("applications", loadApplications);
@@ -4338,6 +4350,18 @@ function fmtDateTime(s) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+/* 🧪 둘러보기 «예시 자료입니다» 알림 — 목록 «바로 위»에 글자로 밝힌다 (2026-08-25)
+   ⭐ 예시를 «가려서» 될 일이 아니라 «말해야» 할 일이다. 이름이 「김○○」이라 눈으로도
+     구분되지만, 실제 접수 현황으로 오해하면 그 화면이 그대로 시정 판단이 된다
+     (인수인계 2-4 「가장 무서운 결함은 멈추는 것이 아니라 그럴듯한 거짓말」).
+   ⚠ 게스트라도 «한 건도 못 읽었으면» 띄우지 않는다 — 그때는 아래 빈 상태 안내가 말한다.
+   ⚠ 로그인한 공무원 화면에는 어떤 경우에도 뜨지 않는다. */
+function paintDemoNote() {
+  const box = $("#aDemoNote");
+  if (!box) return;
+  box.hidden = !(IS_GUEST && AALL.length > 0);
+}
+
 function renderApplications() {
   const list = $("#aList"); if (!list) return;
   const q = ($("#aSearch") ? $("#aSearch").value : "").trim().toLowerCase();
@@ -4361,18 +4385,21 @@ function renderApplications() {
 
   $("#aCount").textContent = `총 ${rows.length}건`;
   renderBulkBar();
+  paintDemoNote();            // 🧪 둘러보기면 «예시 자료입니다» 를 목록 위에 글자로 밝힌다
   if (!rows.length) {
-    /* 🧪 테스트 모드 — 신청 접수는 시민의 이름·연락처가 든 개인정보라, 로그인하지 않은
-       접속에는 서버(RLS)가 «한 건도» 내주지 않는다. 그래서 여기는 «0건»이 아니라
-       «볼 수 없다»가 맞는 말이다. 빈 화면으로 두면 「접수가 없구나」로 오해한다. */
+    /* 🧪 테스트 모드 — 둘러보기는 진짜 신청 자료를 «아예 읽지 않는다»(apply_client.js).
+       대신 demo_applications() 예시를 읽는데, 그 함수가 아직 안 심겼거나 지워졌으면
+       한 건도 오지 않는다. 그때 빈 화면으로 두면 「접수가 없구나」로 오해한다 →
+       «0건»이 아니라 «여기서는 그것을 볼 수 없다»가 사실이므로 그렇게 적는다.
+       ⚠ 붉은 오류판을 띄우지 않는다 — 게스트가 할 수 있는 일이 없고, 고장도 아니다. */
     if (IS_GUEST && !AALL.length) {
       list.innerHTML =
-        '<div class="empty">신청 접수 내역은 테스트 모드에서 볼 수 없습니다. '
-        + '시민의 이름·연락처가 담긴 개인정보라, 담당자 계정으로 로그인하셔야 열립니다.<br>'
+        '<div class="empty">둘러보기 예시 자료가 아직 준비되지 않았습니다. '
+        + '실제 신청 접수 내역은 시민의 이름·연락처가 담긴 개인정보라, 담당자 계정으로 로그인하셔야 열립니다.<br>'
         + '사업 관리·시민 정책제안 탭은 그대로 둘러보실 수 있습니다.</div>';
       $("#aCount").textContent = "";
       $("#aPager").innerHTML = "";
-      announce("신청 접수 내역은 테스트 모드에서 볼 수 없습니다.");
+      announce("둘러보기 예시 자료가 아직 준비되지 않았습니다.");
       return;
     }
     /* 빈 화면에도 «다음 행동»을 알려 준다(규격서 0절).

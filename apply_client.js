@@ -8,10 +8,16 @@
 //     세 앱의 apply_client.js 를 «동시에» 갱신하고 검수 담당에게 알린다.
 //
 //  노출: window.SangjuApply = {
-//    useClient, benefitKey, genReceiptNo,
+//    useClient, setGuestMode, isGuestMode, benefitKey, genReceiptNo,
 //    submitApplication, listApplications, updateApplication, deleteApplication,
-//    subscribeApplications, errKind, TABLE, STATUSES
+//    subscribeApplications, errKind, TABLE, STATUSES, DEMO_RPC
 //  }
+//
+//  ⚠ 2026-08-25 — 이 사본(공무원앱)에만 «둘러보기 분기»가 들어갔습니다.
+//     setGuestMode(true) 이면 listApplications 가 applications 표를 «읽지 않고»
+//     demo_applications() 예시 10건을 읽습니다. 시민앱에는 listApplications 자체가
+//     없고, PC앱은 파이썬 통로로 읽으므로 이 분기가 필요하지 않습니다.
+//     → webui/apply_client.js 와 이 대목이 다른 것이 «정상»입니다.
 //
 //  방어 원칙: applications.sql 이 아직 실행 안 됐으면(테이블 없음·PGRST205)
 //    · listApplications 는 «원인 있는 오류» 를 throw → 공무원앱이 안내(showLoadError)
@@ -120,10 +126,57 @@ window.SangjuApply = (function () {
     return res.data;
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     🧪 둘러보기(게스트) — «진짜 신청 자료를 아예 읽지 않는다» (2026-08-25)
+     ─────────────────────────────────────────────────────────────────────
+     지금까지 「로그인 없이 둘러보기」는 아래 listApplications 를 그대로 타서
+     applications 표를 «익명으로» 읽고 있었다. 그것이 되는 까닭은 단 하나 —
+     supabase/테스트모드_익명조회_260821.sql 이 그 표를 익명에게 통째로 열어 두었기
+     때문이다. 그 문에는 이름·연락처·문의내용·조회코드·처리메모가 다 들어 있다.
+     ⇒ 실제 시민 신청을 받기 «전»에 그 문은 반드시 닫힌다
+       (supabase/테스트모드_되돌리기_260824.sql). 닫히는 순간 둘러보기는 401 로 깨진다.
+
+     그래서 둘러보기는 «표»가 아니라 «지어낸 예시 10건»을 본다.
+       supabase/둘러보기_예시자료_260825.sql 의 demo_applications() —
+       select ... from 이 한 줄도 없는 values 목록이라, 표에 무엇이 들어오든
+       이 통로로는 «구조적으로» 샐 수가 없다.
+
+     ⛔ 이 분기를 «로그인한 공무원»에게 적용하지 마세요. 공무원은 진짜 표를 봐야 합니다.
+     ⛔ 게스트 쪽에 select(TABLE) 을 되살리지 마세요 — 문을 닫는 순간 깨집니다.
+     ⚠ 예시 함수가 «아직 DB 에 없을 수 있다»(2026-08-25 현재 미실행). 그때는
+       throw 하지 «않고» 빈 목록을 돌려준다 → 화면은 오류판이 아니라 «빈 상태 안내»가 뜬다.
+       (게스트에게 붉은 오류를 보이는 것은 사실도 아니고 할 수 있는 일도 없다)
+     ══════════════════════════════════════════════════════════════════════ */
+  var DEMO_RPC = "demo_applications";
+  var _guest = false;
+  function setGuestMode(on) { _guest = (on === true); }
+  function isGuestMode() { return _guest; }
+
+  async function _listDemo(sb) {
+    var res = null;
+    try { res = await sb.rpc(DEMO_RPC); }
+    catch (e) { res = { error: e }; }
+    if (!res || res.error) {
+      // 아직 안 심겼거나(PGRST202·404) 권한이 없어도 «조용히» 빈 목록.
+      console.warn("[둘러보기] 예시 자료를 불러오지 못했습니다(빈 목록으로 진행):",
+                   res && res.error);
+      return [];
+    }
+    var rows = res.data;
+    if (!Array.isArray(rows)) rows = rows ? [rows] : [];
+    // 아래 진짜 조회와 «같은 기준»으로 취소건을 거른다(예시에는 없지만 규칙을 갈라 두지 않는다)
+    return rows.filter(function (r) { return !(r && r.canceled_at); });
+  }
+
   // ── 공무원 조회 — 최신순 전체. 실패는 throw(호출부가 원인별 안내) ──
   async function listApplications() {
     var sb = client();
     if (!sb) return [];
+    if (_guest) return await _listDemo(sb);
+    /* ⛔ 아래 select("*") 를 «칸 목록»으로 좁히지 마세요 (2026-08-25 판단).
+       ㉠ 여기는 로그인한 공무원(authenticated)만 지나갑니다 — 게스트는 위에서 갈라졌습니다.
+       ㉡ 칸 이름을 적어 두면, 그 SQL 이 아직 안 돌아간 환경에서 «없는 칸» 하나로
+          42703 이 나 목록이 통째로 죽습니다(바로 아래 canceled_at 주석과 같은 사연). */
     var res = await sb.from(TABLE).select("*").order("created_at", { ascending: false });
     if (res.error) throw res.error;
     // 🗑 시민이 스스로 취소한 접수는 «없는 것»으로 본다 (2026-08-21)
@@ -237,6 +290,9 @@ window.SangjuApply = (function () {
     TABLE: TABLE,
     STATUSES: STATUSES,
     useClient: useClient,
+    setGuestMode: setGuestMode,     // 🧪 둘러보기 여부 — 화면(app.js showApp)이 한 번만 알려 준다
+    isGuestMode: isGuestMode,
+    DEMO_RPC: DEMO_RPC,
     benefitKey: benefitKey,
     genReceiptNo: genReceiptNo,
     submitApplication: submitApplication,

@@ -33,7 +33,7 @@
 <meta name="apple-mobile-web-app-title" content="상주정책(공무원용)">
 <meta name="application-name" content="상주정책(공무원용)">
 
-<link rel="stylesheet" href="style.css?v=0.7.3">
+<link rel="stylesheet" href="style.css?v=0.7.4">
 <link rel="icon" href="assets/icon-admin-192-v3.png">
 </head>
 <body>
@@ -431,6 +431,18 @@
          ⛔ 표의 «머리행»(.list-head, 「상태·담당팀·접수번호 / 사업명 / 신청자…」)도 함께 없앴습니다.
             격자에서는 열이 «가로»로 늘어서므로 머리글자가 어느 칸도 가리키지 못합니다.
             그 정보는 카드 안의 배지·글자와 카드마다 달린 aria-label 이 그대로 전합니다. -->
+    <!-- 🧪 둘러보기 예시 자료 알림 — 게스트로 들어와 «예시 10건»을 보고 있을 때만 뜬다.
+         ⭐ 가리는 것이 아니라 «말하는» 것이다. 이름이 「김○○」이라 눈으로도 구분되지만,
+            보는 사람이 실제 접수 현황으로 오해하면 시정 판단이 틀어진다
+            (supabase/둘러보기_예시자료_260825.sql 머리말의 부탁).
+         ⚠ 자리는 목록 «바깥»이다. .cardlist 는 격자라 안에 넣으면 카드 한 장 자리를
+            차지해 격자에 구멍이 생긴다(규격서 19-19-3).
+         ⚠ 꼴은 새로 만들지 않고 탭 안내문(.search-hint) 한 벌을 그대로 쓴다.
+         app.js paintDemoNote() 가 켜고 끈다. -->
+    <p id="aDemoNote" class="search-hint" role="status" hidden>
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg>
+      <span><strong>둘러보기 예시 자료입니다.</strong> 실제 접수 내역이 아니라, 화면을 살펴보시라고 지어낸 자료입니다. 실제 신청은 담당자 계정으로 로그인하셔야 보입니다.</span>
+    </p>
     <div id="aList" class="cardlist"></div>
     <div id="aPager" class="pager-wrap"></div>
   </section>
@@ -777,13 +789,13 @@
         integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- 공통 버전·개선사항 단일 소스(앱 스크립트보다 먼저 로드) -->
-<script src="version.js?v=0.7.3"></script>
-<script src="config.js?v=0.7.3"></script>
+<script src="version.js?v=0.7.4"></script>
+<script src="config.js?v=0.7.4"></script>
 <!-- 서식 스토리지 공용 헬퍼(세 앱 공통). app.js 보다 먼저 로드 -->
-<script src="forms.js?v=0.7.3"></script>
+<script src="forms.js?v=0.7.4"></script>
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
-<script src="apply_client.js?v=0.7.3"></script>
-<script src="app.js?v=0.7.3"></script>
+<script src="apply_client.js?v=0.7.4"></script>
+<script src="app.js?v=0.7.4"></script>
 <!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
      CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.
        · tap.js   — 버튼 눌림 파동 + 햅틱(진동). 화면에 무엇을 그리지는 않는다.
@@ -792,13 +804,13 @@
        · icons.js — app.js 가 «만들어 내는» 화면의 이모지를 인라인 SVG 로 바꿔 끼운다.
          (app.js 를 고치지 않고 «그려진 뒤의 글자»만 바꾼다 — 세 앱이 글자 단위로 같아야 하는
           문자열까지 원본을 건드리지 않고 다룰 수 있다) -->
-<script src="tap.js?v=0.7.3"></script>
-<script src="icons.js?v=0.7.3"></script>
-<script src="stats.js?v=0.7.3"></script>
-<script src="a2hs.js?v=0.7.3"></script>
+<script src="tap.js?v=0.7.4"></script>
+<script src="icons.js?v=0.7.4"></script>
+<script src="stats.js?v=0.7.4"></script>
+<script src="a2hs.js?v=0.7.4"></script>
 
 <!-- PWA 서비스워커 등록 (상대경로 → /admin/ 하위에서만 동작, 시민앱과 분리) -->
 <!-- 서비스워커 등록 — CSP 적용을 위해 인라인 대신 별도 파일(sw-register.js)로 둔다 -->
-<script src="sw-register.js?v=0.7.3"></script>
+<script src="sw-register.js?v=0.7.4"></script>
 </body>
 </html>

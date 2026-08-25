@@ -1465,9 +1465,10 @@ body.modal-open{overflow:hidden;}
 /* 「미기재」 — 맨 뒤에 오되 눈에 띄게(고쳐야 할 값이라는 뜻이다). 글자로만 구분한다. */
 .region-list li.rank-unknown .rank-nm{font-weight:var(--fw-heavy);color:var(--gotgam-t);}  /* 흰 7.37:1 */
 
-/* 좁은 화면에서 표·넓은 내용이 넘칠 때의 가로 스크롤 상자(본문 자체는 절대 가로로 밀리지 않게) */
-.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.table-scroll>table{min-width:560px;}
+/* ⛔ 여기 있던 «.table-scroll» 두 줄(overflow-x:auto · >table{min-width:560px})을
+     2026-08-25 에 지웠다 — 이 앱에는 <table> 이 한 개도 없고, class="table-scroll" 을
+     붙이는 곳도 없다(전수 확인). 목록은 모두 .cardlist 격자다.
+   ⚠ 다시 표를 들일 일이 생기면 «그때» 새로 만든다. 미리 두면 다음 사람이 또 확인해야 한다. */
 
 /* ════════════════════════════════════════════════════════════
    👆 눌림 반응 — «살짝 눌리는» 축소 하나만 쓴다.
@@ -1918,12 +1919,18 @@ a[href^="mailto:"],a[href^="http"],.login-help strong,.forms-item-name,
 
 /* ── 줄바꿈 금지 ─────────────────────────────────────────────
    ① 상태 칩·배지 — 두 줄로 갈라지면 표가 들쭉날쭉해진다. 세로 가운데 정렬도 함께. */
-.st-badge,.cat-tag,.rc-tag,.cr-tag,.hide-tag,.chip,.just-tag,.brand-tag,.rt-dot{
+/* ⛔ 2026-08-25 — 이 목록에서 «.rt-dot» 이름 하나만 걷어냈다(죽은 코드 정리).
+     실시간 연결 상태는 지금 «점»이 아니라 setRealtimeDot() → renderDbInfo() 의 «글자»가
+     알린다. 이 저장소의 .js·.html 어디에도 class="rt-dot" 이 없다(전수 확인).
+   ⚠ 나머지 여덟 이름은 하나도 건드리지 않았다 — 이름이 빠지면 그 배지가 두 줄로 갈라진다. */
+.st-badge,.cat-tag,.rc-tag,.cr-tag,.hide-tag,.chip,.just-tag,.brand-tag{
   white-space:nowrap; display:inline-flex; align-items:center; }
 /* ② 버튼 라벨 — 한 줄 유지. 안 들어가면 «문구»를 줄인다(칸을 늘리지 않는다). */
 .top-btn,.nav-btn,.login-btn,.tab-btn,.rt-banner-btn,.sb-btn,.page-btn{ white-space:nowrap; }
 /* ③ 숫자와 단위 — 「총 14건」이 「총 14 / 건」으로 갈라지지 않게 */
-.count,.kpi b,.donut-legend b,.donut-legend em,.pager-info{ white-space:nowrap; }
+/* ⛔ 2026-08-25 — «.pager-info» 이름 하나만 걷어냈다. 쪽 넘김 줄(#aPager·#pPager)은
+     .pager-wrap / .page-btn 으로만 그려지고 .pager-info 를 붙이는 곳이 없다(전수 확인). */
+.count,.kpi b,.donut-legend b,.donut-legend em{ white-space:nowrap; }
 /* ④ 숫자 폭 고정 — 행마다 숫자 폭이 달라 «총 9건 / 총 14건» 이 들썩이지 않게(규격서 §16 정렬).
    ⚠ PC앱 webui/style.css 의 「.pp-table td.num,.ac-table td.num,.lg-ts,.count」 와 같은 규약이다.
       공무원앱에만 .count 가 빠져 있었다(2026-08-20 세 앱 대조에서 발견). */
