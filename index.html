@@ -394,7 +394,13 @@
     <!-- 상태 필터 — «한 개만» 고르는 줄(전체/접수/심사중/승인/반려). 줄바꿈 알약(.chips.wrap).
          분야 칩(.chips.grid)과 «모양부터» 달라 역할이 헷갈리지 않는다. -->
     <div class="chips-cap" id="aStatusCap">상태로 좁혀보기 <span class="chips-cap-sub">(하나만)</span></div>
-    <div id="aStatusChips" class="chips wrap" role="group" aria-labelledby="aStatusCap"></div>
+    <!-- 오른쪽 「모두 읽음」 — 확인하지 않은 접수를 «한 번에» 읽음으로 표시한다(2026-08-26 ㉣).
+         ⚠ 확인하지 않은 건이 0건이면 app.js paintTabBadges() 가 hidden 으로 감춘다.
+         ⛔ 이 단추를 탭 배지 옆으로 옮기지 마세요 — 「배지를 눌러 지운다」로 읽혀 오조작이 늡니다. -->
+    <div class="chips-row">
+      <div id="aStatusChips" class="chips wrap" role="group" aria-labelledby="aStatusCap"></div>
+      <button id="aMarkAllRead" class="readall-btn" type="button" hidden>모두 읽음</button>
+    </div>
     <!-- 요약 카드로 좁혀 보는 중임을 «한 줄»로 알리는 띠 (2026-08-19)
          칩을 늘리는 대신 이 줄 하나로 「무엇만 보는 중인지 + 되돌리는 길」을 함께 준다.
          app.js renderAScopeUI() 가 켜고 끈다. 글자만으로도 뜻이 통한다(색 의존 없음). -->
@@ -524,7 +530,11 @@
     </div>
     <!-- 상태(하나만) = 알약 줄 · 분야(여러 개) = 격자. 접수 처리·사업 탭과 같은 규약. -->
     <div class="chips-cap" id="pStatusCap">상태로 좁혀보기 <span class="chips-cap-sub">(하나만)</span></div>
-    <div id="pStatusChips" class="chips wrap" role="group" aria-labelledby="pStatusCap"></div>
+    <!-- 오른쪽 「모두 읽음」 — 신청 탭과 «같은 규약»(2026-08-26 ㉣). 0건이면 감춘다. -->
+    <div class="chips-row">
+      <div id="pStatusChips" class="chips wrap" role="group" aria-labelledby="pStatusCap"></div>
+      <button id="pMarkAllRead" class="readall-btn" type="button" hidden>모두 읽음</button>
+    </div>
     <!-- 🗂 분야 칩 접기 (2026-08-25 양호창님 「분야 칩도 접게 해줘」) — 규격서 §19-7 «한 벌» 그대로.
          마크업 규약: 제목 안에 .fold-btn[aria-expanded][aria-controls] 하나 + 그 바로 아래 같은 id 의 .fold-body.
          그러면 stats.js 의 initFolds() 가 «저절로» 이어 준다(새 코드가 필요 없다).
@@ -833,6 +843,11 @@
 <script src="forms.js?v=0.7.6"></script>
 <!-- 신청 접수 공용 헬퍼(세 앱 공통·byte-identical). app.js 보다 먼저 로드 -->
 <script src="apply_client.js?v=0.7.6"></script>
+<!-- 읽음/안읽음 저장 어댑터(세 앱 공통). app.js 보다 먼저 로드.
+     ⚠ app.js 는 window.SangjuReads 만 부르고 localStorage 를 직접 만지지 않는다 —
+       나중에 «계정별 서버 저장»으로 옮길 때 이 파일 안쪽만 바꾸면 화면은 그대로다.
+     ⚠ 이 파일이 없어도 앱은 멀쩡히 뜬다(app.js READS() 가 null 이면 배지를 안 그린다). -->
+<script src="reads.js?v=0.7.6"></script>
 <script src="app.js?v=0.7.6"></script>
 <!-- ── 시각 레이어 전용 스크립트(app.js 의 «업무 로직»은 건드리지 않는다) ──────────
      CSP 가 인라인 <script> 를 막으므로 각각 별도 파일로 둔다.

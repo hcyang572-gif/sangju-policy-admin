@@ -320,19 +320,64 @@ function closeModal(modal, opts) {
    ✕·바깥클릭·Esc·탭 이동·뒤로가기로 나가면 «확인 없이» 사라지던 문제를 막는다.
    판정은 «연 순간의 값과 달라졌는가» — 아무것도 손대지 않았으면 묻지 않는다.
    ⚠ 저장·삭제가 «성공한 뒤»의 closeModal 은 묻지 않는다(이미 반영됐으므로).
+   ⚠ 비밀번호 칸·파일 선택칸은 비교에서 뺀다(아래 fieldSnapValue 머리말 참조).
    ══════════════════════════════════════════════════════════════════════ */
 const DIRTY_GUARD_IDS = new Set(["modal", "aModal", "pModal"]);   // 읽기 전용 모달(방침·버전)은 제외
 // 🔑 비밀번호 모달은 제외 — 닫을 때 비밀번호 칸을 «반드시» 비우는 보안 규약이 있어 되물을 게 없다.
 
+/* 칸 하나를 «기준선에 적을 글자»로 바꾼다.
+   ⛔ 이 규칙을 formSnapshot 과 rebaseModalField 두 곳에 나눠 적지 마세요 —
+      갈라지는 순간 기준선과 비교값이 서로 다른 자를 쓰게 됩니다. */
+function fieldSnapValue(n) {
+  /* ⚠ 파일 선택칸은 «비교에서 뺀다» — 2026-08-26 실측으로 두 번째 「양치기 소년」을 잡았다.
+     서식은 「서식 등록」 단추로 «즉시» 올라가는 값이라 저장 대상이 아닌데, 고르고 나면
+     input.value 에 "C:akepath\신청서식.hwp" 가 남아 «아무것도 안 고쳤는데» 창을 닫을 때
+     「작성 중인 내용이 있습니다」가 떴다(사업 추가·수정 창 #modal · #formsFile).
+     ★ PC앱 webui/app.js 의 formSnapshot 은 이미 file 을 빼고 있었다 — 그쪽에 맞춘 것이다. */
+  if (n.type === "password" || n.type === "file") return "";
+  if (n.type === "checkbox" || n.type === "radio") return n.checked ? "1" : "0";
+  return String(n.value == null ? "" : n.value);
+}
+
 function formSnapshot(modal) {
   if (!modal || !DIRTY_GUARD_IDS.has(modal.id)) return null;
   const out = [];
-  modal.querySelectorAll("input, textarea, select").forEach((n) => {
-    if (n.type === "password") { out.push(""); return; }
-    if (n.type === "checkbox" || n.type === "radio") out.push(n.checked ? "1" : "0");
-    else out.push(String(n.value == null ? "" : n.value));
-  });
+  modal.querySelectorAll("input, textarea, select").forEach((n) => { out.push(fieldSnapValue(n)); });
   return JSON.stringify(out);   // 칸 경계가 섞이지 않도록 배열 그대로 직렬화
+}
+
+/* ⭐⭐ 2026-08-26 «양치기 소년» 결함 수정 — 아무것도 안 고치고 닫아도 경고가 떴다
+   ────────────────────────────────────────────────────────────────────────────
+   ⓘ 무엇이 잘못됐나 (실제 브라우저로 재현·확정)
+     기준선(_sjSnap)은 openModal() 이 «창을 여는 그 순간» 잡는다. 그런데 정책제안
+     검토창의 «처리메모»(#pmMemo)는 목록에 없는 값이라, openProposal() 이
+     loadProposalMemo() 를 «기다리지 않고» 띄운다(그래야 창이 곧바로 열린다).
+     그 조회가 창이 열린 «뒤»에 도착해 칸을 채우므로, 담당자는 손 하나 안 댔는데
+     기준선("")과 지금 값("담당 배정 전. 분야 확인 필요.")이 달라진다 → 「작성 중」.
+     실측 — 칸 4개(pmStatus·pmMemo·pmReply·pmHidden) 중 «pmMemo 한 칸만» 어긋났다.
+   ⓘ 왜 그냥 두면 안 되나 — 처리메모가 적힌 제안은 «열었다 닫기만 해도» 매번 경고가
+     뜬다. 경고를 읽지 않고 넘기는 버릇이 들면, 정작 답변을 쓰다 나가는 날 그 경고가
+     아무 일도 못 한다(양치기 소년).
+   ⓘ 어떻게 고쳤나 — 창을 늦게 열지 않는다(그러면 조회를 기다리게 된다).
+     대신 «프로그램이 채워 넣은 그 칸 하나만» 기준선에 반영한다.
+   ⛔ formSnapshot(modal) 로 «통째로» 다시 잡지 마세요 — 그 사이 담당자가 답변·메모를
+      이미 쓰고 있었다면 그 «진짜 작성 중»까지 함께 지워집니다(경고를 죽이는 셈).
+   ⚠ 이 함수는 «사람이 친 값»에는 절대 쓰지 않는다 — 오직 «화면이 스스로 채운 칸»에만.
+   ⚠ 칸 개수가 달라졌으면(창 안에 입력칸이 새로 생겼다면) 자리가 어긋나므로 통째로
+     다시 잡는다 — 그때는 어차피 자리 대조 자체가 뜻을 잃는다. */
+function rebaseModalField(modal, node) {
+  if (!modal || !node || modal._sjSnap == null) return;
+  const list = [...modal.querySelectorAll("input, textarea, select")];
+  const i = list.indexOf(node);
+  if (i < 0) return;
+  let snap = null;
+  try { snap = JSON.parse(modal._sjSnap); } catch (e) { snap = null; }
+  if (!Array.isArray(snap) || snap.length !== list.length) {
+    modal._sjSnap = formSnapshot(modal);
+    return;
+  }
+  snap[i] = fieldSnapValue(node);
+  modal._sjSnap = JSON.stringify(snap);
 }
 
 function isModalDirty(modal) {
@@ -1320,6 +1365,9 @@ function renderChangelog() {
    ★ 화면에서 감추는 것은 «안내»이지 «방어»가 아니다. 실제 차단은 Supabase RLS·권한이 한다.
    ⚠ PC앱(webui/app.js) 의 같은 덩어리와 문구·구조를 맞춰 두었다. 한쪽만 고치지 말 것. */
 let IS_GUEST = false;
+/* 🔴 읽음/안읽음 저장 칸을 가르는 «담당자 이메일». showApp() 이 한 번 채운다(2026-08-26).
+   ⚠ 화면에는 절대 찍지 않는다 — reads.js 의 저장 칸 이름표로만 쓴다. */
+let READS_USER = "";
 const GUEST_WRITE_MSG =
   "테스트 모드(로그인 없이 둘러보기)에서는 저장·수정·삭제를 할 수 없습니다. "
   + "실제 처리는 담당자 계정으로 로그인한 뒤 이용해 주세요.";
@@ -1935,6 +1983,17 @@ async function showApp() {
      ⚠ 삭제 차단은 그대로다 — 목록을 진짜로 읽는 것과 지울 수 있는 것은 다른 문제다. */
   try { SangjuApply.setGuestMode(guestUsesDemoList()); } catch (e) { /* 옛 헬퍼면 그냥 넘어간다 */ }
 
+  /* 🔴 읽음/안읽음 저장 칸을 «누구 것»으로 쓸지 어댑터에 알린다 (2026-08-26).
+     ⭐ 알리는 자리를 여기 «한 곳»으로 둔 까닭은 위 setGuestMode 와 똑같다 —
+        로그인으로 들어오든 둘러보기로 들어오든 반드시 이 함수를 지난다.
+     ⚠ 사람이 바뀌면 어댑터가 시렁을 비운다(앞 사람의 읽음이 뒷사람에게 새면 안 된다).
+     ⚠ 이 줄은 APP_STARTED 관문보다 «앞»이다 — 둘러보기로 열어 둔 탭에서 담당자가
+       로그인하면 그 길은 관문에서 되돌아가므로, 관문 뒤에 두면 칸이 안 갈아 끼워진다.
+     ⛔ 여기에 await 를 넣지 마세요 — 관문(APP_STARTED) «앞»에서 기다리면 showApp() 이
+        두 번 들어와 실시간 채널이 중복 구독됩니다(위 「재진입 방어」 머리말 참조).
+        이메일은 관문을 지난 뒤 아래에서 한 번 채워 넣습니다. */
+  readsSetContext(READS_USER, IS_GUEST);
+
   /* 🔁 재진입 방어 (B-7 · 2026-08-25) ─────────────────────────────────────
      getSession() 이 늦게 풀리는 동안 로그인이 성공하면 «진입 관문»과 login() 이
      둘 다 showApp() 을 부른다. 그러면 bindUI 의 addEventListener 가 겹치고,
@@ -1947,6 +2006,22 @@ async function showApp() {
         ⛔ 이 줄을 함수 맨 앞으로 올리지 마세요(그 순간 잠금이 안 풀린다). */
   if (APP_STARTED) return;
   APP_STARTED = true;
+
+  /* 🔴 저장 칸 이름을 «담당자 이메일»로 못 박는다 — 한 기기를 여러 담당자가 쓰는 자리에서
+     앞 사람의 읽음이 뒷사람에게 새지 않게. 관문을 지난 뒤라 «딱 한 번»만 돈다.
+     ⚠ 게스트는 어댑터가 scope:"guest" 한 칸으로 몰아 두므로 이메일이 필요 없다.
+     ⚠ 아래 loadApplications() 보다 «먼저» 끝나야 한다 — 목록을 그린 뒤에 칸이 바뀌면
+       어댑터의 시렁이 비워져 방금 그린 「신규」와 배지가 어긋난다. */
+  if (!IS_GUEST) {
+    let who = "";
+    try {
+      const r = await sb.auth.getSession();
+      const ses = r && r.data ? r.data.session : null;
+      who = (ses && ses.user && ses.user.email) || "";
+    } catch (e) { who = ""; }
+    READS_USER = who;
+    readsSetContext(READS_USER, false);
+  }
 
   // ⬅ 히스토리 루트를 «첫 탭»으로 잡는다. 여기서 뒤로가기를 누르면 앱이 종료되는 것이 정상.
   //    (로그인 화면에서는 NAV_READY 가 거짓이라 히스토리를 전혀 건드리지 않는다)
@@ -3478,11 +3553,226 @@ let P_REPORTS = {}; // proposal_id -> 신고 건수
 // 뒤로가기가 엉뚱한 탭으로 가지 않는다.
 let pCurrentTab = "applications";
 
+/* ══ 🔴 «아직 확인하지 않음» — 카드 「신규」 배지 + 탭 건수 배지 ════════════════
+   (2026-08-26 양호창님 승인 · 🩵물결 설계 · 세 앱 공통 규약)
+
+   ⭐ 무엇을 세는가 — «오늘 들어온 건수»가 아니라 «아직 아무도 열어 보지 않은 건수»다.
+      예전 PC앱 배지는 「오늘 N건」이라 눌러도 줄지 않아, 다 처리한 뒤에도 빨간 숫자가 남았다.
+      이제는 상세를 여는 «그 순간» 읽음이 되고 숫자가 1 줄어든다.
+
+   ⭐ 저장은 «어댑터»(reads.js · window.SangjuReads) 한 곳에만 맡긴다.
+      ⛔ 이 파일에서 localStorage 를 직접 만지지 마세요 — 나중에 «계정별 서버 저장»으로
+         옮길 때 어댑터 안쪽만 바꾸면 화면이 안 바뀌게 하려는 것입니다.
+      ⚠ 어댑터가 아직 없거나(배포 누락) 브라우저가 저장을 막았으면 아래 감싸개가 모두
+        «조용히 0/false» 를 돌려준다 → 배지가 하나도 안 그려질 뿐, 앱은 멀쩡하다.
+
+   ⭐ 세 앱이 «글자 단위로» 같아야 하는 것 —
+        카드 배지 글자      : 「신규」
+        카드 접근명 꼬리    : 「, 아직 확인하지 않음」 (aria-label 맨 뒤 · ⛔ 맨 앞 금지)
+        탭 접근명           : 「신청사업 현황 — 확인하지 않은 접수 3건」
+                              「정책제안 현황 — 확인하지 않은 제안 3건」
+        0건                 : 배지를 아예 그리지 않는다
+        표시 상한           : 「99+」
+        한꺼번에 읽음 단추  : 「모두 읽음」
+
+   ⭐ 배지 «차례» 규약 (세 앱 공통 · 2026-08-26 개정)
+        (신규) → 상태 → (경과 — 신규가 붙었으면 생략) → 블라인드 → 신고 → 분야
+      「신규」가 붙는 동안 「N일 경과」를 생략하는 까닭 — 정책제안은 P_OVERDUE_DAYS=1 이라
+      «어제 들어온 제안»이 둘을 함께 달게 되는데, 둘 다 「어제 들어와 아직 손 안 댄 글」이라는
+      «한 사실»이다. 생략하면 최악 5배지 조합이 57px 좁아진다.
+   ══════════════════════════════════════════════════════════════════════ */
+/* ⚠ 갈래 이름은 «단수»다 — reads.js 의 KINDS = ["application","proposal"] 와 «글자 그대로» 같아야
+     한다. 다르면 normKind() 가 빈 값을 돌려 배지가 통째로 안 그려진다(오류는 안 난다 — 더 나쁘다). */
+const RK_A = "application";
+const RK_P = "proposal";
+const NEW_TAG_HTML = `<span class="new-tag">신규</span>`;
+const NEW_ALABEL   = "아직 확인하지 않음";   // ⚠ aLabel 배열 «맨 뒤»에 넣는다
+
+/* 🔴 실시간으로 «방금 들어온» id 만 담아 두는 임시 주머니.
+   ⛔ 배지 숫자를 rtAutoApply() 에 태우지 «않는다» — 그 함수는 rtBusy()(모달 열림)면 미룬다.
+      처리 창을 5분 열어 두면 그동안 배지가 멈춘 채로 있게 된다.
+   ⚠ 여기에 «id 만» 넣는다. 목록(AALL·PALL)은 건드리지 않으므로 「쓰는 중이면 미룬다」
+     원칙은 그대로다 — 화면의 목록은 담당자가 띠를 누르거나 rtAutoApply 가 적용할 때 바뀐다.
+   ⚠ loadApplications()/loadProposals() 가 목록을 «실제로» 받으면 그때 비운다(중복 계수 방지). */
+let A_NEW = new Set(), P_NEW = new Set();
+
+function READS() { return (typeof window !== "undefined" && window.SangjuReads) || null; }
+
+/* 🧪 둘러보기(게스트) 판정은 «어댑터 안»에 있다 — 화면에서 다시 보지 않는다.
+   게스트의 «신청»은 count 0 · badgeText "" · isNew false 를 돌려주고 저장 칸조차 만들지 않는다
+   (게스트 목록이 demo_applications() 고정 예시라 「신규 3건」이 그럴듯한 거짓말이 되기 때문).
+   «정책제안»은 게스트도 진짜 제안을 보므로 scope:"guest" 칸에 따로 기억해 정상 동작한다.
+   ⛔ 여기에 IS_GUEST 검사를 다시 넣지 마세요 — 규칙이 두 곳으로 갈라져 언젠가 어긋납니다. */
+function readsOn(kind) {
+  const R = READS();
+  if (!R) return false;                       // 어댑터가 아직 없으면 배지를 안 그릴 뿐, 앱은 멀쩡하다
+  try { return !!R.badgeEnabled(kind); } catch (e) { return false; }
+}
+function readsIsNew(kind, id, createdAt) {
+  if (!readsOn(kind)) return false;
+  try { return !!READS().isNew(kind, id, createdAt); } catch (e) { return false; }
+}
+/* ⛔ 행에서 id·시각을 «직접 꺼내» 넘기지 마세요 — count/badgeText/prune 은 행 객체를 그대로
+     받아 어댑터 안에서 꺼냅니다(세 앱의 칸 이름이 달라 그 자리를 한 곳에 모아 둔 것입니다). */
+function readsCount(kind, rows) {
+  if (!readsOn(kind)) return 0;
+  try { return Number(READS().count(kind, rows || [])) || 0; } catch (e) { return 0; }
+}
+function readsMarkRead(kind, id) {
+  if (!readsOn(kind)) return;
+  try { READS().markRead(kind, id); } catch (e) { /* 저장 실패해도 화면은 계속 돈다 */ }
+}
+function readsMarkAllRead(kind, rows) {
+  if (!readsOn(kind)) return Promise.resolve(false);
+  // ⚠ rows 는 «화면 필터(상태·담당팀·검색)를 걷어낸» 전체 목록이어야 한다(AALL·PALL).
+  try { return Promise.resolve(READS().markAllRead(kind, rows || [])); } catch (e) { return Promise.resolve(false); }
+}
+function readsPrune(kind, rows) {
+  if (!readsOn(kind)) return Promise.resolve(false);
+  try { return Promise.resolve(READS().prune(kind, rows || [])); } catch (e) { return Promise.resolve(false); }
+}
+function readsLoad(kind) {
+  if (!readsOn(kind)) return Promise.resolve(null);
+  try { return Promise.resolve(READS().load(kind)); } catch (e) { return Promise.resolve(null); }
+}
+/* 로그인·둘러보기 시작·로그아웃 «직후» 한 번. 사람이 바뀌면 어댑터가 시렁을 비운다
+   (앞 사람의 읽음이 뒷사람에게 새지 않게). 안 불러도 어댑터가 #guestNotice 띠로 스스로 살핀다. */
+function readsSetContext(user, guest) {
+  const R = READS(); if (!R) return;
+  try { R.setContext({ user: user || "", guest: !!guest }); } catch (e) {}
+}
+
+/* 지금 «확인하지 않은» 건수. 목록을 받았으면 목록 기준으로 세고,
+   아직 목록에 «없는» 것(실시간으로 방금 들어온 것)만 따로 더한다.
+   ⚠ 목록에 «이미 있는» id 는 더하지 않는다 — 목록을 받는 도중 그 행의 INSERT 가
+     도착하면(경합) 같은 한 건을 두 번 세게 된다. */
+function extraNewCount(set, rows) {
+  if (!set.size) return 0;
+  const have = new Set((rows || []).map((r) => String(r.id)));
+  let n = 0;
+  set.forEach((id) => { if (!have.has(id)) n += 1; });
+  return n;
+}
+function aUnreadCount() {
+  if (!readsOn(RK_A)) return 0;
+  return (A_LOADED ? readsCount(RK_A, AALL) : 0) + extraNewCount(A_NEW, A_LOADED ? AALL : []);
+}
+function pUnreadCount() {
+  if (!readsOn(RK_P)) return 0;
+  return (P_LOADED ? readsCount(RK_P, PALL) : 0) + extraNewCount(P_NEW, P_LOADED ? PALL : []);
+}
+
+/* 탭 배지 하나를 그린다 / 지운다.
+   ⚠ 탭 단추의 aria-label 을 «갈아 끼운다» — index.html 이 이미 갖고 있으므로 값만 바꾼다.
+     (aria-label 이 있으면 보조기기는 안쪽 글자 대신 그것을 읽는다 — 탭바 3단 규약과 같은 원리)
+   ⚠ .has-badge 토글이 style.css 의 «좁은 화면에서 아이콘 접기» 처방의 «전제»다. 지우지 말 것. */
+function paintOneTabBadge(sel, kind, baseName, unit, n) {
+  const t = $(sel); if (!t) return;
+  /* 「99+」 상한은 어댑터(reads.js badgeText)가 한 곳에서 정한다 — 여기서 다시 계산하지 않는다.
+     ⚠ 숫자를 넘기면 badgeText 가 그 숫자에 상한만 씌워 돌려준다(0 이면 빈 글자). */
+  const R = READS();
+  let txt = "";
+  if (n > 0) { try { txt = R ? String(R.badgeText(kind, n) || "") : String(n); } catch (e) { txt = String(n); } }
+  let b = t.querySelector(".tab-badge");
+  if (!txt) {
+    if (b) b.remove();
+    t.classList.remove("has-badge");
+    t.setAttribute("aria-label", baseName);
+    return;
+  }
+  if (!b) {
+    b = el("span", "tab-badge");
+    b.setAttribute("aria-hidden", "true");   // 숫자는 아래 aria-label 이 문장으로 읽어 준다
+    t.appendChild(b);
+  }
+  b.textContent = txt;
+  t.classList.add("has-badge");
+  // 접근명은 «상한 없는 진짜 건수»로 읽어 준다(99+ 는 눈으로 보는 표기일 뿐이다).
+  t.setAttribute("aria-label", `${baseName} — ${unit} ${n}건`);
+}
+
+/* 탭 배지 두 개 + 「모두 읽음」 단추 두 개를 «한 번에» 맞춘다.
+   ⚠ 부르는 자리 — 목록을 받았을 때 · 목록을 다시 그릴 때 · 상세를 열었을 때(읽음)
+     · 실시간 INSERT 가 왔을 때 · 「모두 읽음」을 눌렀을 때. */
+function paintTabBadges() {
+  const a = aUnreadCount(), p = pUnreadCount();
+  paintOneTabBadge("#tabApplications", RK_A, "신청사업 현황", "확인하지 않은 접수", a);
+  paintOneTabBadge("#tabProposals", RK_P, "정책제안 현황", "확인하지 않은 제안", p);
+  const ab = $("#aMarkAllRead");
+  if (ab) {
+    ab.hidden = !a;
+    ab.setAttribute("aria-label", `확인하지 않은 접수 ${a}건을 모두 읽음으로 표시`);
+  }
+  const pb = $("#pMarkAllRead");
+  if (pb) {
+    pb.hidden = !p;
+    pb.setAttribute("aria-label", `확인하지 않은 제안 ${p}건을 모두 읽음으로 표시`);
+  }
+}
+
+/* 상세를 «연 순간» 읽음으로 바꾸고, 그 카드에서 「신규」 배지만 걷어낸다.
+   ⚠ 목록을 통째로 다시 그리지 «않는다» — 다시 그리면 카드가 사라졌다 나타나며
+     방금 누른 자리가 흔들리고(초점·스크롤) staggerCards 가 헛돈다.
+   ⚠ 접근명 꼬리(「, 아직 확인하지 않음」)도 함께 뗀다 — 화면과 낭독이 갈라지면 안 된다. */
+function markOpened(kind, r, listSel) {
+  if (!r || r.id == null) return;
+  if (!readsOn(kind)) return;
+  const wasNew = readsIsNew(kind, r.id, r.created_at) || (kind === RK_A ? A_NEW : P_NEW).has(String(r.id));
+  readsMarkRead(kind, r.id);
+  (kind === RK_A ? A_NEW : P_NEW).delete(String(r.id));
+  if (wasNew) {
+    try {
+      const list = $(listSel);
+      const card = list && list.querySelector('.pcard[data-id="' + String(r.id).replace(/"/g, '\\"') + '"]');
+      if (card) {
+        const tag = card.querySelector(".new-tag");
+        if (tag) tag.remove();
+        const al = card.getAttribute("aria-label") || "";
+        card.setAttribute("aria-label", al.replace(", " + NEW_ALABEL, ""));
+      }
+    } catch (e) { /* 배지 걷어내기는 «거들 뿐» — 실패해도 읽음 처리는 이미 끝났다 */ }
+  }
+  paintTabBadges();
+}
+
 function bindProposalsUI() {
   // 실시간 알림 띠의 «새로고침» — 목록 갱신은 오직 이 클릭으로만 일어난다
   const rtb = $("#rtBtn"); if (rtb) rtb.onclick = () => { RT_PENDING = 0; syncRtBanners(); loadBenefits(); };
   const prtb = $("#pRtBtn"); if (prtb) prtb.onclick = () => { PRT_PENDING = 0; syncRtBanners(); loadProposals(); };
   const artb = $("#aRtBtn"); if (artb) artb.onclick = () => { ART_PENDING = 0; syncRtBanners(); loadApplications(); };
+
+  /* 🔴 「모두 읽음」 — 목록 위 도구줄 오른쪽(#aStatusChips·#pStatusChips 줄).
+     ⚠ 「신규」는 걷히지만 «상태»는 하나도 안 바뀐다 — 되돌릴 수 없는 조작이 아니므로
+       확인창을 두지 않는다(확인창을 남발하면 정작 필요한 확인창을 안 읽게 된다).
+     ⚠ 여기서 다시 그리는 것은 «목록»이다 — 걸러 보는 중이어도 읽음은 «전체»에 적용한다
+       (탭 배지가 전체 기준이라, 걸러진 것만 읽으면 숫자와 화면이 어긋난다).
+     ⚠ announce() 로 낭독기에도 결과를 알린다 — 배지가 사라지는 것은 «눈»으로만 보인다. */
+  const amr = $("#aMarkAllRead");
+  if (amr) amr.onclick = async () => {
+    const n = aUnreadCount();
+    await readsMarkAllRead(RK_A, AALL);   // ⚠ AALL — «화면 필터를 걷어낸» 전체 목록
+    A_NEW.clear();
+    renderApplications();
+    paintTabBadges();
+    announce(`확인하지 않은 접수 ${n}건을 모두 읽음으로 표시했습니다.`);
+  };
+  const pmr = $("#pMarkAllRead");
+  if (pmr) pmr.onclick = async () => {
+    const n = pUnreadCount();
+    await readsMarkAllRead(RK_P, PALL);   // ⚠ PALL — «화면 필터를 걷어낸» 전체 목록
+    P_NEW.clear();
+    renderProposals();
+    paintTabBadges();
+    announce(`확인하지 않은 제안 ${n}건을 모두 읽음으로 표시했습니다.`);
+  };
+
+  /* 🔁 다른 탭·다른 창에서 읽음이 바뀌면 이 화면의 배지도 따라 바뀐다(어댑터가 알려 준다).
+     ⚠ 목록은 다시 그리지 않는다 — 담당자가 지금 보고 있는 자리(초점·스크롤)를 흔들지 않는다.
+       다음에 목록을 다시 그릴 때 「신규」가 함께 걷힌다. */
+  const R = READS();
+  if (R && typeof R.subscribe === "function") {
+    try { R.subscribe(() => paintTabBadges()); } catch (e) {}
+  }
 
   /* 탭: 클릭 + 좌우/Home/End 화살표 이동(WAI-ARIA tablist 표준 조작).
      PC앱(webui)과 같은 규약 — 탭바는 Tab 키 «한 번»으로 진입하고(로빙 tabindex),
@@ -3582,6 +3872,16 @@ function switchTab(which, opts) {
 async function loadProposals() {
   showSkeleton("#pList", 4);          // 첫 불러오기에만(이미 목록이 있으면 그대로 둔다)
   // 공무원은 숨김(is_hidden) 글도 모두 본다 → 필터 없이 전체 조회
+  /* ⛔⛔ 여기에 .eq("is_hidden", false) 를 «절대» 붙이지 마세요 (2026-08-26 못 박음)
+     예전에는 시민 본인 삭제가 «숨김»일 뿐이어서, 시민이 지운 글이 이 목록에
+     「🚫 블라인드」로 남아 담당자를 헷갈리게 했다. 그래서 「필터를 넣자」는 생각이
+     들 수 있다 — 하지만 그 원인은 2026-08-26 에 «DB 함수 delete_proposal 을 진짜
+     삭제로 바꾸어» 뿌리째 없앴다. 지운 글은 이제 행 자체가 없다.
+     그 뒤로 is_hidden 이 뜻하는 것은 «담당자가 감춘 글»과 «신고 5명 자동숨김» 둘뿐이고,
+     그것은 담당자가 «반드시 봐야 하는» 글이다. 필터를 붙이면 담당자가 자기 손으로
+     감춘 글을 다시 찾지 못해 되돌릴 수도 없게 된다 — 새 결함을 만드는 셈이다.
+     ⚠ 시민앱(모바일웹/proposals.js)에는 반대로 is_hidden=false 필터가 «있어야» 한다.
+        두 앱은 보는 범위가 다른 것이 정상이다 — 한쪽에 맞춘다고 옮겨 오지 마세요. */
   /* 조회할 «칸» 목록 — pin_hash 는 «절대» 넣지 않는다 (2026-08-19).
      본인확인용 PIN 해시가 필요 없는 화면에까지 딸려 나오지 않게 «쓰는 칸만» 적는다.
      시민앱(모바일웹/proposals.js)에서는 anon 에게 pin_hash 권한이 없어 select("*") 가
@@ -3605,10 +3905,15 @@ async function loadProposals() {
   PCATS = [...new Set(PALL.map((r) => r.category).filter(Boolean))].sort();
   P_LOADED = true;
   await loadReportCounts();
+  /* 🔴 목록을 «실제로» 받았으므로 임시 주머니를 버리고 PALL 기준으로 다시 센다(신청과 같은 규약). */
+  P_NEW.clear();
+  await readsLoad(RK_P);              // ⚠ isNew() 는 load() 뒤라야 답한다 — 반드시 «먼저»
+  await readsPrune(RK_P, PALL);       // ⚠ 행 객체를 «그대로» 넘긴다(어댑터가 id 를 꺼낸다)
   renderPSummary();
   renderPStatusChips();
   renderPCatChips();
   renderProposals();
+  paintTabBadges();
 }
 
 // 신고 건수 집계(신고 확인 표시용). 권한 없으면 조용히 건너뜀.
@@ -3659,6 +3964,12 @@ async function loadProposalMemo(id) {
   ta.placeholder = "검토 경과·내부 판단을 기록하세요.";
   ta.dataset.loaded = "1";
   ta.disabled = false;
+  /* ✍ 이 칸은 «화면이 스스로» 채운 것이지 담당자가 친 것이 아니다 →
+     이탈 보호의 기준선에 그대로 반영한다. 이 한 줄이 없으면 처리메모가 적힌 제안은
+     «열었다 닫기만 해도» 매번 「작성 중인 내용이 있습니다」가 뜬다(2026-08-26 수정).
+     ⛔ 지우지 마세요. ⛔ formSnapshot() 으로 통째로 다시 잡지도 마세요
+        (rebaseModalField 머리말 참조 — 담당자가 이미 쓰던 답변까지 지워집니다). */
+  rebaseModalField($("#pModal"), ta);
 }
 
 // 저장 payload 에서 admin_memo 를 빼야 하는 오류인지(칸 미생성·권한없음) 판정
@@ -3918,8 +4229,18 @@ function pCmtRefocus(commentId) {
 function subscribeProposalsRealtime() {
   sb.channel("proposals-rt")
     .on("postgres_changes", { event: "*", schema: "public", table: "proposals" },
-        () => {
+        (p) => {
           if (!P_LOADED) return;
+          /* 🔴 탭 배지 숫자는 «즉시» 올린다 (2026-08-26)
+             ⛔ 이 두 줄을 rtAutoApply() 안으로 옮기지 마세요 — 그 함수는 rtBusy()(모달 열림)면
+                적용을 미룹니다. 검토 창을 5분 열어 두면 그동안 배지가 멈춰 버립니다.
+             ⚠ 여기서는 «id 만» 담는다. 목록(PALL)은 건드리지 않으므로
+               「쓰는 중이면 미룬다」 원칙은 그대로다.
+             ⚠ INSERT 만 센다 — 상태 변경(UPDATE)은 «새로 들어온 것»이 아니다.
+               (apply_client.js 와 달리 여기는 supabase-js 가 payload 를 원래부터 넘겨 준다) */
+          if (p && p.eventType === "INSERT" && p.new && p.new.id != null) {
+            P_NEW.add(String(p.new.id)); paintTabBadges();
+          }
           PRT_PENDING += 1; syncRtBanners(); rtAutoApply("proposals", loadProposals);
           /* 🔔 소리 — 사업신청과 «같은 규약»(A-12 · 2026-08-24).
              ⚠ 예전에는 이 한 줄이 없어서 정책제안만 소리 없이 들어왔다. 지우지 말 것.
@@ -4103,21 +4424,33 @@ function renderProposals() {
     const cmts = Number(r.comment_count || 0); // 💬 A-07 — 트리거가 맞춰 준 수(화면에서 세지 않는다)
     /* ⚠ 접근명에도 배지와 «같은 정보»를 글자로 넣는다 — 배지는 이모지가 섞여 있어
        낭독기가 「모래시계 3일 경과」처럼 읽으면 뜻이 흐려진다(이모지는 aria-hidden). */
+    /* 🔴 «아직 확인하지 않음» — 아무도 이 제안을 열어 본 적이 없으면 「신규」 배지가 붙는다.
+       ⚠ 「신규」가 붙는 동안 「N일 경과」는 «화면에서도 접근명에서도» 생략한다
+         (P_OVERDUE_DAYS=1 이라 어제 들어온 제안은 둘이 겹치는데, 둘 다 「어제 들어와
+          아직 손 안 댄 글」이라는 한 사실이다 — 위 «배지 차례 규약» 참조). */
+    const isNew = readsIsNew(RK_P, r.id, r.created_at);
+    /* ⛔ 여기에 「신규」를 «맨 앞»으로 한 번 더 넣지 마세요 — 배지의 접근명은 아래 «맨 뒤» 꼬리
+         (「, 아직 확인하지 않음」) 하나뿐입니다(세 앱 공통 규약). 앞뒤로 두 번 넣으면 낭독기가
+         한 사실을 두 번 읽고, 읽음 처리 때 걷어낼 곳도 두 곳이 되어 한쪽이 남습니다(실측 확인). */
     const aLabel = [
       `상태 ${st}`,
       r.proposal_no ? `접수번호 ${r.proposal_no}` : "",
-      days ? `${days}일 경과` : "",
+      (days && !isNew) ? `${days}일 경과` : "",
       r.category ? `분야 ${r.category}` : "",
       r.is_hidden ? "블라인드 처리됨" : "",
       reps ? `신고 ${reps}건` : "",
       cmts ? `댓글 ${cmts}건` : "",
       `제목 ${r.title || ""}`,
+      // ⛔ 이 꼬리는 «맨 뒤»여야 한다 — 맨 앞으로 옮기면 음성명령 매칭이 어긋난다(세 앱 공통).
+      isNew ? NEW_ALABEL : "",
     ].filter(Boolean).join(", ") + " — 검토 열기";
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", aLabel);
-    /* ⭐⭐ 배지 «차례» 규약 (2026-08-25 개정 · 세 앱 공통)
-          상태 → (경과) → 블라인드 → 신고 → 분야
+    // 🔴 상세를 연 뒤 «그 카드만» 찾아 「신규」를 걷어내기 위한 표식(markOpened)
+    card.dataset.id = String(r.id);
+    /* ⭐⭐ 배지 «차례» 규약 (2026-08-26 개정 · 세 앱 공통)
+          (신규) → 상태 → (경과 — 신규가 붙었으면 생략) → 블라인드 → 신고 → 분야
        ⭐ 2026-08-25 양호창님 — 「접수번호 배지가 과도하게 자리를 많이 차지한다. 제거해 줘」
           목록 카드에서 접수번호 배지(.rc-tag)를 뺐다 — 신청 접수 목록과 «같이» 뺀다.
           ⛔ 되살리지 마세요. 접수번호는 검토 창(openProposal) 맨 위와 카드 aria-label 에 그대로 있습니다.
@@ -4128,9 +4461,10 @@ function renderProposals() {
        ⛔ 분야를 앞으로 옮기지 마세요(그러면 신고가 대신 잘립니다). */
     card.innerHTML = `<div class="pcard-main">
         <div class="pcard-top">
+          ${isNew ? NEW_TAG_HTML : ""}
           <span class="st-badge st-${esc(st)}">${esc(st)}</span>
-          ${days ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${days}일 경과</span>` : ""}
-          ${r.is_hidden ? `<span class="hide-tag"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
+          ${(days && !isNew) ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${days}일 경과</span>` : ""}
+          ${r.is_hidden ? `<span class="hide-tag" title="담당자가 감춘 글 — 시민에게 보이지 않습니다"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
           ${reps ? `<span class="report-tag"><span aria-hidden="true">🚩</span> 신고 ${reps}</span>` : ""}
           ${r.category ? `<span class="cat-tag" title="${esc(r.category)}"><span>${esc(r.category)}</span></span>` : ""}
         </div>
@@ -4179,18 +4513,25 @@ function renderPPager(total, pages) {
 /* ══════════════════════════════════════════════════════════════════════
    🗑 정책제안 «지우기» — 실행부는 이 함수 «하나»뿐이다 (★ 2026-08-24)
    ────────────────────────────────────────────────────────────────────
-   왜 함수로 뺐나 — 「완전 삭제」로 갈지 「숨김 뒤 90일 보관 후 삭제」로 갈지가
-   아직 양호창님 결정 대기 중이다(proposals 에는 이미 is_hidden 이 있고,
-   시민 본인 삭제 delete_proposal 은 실제로는 «숨김»일 뿐이다).
-   결정이 바뀌면 «이 함수 안»만 고치면 된다 — 단추·확인창·목록 갱신 코드는 그대로 쓴다.
-   두 번 일하지 않으려고 미리 갈라 두는 것이다.
+   ★★ 2026-08-26 양호창님 결정 — «완전 삭제»로 확정했다. (이전에는 결정 대기 중이었다)
+     왜 이렇게 정했나 — 개인정보처리방침 4절이 시민에게 「복구할 수 없도록 파기한다」고
+     약속하고 있다. 그런데 시민 본인 삭제(DB 함수 delete_proposal)는 실제로는
+     is_hidden=true 만 켜는 «숨김»이어서, 시민 화면에서만 사라지고 자료는 그대로 남아
+     방침과 어긋났다(게다가 공무원앱에는 「🚫 블라인드」로 계속 보였다).
+     → 같은 날 delete_proposal 을 진짜 delete 로 바꿨고, 이 함수와 «같은 뜻»이 되었다.
+       세 앱 어디서 지우든 결과가 하나다 — 시민이 이해하는 「지웠다」와도 맞다.
+   ⛔ 「숨김 뒤 N일 보관」으로 되돌리지 말 것 — 방침 문구를 함께 고치지 않으면
+      약속 위반이 된다. 되살릴 일이 생기면 방침 4절부터 손대고 오시라.
+   ⚠ 다만 이 함수는 «지우는 곳 한 줄»로 계속 남겨 둔다 — 규칙이 또 바뀌더라도
+      단추·확인창·목록 갱신 코드는 그대로 쓸 수 있게.
 
    ★ «성공 판정»은 error 가 아니라 «지워진 행 수»로 한다 (🩷자물쇠 확인 사항)
      RLS 를 세워도, 권한 없는 접속(테스트 모드 anon·세션 만료)의 delete 는
      «0행을 지우고 정상 종료»한다. supabase-js 는 이때 error 를 주지 «않는다».
      res.error 만 보고 넘기면 앱이 「삭제했습니다」라고 «거짓»을 말한다.
    ⚠ .select("id") 를 빼지 말 것 — 빼면 res.data 가 null 이라 판정 자체가 불가능해진다.
-   ⚠ 자식 자료(proposal_likes·proposal_reports)는 DB 가 on delete cascade 로 함께 지운다.
+   ⚠ 자식 자료(proposal_likes·proposal_reports·proposal_comments)는 DB 가 on delete cascade 로
+     함께 지운다 — 담당 부서가 단 «답변»도 의견(proposal_comments)의 하나라 같이 사라진다.
      ⛔ 화면에서 따로 지우려 하지 말 것 — 순서를 잘못 밟으면 «공감만 지워지고 제안은 남는»
         반쪽 상태가 만들어진다. 지우는 곳은 한 줄, 나머지는 DB 가 맡는다.
    반환 — { ok:true } 또는 { ok:false, msg:"사람이 읽을 안내문" }
@@ -4208,6 +4549,11 @@ async function deleteProposal(id) {
 }
 
 async function openProposal(r) {
+  /* 🔴 읽음 판정 «시점» — 상세를 연 «그 순간»이다(2026-08-26 · 세 앱 공통).
+     ⛔ 저장 버튼이나 모달 닫기로 옮기지 마세요 — 「열어 보기만 하고 나중에 처리」가
+        가장 흔한 흐름인데, 그때 배지가 안 줄면 「눌러도 안 줄어드는 배지」로 되돌아갑니다.
+     ⚠ 첫 줄이어야 한다 — 아래에서 await 로 잠시 멈추므로 뒤에 두면 숫자가 늦게 준다. */
+  markOpened(RK_P, r, "#pList");
   $("#pmTitle").textContent = "🗳 정책제안 검토";
   const st = r.status || "접수";
   const reps = P_REPORTS[r.id] || 0;
@@ -4229,7 +4575,7 @@ async function openProposal(r) {
            (양호창님 「불필요해 보인다」 · 신청접수 모달과 «같이» 뺐다). 번호를 지우지 말 것. -->
       ${r.proposal_no ? `<span class="rc-tag"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>${esc(r.proposal_no)}</span>` : ""}
       ${r.category ? `<span class="cat-tag">${esc(r.category)}</span>` : ""}
-      ${r.is_hidden ? `<span class="hide-tag"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
+      ${r.is_hidden ? `<span class="hide-tag" title="담당자가 감춘 글 — 시민에게 보이지 않습니다"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
     </div>
     <!-- 🖨 인쇄 전용 안내 — 화면에는 안 보이고 «종이에만» 찍힌다(style.css .print-only).
          정책제안 인쇄물에도 닉네임·읍면동이 함께 찍히므로 신청접수와 «같은 문구»를 둔다. -->
@@ -4436,7 +4782,11 @@ async function openProposal(r) {
     const ok = await askConfirm({
       title: "이 정책제안을 삭제할까요?",
       body: `«${r.title || "제목 없음"}»\n\n`
-          + "삭제하면 시민 화면에서도 사라집니다. 시민이 남긴 공감·신고 기록도 함께 지워집니다.\n"
+          /* ⭐ 2026-08-26 (㉥) — 예전 문구는 「공감·신고 기록」만 말해, 실제로 함께 사라지는
+                «의견(댓글)»과 «담당 부서의 답변»을 빠뜨렸다. 지워지는 것을 다 적지 않으면
+                되돌릴 수 없는 조작 앞에서 담당자가 «무엇을 잃는지» 모르고 누르게 된다.
+             ⚠ PC앱 webui/proposals.js 의 같은 확인창도 «글자 단위로» 같다(🟠단장). 한쪽만 고치지 말 것. */
+          + "삭제하면 시민 화면에서도 사라집니다. 시민이 남긴 공감·의견·신고 기록과 담당 부서의 답변도 함께 지워집니다.\n"
           + "되돌릴 수 없습니다. 부적절한 글이라면 «블라인드»로 감추는 방법도 있습니다.",
       cancelText: "취소",
       okText: "삭제"
@@ -4768,8 +5118,14 @@ async function loadApplications() {
   renderTeamOptions();               // 🏢 담당팀 목록도 방금 받은 자료로 다시 채운다
   A_LOADED = true;
   ART_PENDING = 0; syncRtBanners();   // 새로 불러왔으니 «밀린 알림»도 지운다
+  /* 🔴 목록을 «실제로» 받았으므로 임시 주머니를 버리고 AALL 기준으로 다시 센다.
+     ⚠ prune — 이미 지워진 접수의 읽음 기록을 저장소에서 걷어낸다(무한히 쌓이지 않게). */
+  A_NEW.clear();
+  await readsLoad(RK_A);              // ⚠ isNew() 는 load() 뒤라야 답한다 — 반드시 «먼저»
+  await readsPrune(RK_A, AALL);       // ⚠ 행 객체를 «그대로» 넘긴다(어댑터가 id 를 꺼낸다)
   renderAStatusChips();
   renderApplications();
+  paintTabBadges();
 }
 
 function subscribeApplicationsRealtime() {
@@ -4781,8 +5137,15 @@ function subscribeApplicationsRealtime() {
      ② 실시간 방송에는 시민의 이름·연락처가 그대로 실린다. 쓰지도 않을 개인정보를
         게스트 브라우저로 흘려보낼 이유가 없다(안 받는 것이 가장 확실한 차단이다). */
   if (IS_GUEST) return;
-  SangjuApply.subscribeApplications(() => {
+  SangjuApply.subscribeApplications((p) => {
     if (A_LOADED) {
+      /* 🔴 탭 배지 숫자는 «즉시» 올린다 (2026-08-26 · 정책제안 구독과 같은 규약)
+         ⛔ rtAutoApply() 에 태우지 마세요 — 모달을 열어 둔 동안 배지가 멈춥니다.
+         ⚠ payload(p) 는 apply_client.js subscribeApplications 가 넘겨 준다.
+           예전에는 그 함수가 인자를 삼켜 INSERT/UPDATE 를 구분할 수 없었다(2026-08-26 수정). */
+      if (p && p.eventType === "INSERT" && p.new && p.new.id != null) {
+        A_NEW.add(String(p.new.id)); paintTabBadges();
+      }
       ART_PENDING += 1; syncRtBanners(); rtAutoApply("applications", loadApplications);
       // 🔔 소리 — 켜 둔 사람에게만. 화면 띠(«새 접수 N건»)가 언제나 함께 뜨므로
       //    소리만으로 정보를 전하지 않는다(KWCAG 5.4.1). A_LOADED 안이라 첫 화면에서는 울리지 않는다.
@@ -4907,18 +5270,28 @@ function renderApplications() {
     const rid = String(r.id);
     const card = el("div", "pcard");
     // 키보드 접근: role=button + Enter/Space. 상태·사업명·신청자를 접근명에 포함(색 의존 금지).
+    /* 🔴 «아직 확인하지 않음» — 아무도 이 접수를 열어 본 적이 없으면 「신규」 배지가 붙는다.
+       ⚠ 「신규」가 붙는 동안 「N일 경과」는 생략한다(세 앱 공통 «배지 차례 규약»).
+         신청은 OVERDUE_DAYS=7 이라 정책제안(1일)처럼 매번 겹치지는 않는다.
+       🧪 둘러보기(게스트)에게는 아예 붙지 않는다 — readsIsNew() 안에서 걸러진다. */
+    const isNew = readsIsNew(RK_A, r.id, r.created_at);
+    /* ⛔ 「신규」를 «맨 앞»에 한 번 더 넣지 마세요 — 정책제안 카드와 같은 까닭입니다(그쪽 주석 참조). */
     const aLabel = [
       `상태 ${st}`,
-      od ? `접수 후 ${od}일 경과` : "",          // ⏳ 색이 아니라 «글자»로도 알린다
+      (od && !isNew) ? `접수 후 ${od}일 경과` : "",   // ⏳ 색이 아니라 «글자»로도 알린다
       `사업 ${r.benefit_name || ""}`,
       `신청자 ${r.applicant_name || ""}`,
       `읍면동 ${regionLabel(r.region)}`,        // 📍 값이 없으면 「미기재」로 읽힌다
       r.receipt_no ? `접수번호 ${r.receipt_no}` : "",
       r.citizen_reply ? "시민 안내문 공개중" : "",
+      // ⛔ 이 꼬리는 «맨 뒤»여야 한다 — 맨 앞으로 옮기면 음성명령 매칭이 어긋난다(세 앱 공통).
+      isNew ? NEW_ALABEL : "",
     ].filter(Boolean).join(", ") + " — 접수 처리 열기";
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", aLabel);
+    // 🔴 상세를 연 뒤 «그 카드만» 찾아 「신규」를 걷어내기 위한 표식(markOpened)
+    card.dataset.id = rid;
     /* ☑ 맨 앞 «고르기» 칸 — 여러 건 한꺼번에 상태를 바꾸기 위한 것.
        ⚠ 이 칸을 누르는 것은 «줄 열기»가 아니다 → 아래에서 클릭·키 이벤트를 반드시 멈춘다.
        ⚠ 낭독기에는 접수번호(없으면 사업명)로 «무엇을 고르는지» 밝힌다. */
@@ -4937,8 +5310,8 @@ function renderApplications() {
         `<input type="checkbox" class="row-pick" data-id="${esc(rid)}"` +
         ` aria-label="${esc(pickName)} 선택"${A_SEL.has(rid) ? " checked" : ""}></label>`) +
       `<div class="pcard-main">
-        <!-- ⭐⭐ 배지 «차례» 규약 (2026-08-25 개정 · 세 앱 공통)
-                상태 → (경과) → (안내 공개중) → 분류(담당팀)
+        <!-- ⭐⭐ 배지 «차례» 규약 (2026-08-26 개정 · 세 앱 공통)
+                (신규) → 상태 → (경과 — 신규가 붙었으면 생략) → (안내 공개중) → 분류(담당팀)
              ⭐ 2026-08-25 양호창님 — 「접수번호 배지가 과도하게 자리를 많이 차지한다. 제거해 줘」
                 그래서 «목록 카드»에서 🧾 접수번호 배지(.rc-tag)를 뺐다.
                 ⛔ 되살리지 마세요. 접수번호가 필요한 자리는 이미 셋 다 살아 있습니다 —
@@ -4951,8 +5324,9 @@ function renderApplications() {
                 상태·경과는 목록에서 «그 자리에서» 판단해야 하는 값이라 앞에 둔다.
              ⛔ 담당팀을 앞으로 옮기지 마세요 — 그러면 「⏳ N일 경과」가 대신 잘립니다. -->
         <div class="pcard-top">
+          ${isNew ? NEW_TAG_HTML : ""}
           <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
-          ${od ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${od}일 경과</span>` : ""}
+          ${(od && !isNew) ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${od}일 경과</span>` : ""}
           ${r.citizen_reply ? `<span class="cr-tag" title="시민 안내문 공개중"><span aria-hidden="true">💬</span> <span>시민 안내문 공개중</span></span>` : ""}
           ${r.team ? `<span class="cat-tag" title="${esc(r.team)}"><span>${esc(r.team)}</span></span>` : ""}
         </div>
@@ -5021,6 +5395,8 @@ function renderAPager(total, pages) {
 }
 
 async function openApplication(r) {
+  /* 🔴 읽음 판정 «시점» — 상세를 연 «그 순간»(openProposal 과 같은 규약). 첫 줄에 둔다. */
+  markOpened(RK_A, r, "#aList");
   $("#amTitle").textContent = "📥 신청 접수 처리";
   const st = r.status || "접수";
   const optHtml = A_STATUSES.map((s) => `<option value="${s}"${s === st ? " selected" : ""}>${s}</option>`).join("");

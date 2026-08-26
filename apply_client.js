@@ -312,7 +312,13 @@ window.SangjuApply = (function () {
       return sb.channel("applications-rt")
         .on("postgres_changes",
             { event: "*", schema: "public", table: TABLE },
-            function () { try { if (cb) cb(); } catch (e) {} })
+            /* ⭐ 2026-08-26 — payload(p) 를 «그대로» 넘긴다.
+               예전에는 `function () { cb(); }` 라 INSERT / UPDATE / DELETE 를 구분할 수 없었다.
+               탭의 «확인하지 않은 접수 N건» 배지는 «새로 들어온 것(INSERT)»만 세야 하므로
+               구독자가 p.eventType · p.new 를 볼 수 있어야 한다.
+               ⛔ 다시 인자를 삼키지 마세요 — 삼키면 배지가 상태 변경까지 새 접수로 셉니다.
+               ⚠ 기존 구독자는 인자를 안 쓰면 그만이라 «되돌림 없이» 안전하다. */
+            function (p) { try { if (cb) cb(p); } catch (e) {} })
         .subscribe(function (status) { try { if (onStatus) onStatus(status); } catch (e) {} });
     } catch (e) {
       console.warn("[신청접수] 실시간 구독 실패(무시):", e);

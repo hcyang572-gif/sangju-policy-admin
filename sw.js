@@ -116,7 +116,8 @@ const ASSET_V = "0.7.6";
 //     받지만, 서비스워커가 «없는» 브라우저(첫 방문·SW 미지원)는 ?v= 가 그대로면 최대 10분 동안
 //     옛 a2hs.js 를 씁니다. ?v= 는 버전정보.json 이 단일 출처라 이 작업 범위(cloudui 전용)에서
 //     손대지 않았습니다 — version.js 는 세 앱이 글자 단위로 같아야 하기 때문입니다.
-const CACHE = "sangju-admin-v57";   // v57: version.js 의 changelog v0.7.6 date 를 8/25→8/26 로
+const CACHE = "sangju-admin-v58";   // v58: 「신규」 배지 + 탭 «확인하지 않은 건수» 배지 (reads.js 새 파일 · app.js/style.css/index.html 동시 변경)
+                                    //      + 이탈 경고 오탐 수정(처리메모 비동기 채움 · 서식 파일칸) — v58 이 아직 «배포 전»이라 함께 실린다
                                      //   바로잡음(문서 표지 정합) — ESSENTIAL 프리캐시 대상이라
                                      //   이름을 안 올리면 옛 날짜가 「개선사항」 화면에 계속 뜬다.
                                      //   (2026-08-26, 🟣나루)
@@ -210,6 +211,9 @@ const ESSENTIAL = [
   vq("version.js"),
   vq("forms.js"),
   vq("apply_client.js"),
+  vq("reads.js"),               // ★ v58 추가 — 읽음/안읽음 저장 어댑터(세 앱 공통).
+                               //   ⛔ 빼지 마세요. 없으면 이미 설치된 앱이 옛 캐시를 물어
+                               //      window.SangjuReads 가 undefined 가 되고 배지가 통째로 안 뜹니다.
   vq("sw-register.js"),        // CSP 때문에 인라인에서 분리한 서비스워커 등록 코드
   vq("tap.js"),                // 눌림 파동 + 햅틱(시각 레이어)
   vq("icons.js"),              // ★ v27 추가 — v0.4.0 부터 빠져 있던 결함. index.html 이 필수로 부르는데
