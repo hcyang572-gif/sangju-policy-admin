@@ -114,6 +114,84 @@ function announce(msg) {
   setTimeout(() => { box.textContent = String(msg || ""); }, 30);
 }
 
+/* ════════════════════════════════════════════════════════════
+   🏷 배지 범례 「배지 안내」 — 2026-08-26 v0.7.7 (양호창님 지시 · 🟡잣대 조건부 적합 해소)
+   ────────────────────────────────────────────────────────────
+   왜 두는가 — 이번 판에서 배지 글자를 «아이콘»으로 줄였다(.tag-min).
+     그러면 뜻을 알 시각적 단서가 title 툴팁뿐인데, 툴팁은 ① 마우스를 올려야 뜨고
+     ② 배지가 <span> 이라 키보드 초점으로는 뜨지 않으며 ③ 터치 화면에서는 거의
+     발견되지 않는다. 줄인 쪽이 이번 변경이니 «안내»를 함께 둔다.
+
+   ⭐ 목록마다 담는 줄이 «다르다» — 그 목록에 실제로 나오는 배지만 적는다.
+        정책제안 현황   : 신규 · 블라인드 · 신고 · 경과  (4줄)
+        신청사업 현황   : 신규 · 경과                    (2줄)
+     ⛔ 신청사업 현황에 「블라인드·신고」를 넣지 «말 것» — 그 목록에는 아예 없는 배지라
+        적어 두면 「내 목록엔 왜 안 보이지?」 하고 헤맨다.
+     ⛔ 상태·분야·담당팀·시민 안내문 배지는 넣지 «말 것» — 글자가 그대로 보인다.
+     ※ 「신규」는 글자가 보이지만 넣는다 — 「신규」만으로는 «새로 들어온 건»으로 읽히고
+       실제 뜻인 «아직 아무도 열어 보지 않은 건»이 전달되지 않기 때문이다.
+
+   ♿ <dl> 인 까닭 — 「용어 ↔ 뜻」 짝이 이 칸의 내용 그 자체다.
+     <dt> 가 배지(이름), <dd> 가 뜻이다. 낭독기가 짝으로 읽는다.
+     ⛔ 배지에 aria-hidden 을 걸지 «말 것» — 그러면 낭독기 이용자에게는 뜻만 남고
+        «어느 배지의» 뜻인지가 사라진다. 아이콘만인 배지도 .tag-min 안의
+        <span class="tag-t"> 에 이름 글자가 살아 있어 <dt> 가 제대로 읽힌다.
+
+   ⛔ 문구를 새로 짓지 말 것 — 배지의 title 에 이미 쓰는 말을 «그대로» 옮겼다.
+      범례와 툴팁이 다른 말을 하면 오히려 더 헷갈린다.
+   ⛔ PC앱(webui)과 같은 클래스·구조·문구·padding·font-size·gap 이다.
+      아이콘 «문자»만 다르다(PC앱 SVG ICO · 공무원앱 이모지 🚫🚩⏳) — 각자 자기 목록과
+      일치시키는 것이라 그 차이는 «뜻 있는 차이»가 아니다. 한쪽만 고치지 말 것.
+   ⛔ .cardlist «안»에 넣지 말 것 — 900px 이상에서 격자라 카드 한 장 자리를 먹는다
+      (규격서 19-19-3). 자리는 .cardlist 바로 «위»다.
+   ════════════════════════════════════════════════════════════ */
+const LEGEND_ROWS = {
+  // 숫자는 «N» 으로 둔다 — 실제 건수(3건)를 적으면 «그 건수의 설명»처럼 읽힌다.
+  // ⚠ 배지 마크업은 목록 카드(renderProposals·renderApplications)와 «글자 단위로» 같다.
+  new:    () => [`<span class="new-tag">신규</span>`, "아직 확인하지 않음"],
+  hidden: () => [`<span class="hide-tag tag-min"><span aria-hidden="true">🚫</span><span class="tag-t"> 블라인드</span></span>`,
+                 "담당자가 감춘 글 — 시민에게 보이지 않습니다"],
+  report: () => [`<span class="report-tag tag-min"><span aria-hidden="true">🚩</span><span class="tag-t">신고 </span>N</span>`,
+                 "시민 신고 N건"],
+  over:   () => [`<span class="od-tag tag-min"><span aria-hidden="true">⏳</span>N일<span class="tag-t"> 경과</span></span>`,
+                 "처리 기한 N일 경과"],
+};
+
+// 범례 칸을 채운다. 내용이 고정이라 한 번만 그린다.
+function paintBadgeLegend(boxId, keys) {
+  const box = document.getElementById(boxId);
+  if (!box || box.dataset.done === "1") return;
+  box.innerHTML = '<dl class="bl-list">' + keys.map((k) => {
+    const [badge, mean] = LEGEND_ROWS[k]();
+    return '<div class="bl-item"><dt class="bl-b">' + badge +
+           '</dt><dd class="bl-t">' + mean + "</dd></div>";
+  }).join("") + "</dl>";
+  box.dataset.done = "1";
+}
+
+/* 「배지 안내」 단추 배선 — 접었다 편다.
+   ★ <button> 이라 키보드로 열린다. aria-expanded 로 접힘·펼침을 낭독기에도 알린다.
+   ⚠ .fold-btn(stats.js initFolds) 을 쓰지 «않는다» — 그 규약은 저장값이 없으면 «펼침»으로
+     시작하는데(2026-08-25 양호창님 확정), 범례는 «접힘»이 기본이어야 한다.
+     그래서 여기서 직접 배선한다. 접근성 속성(aria-expanded·aria-controls)은 그대로 지킨다.
+   ⚠ PC앱은 여기서 resetFit() + 다시 그리기를 부른다 — 한 쪽에 담는 카드 수를 «화면 높이»에
+     맞춰 재기 때문이다. 공무원앱은 PAGE = 12 «고정»이라 범례를 펴도 담기는 수가 달라지지
+     않는다 → 다시 그릴 일이 없다. ⛔ PAGE 를 화면 높이에 맞춰 재도록 바꾸면 그때는
+     이 자리에서도 다시 그려야 한다(안 그러면 마지막 줄이 잘려 보인다). */
+function bindLegendBtn(btnId, boxId, keys) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  paintBadgeLegend(boxId, keys);
+  btn.onclick = () => {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const open = box.hasAttribute("hidden");          // 지금 접혀 있으면 편다
+    if (open) box.removeAttribute("hidden"); else box.setAttribute("hidden", "");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    announce(open ? "배지 안내를 펼쳤습니다." : "배지 안내를 접었습니다.");
+  };
+}
+
 // C2: 모달 포커스 트랩 — 열 때 첫 포커스, Tab 순환, Esc/닫기 시 복귀.
 // 모달별로 한 번만 등록(중복 keydown 방지). open/close는 헬퍼로 통일.
 const FOCUS_SEL = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -2028,6 +2106,9 @@ async function showApp() {
   navReset({ type: "tab", tab: pCurrentTab });
   bindUI();
   bindProposalsUI();
+  // 🏷 배지 안내(범례) — 목록마다 «그 목록에 나오는 배지»만 담는다(위 머리말 참조).
+  bindLegendBtn("btnAppsLegend", "appsLegend", ["new", "over"]);
+  bindLegendBtn("btnPropsLegend", "pLegend", ["new", "hidden", "report", "over"]);
   bindApplicationsUI();
   // 로그인 만료 예고 예약 + 띠 버튼 연결
   scheduleExpiryWarning();
@@ -2037,7 +2118,7 @@ async function showApp() {
   subscribeRealtime();
   // 정책제안: 탭 진입 시 1회 로드(초기엔 비활성 섹션이라 미로드 → 첫 탭 전환에서 로드)
   subscribeProposalsRealtime();
-  // 📥 신청 접수: 공무원 1순위 업무 → 기본(첫) 탭. 즉시 로드 + 실시간 구독.
+  // 📥 신청사업 현황: 공무원 1순위 업무 → 기본(첫) 탭. 즉시 로드 + 실시간 구독.
   subscribeApplicationsRealtime();
   bindRtRecovery();          // 끊김 → 복구 시 즉시 다시 확인(폴백)
   // 📍 읍·면·동 목록(data.json) — 접수 목록과 «나란히» 받는다. 기다리지 않는다:
@@ -2678,7 +2759,7 @@ function render() {
   /* 🈳 빈 화면 — «걸러서 0건»과 «원래 0건»을 가른다 (B-5 · 2026-08-25).
      예전에는 어느 쪽이든 「조건에 맞는 사업이 없습니다」 였다. 필터를 하나도 안 건
      담당자는 그 말을 보고 「내가 뭘 잘못 걸었나」 하고 칩·검색창을 헤맸다.
-     신청 접수 탭(renderApplications 의 빈 화면)과 «같은 결»로 나눈다. */
+     신청사업 현황 탭(renderApplications 의 빈 화면)과 «같은 결»로 나눈다. */
   if (!rows.length) {
     const narrowed = SELCATS.size > 0 || !!q;
     list.innerHTML = narrowed
@@ -3525,7 +3606,7 @@ function initFormsSection(r) {
 }
 
 /* ============================================================
-   🗳 정책제안 관리 (Phase A) — proposals / proposal_reports
+   🗳 정책제안 현황 (Phase A) — proposals / proposal_reports
    기존 사업관리·로그인·게스트·실시간 무손상. 추가 모듈.
    ============================================================ */
 const P_STATUSES = ["접수", "검토중", "반영", "불채택", "보류"];
@@ -3549,12 +3630,12 @@ const REPLY_REQUIRED = new Set(["반영", "불채택"]); // 전환 시 답변/�
 let PALL = [], PCATS = [], P_SELCAT = new Set(), P_STATUS = "전체";
 let pSort = "new", pPage = 0, P_LOADED = false;
 let P_REPORTS = {}; // proposal_id -> 신고 건수
-// 첫 화면(루트) 탭 = 신청 접수. index.html 의 .tab-btn.on / 보이는 섹션과 «반드시» 같아야
+// 첫 화면(루트) 탭 = 신청사업 현황. index.html 의 .tab-btn.on / 보이는 섹션과 «반드시» 같아야
 // 뒤로가기가 엉뚱한 탭으로 가지 않는다.
 let pCurrentTab = "applications";
 
 /* ══ 🔴 «아직 확인하지 않음» — 카드 「신규」 배지 + 탭 건수 배지 ════════════════
-   (2026-08-26 양호창님 승인 · 🩵물결 설계 · 세 앱 공통 규약)
+   (2026-08-26 양호창님 승인 · 🩵물결 설계 · PC앱·공무원앱 공통(시민앱은 해당 없음) 규약)
 
    ⭐ 무엇을 세는가 — «오늘 들어온 건수»가 아니라 «아직 아무도 열어 보지 않은 건수»다.
       예전 PC앱 배지는 「오늘 N건」이라 눌러도 줄지 않아, 다 처리한 뒤에도 빨간 숫자가 남았다.
@@ -3575,7 +3656,7 @@ let pCurrentTab = "applications";
         표시 상한           : 「99+」
         한꺼번에 읽음 단추  : 「모두 읽음」
 
-   ⭐ 배지 «차례» 규약 (세 앱 공통 · 2026-08-26 개정)
+   ⭐ 배지 «차례» 규약 (PC앱·공무원앱 공통(시민앱은 해당 없음) · 2026-08-26 개정)
         (신규) → 상태 → (경과 — 신규가 붙었으면 생략) → 블라인드 → 신고 → 분야
       「신규」가 붙는 동안 「N일 경과」를 생략하는 까닭 — 정책제안은 P_OVERDUE_DAYS=1 이라
       «어제 들어온 제안»이 둘을 함께 달게 되는데, 둘 다 「어제 들어와 아직 손 안 댄 글」이라는
@@ -4387,7 +4468,7 @@ function renderProposals() {
          목록 카드에서 접수번호 배지를 뺐기 때문이다(양호창님 「자리를 과도하게 차지한다」).
          눈으로 훑어 찾던 길을 없앴으면 «찾는 길»은 반드시 남겨 두어야 한다 —
          시민이 전화로 「20260820-101500-01」 을 불러 줄 때 이 칸에 그대로 넣어 찾는다.
-         ⛔ 이 한 칸을 지우지 마세요(신청 접수 탭의 receipt_no 검색과 «짝»입니다). */
+         ⛔ 이 한 칸을 지우지 마세요(신청사업 현황 탭의 receipt_no 검색과 «짝»입니다). */
       const blob = `${r.title || ""} ${r.body || ""} ${r.author_nick || ""} ${r.region || ""} ${r.proposal_no || ""}`.toLowerCase();
       if (!blob.includes(q)) return false;
     }
@@ -4399,7 +4480,7 @@ function renderProposals() {
   $("#pCount").textContent = `총 ${rows.length}건`;
   const list = $("#pList");
   /* 🈳 빈 화면 — «걸러서 0건»과 «원래 0건»을 가른다 (B-5 · 2026-08-25).
-     신청 접수 탭(renderApplications)과 «같은 결»이다. 아무 필터도 안 건 담당자에게
+     신청사업 현황 탭(renderApplications)과 «같은 결»이다. 아무 필터도 안 건 담당자에게
      「조건에 맞는…」 이라고 말하면, 걸지도 않은 조건을 찾아 헤매게 된다. */
   if (!rows.length) {
     const narrowed = (P_STATUS !== "전체") || P_SELCAT.size > 0 || !!q;
@@ -4430,7 +4511,7 @@ function renderProposals() {
           아직 손 안 댄 글」이라는 한 사실이다 — 위 «배지 차례 규약» 참조). */
     const isNew = readsIsNew(RK_P, r.id, r.created_at);
     /* ⛔ 여기에 「신규」를 «맨 앞»으로 한 번 더 넣지 마세요 — 배지의 접근명은 아래 «맨 뒤» 꼬리
-         (「, 아직 확인하지 않음」) 하나뿐입니다(세 앱 공통 규약). 앞뒤로 두 번 넣으면 낭독기가
+         (「, 아직 확인하지 않음」) 하나뿐입니다(PC앱·공무원앱 공통(시민앱은 해당 없음) 규약). 앞뒤로 두 번 넣으면 낭독기가
          한 사실을 두 번 읽고, 읽음 처리 때 걷어낼 곳도 두 곳이 되어 한쪽이 남습니다(실측 확인). */
     const aLabel = [
       `상태 ${st}`,
@@ -4441,7 +4522,7 @@ function renderProposals() {
       reps ? `신고 ${reps}건` : "",
       cmts ? `댓글 ${cmts}건` : "",
       `제목 ${r.title || ""}`,
-      // ⛔ 이 꼬리는 «맨 뒤»여야 한다 — 맨 앞으로 옮기면 음성명령 매칭이 어긋난다(세 앱 공통).
+      // ⛔ 이 꼬리는 «맨 뒤»여야 한다 — 맨 앞으로 옮기면 음성명령 매칭이 어긋난다(PC앱·공무원앱 공통(시민앱은 해당 없음)).
       isNew ? NEW_ALABEL : "",
     ].filter(Boolean).join(", ") + " — 검토 열기";
     card.setAttribute("role", "button");
@@ -4449,10 +4530,10 @@ function renderProposals() {
     card.setAttribute("aria-label", aLabel);
     // 🔴 상세를 연 뒤 «그 카드만» 찾아 「신규」를 걷어내기 위한 표식(markOpened)
     card.dataset.id = String(r.id);
-    /* ⭐⭐ 배지 «차례» 규약 (2026-08-26 개정 · 세 앱 공통)
+    /* ⭐⭐ 배지 «차례» 규약 (2026-08-26 개정 · PC앱·공무원앱 공통(시민앱은 해당 없음))
           (신규) → 상태 → (경과 — 신규가 붙었으면 생략) → 블라인드 → 신고 → 분야
        ⭐ 2026-08-25 양호창님 — 「접수번호 배지가 과도하게 자리를 많이 차지한다. 제거해 줘」
-          목록 카드에서 접수번호 배지(.rc-tag)를 뺐다 — 신청 접수 목록과 «같이» 뺀다.
+          목록 카드에서 접수번호 배지(.rc-tag)를 뺐다 — 신청사업 현황 목록과 «같이» 뺀다.
           ⛔ 되살리지 마세요. 접수번호는 검토 창(openProposal) 맨 위와 카드 aria-label 에 그대로 있습니다.
        ⚠ 배지 줄은 «한 줄»이라 넘치면 «맨 뒤»가 …로 줄어든다.
           잘리는 것이 «분야»가 되도록 분야를 맨 뒤에 둔다 —
@@ -4463,9 +4544,9 @@ function renderProposals() {
         <div class="pcard-top">
           ${isNew ? NEW_TAG_HTML : ""}
           <span class="st-badge st-${esc(st)}">${esc(st)}</span>
-          ${(days && !isNew) ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${days}일 경과</span>` : ""}
-          ${r.is_hidden ? `<span class="hide-tag" title="담당자가 감춘 글 — 시민에게 보이지 않습니다"><span aria-hidden="true">🚫</span> 블라인드</span>` : ""}
-          ${reps ? `<span class="report-tag"><span aria-hidden="true">🚩</span> 신고 ${reps}</span>` : ""}
+          ${(days && !isNew) ? `<span class="od-tag tag-min" title="처리 기한 ${days}일 경과" aria-label="${days}일 경과"><span aria-hidden="true">⏳</span>${days}일<span class="tag-t"> 경과</span></span>` : ""}
+          ${r.is_hidden ? `<span class="hide-tag tag-min" title="담당자가 감춘 글 — 시민에게 보이지 않습니다" aria-label="블라인드 처리된 제안"><span aria-hidden="true">🚫</span><span class="tag-t"> 블라인드</span></span>` : ""}
+          ${reps ? `<span class="report-tag tag-min" title="시민 신고 ${reps}건" aria-label="시민 신고 ${reps}건"><span aria-hidden="true">🚩</span><span class="tag-t">신고 </span>${reps}</span>` : ""}
           ${r.category ? `<span class="cat-tag" title="${esc(r.category)}"><span>${esc(r.category)}</span></span>` : ""}
         </div>
         <div class="pcard-title" title="${esc(r.title || "")}">${esc(r.title)}</div>
@@ -4549,7 +4630,7 @@ async function deleteProposal(id) {
 }
 
 async function openProposal(r) {
-  /* 🔴 읽음 판정 «시점» — 상세를 연 «그 순간»이다(2026-08-26 · 세 앱 공통).
+  /* 🔴 읽음 판정 «시점» — 상세를 연 «그 순간»이다(2026-08-26 · PC앱·공무원앱 공통(시민앱은 해당 없음)).
      ⛔ 저장 버튼이나 모달 닫기로 옮기지 마세요 — 「열어 보기만 하고 나중에 처리」가
         가장 흔한 흐름인데, 그때 배지가 안 줄면 「눌러도 안 줄어드는 배지」로 되돌아갑니다.
      ⚠ 첫 줄이어야 한다 — 아래에서 await 로 잠시 멈추므로 뒤에 두면 숫자가 늦게 준다. */
@@ -4817,7 +4898,7 @@ async function loadReportDetail(proposalId) {
 }
 
 /* ============================================================
-   📥 신청 접수 관리 (「앱 직접 접수(실시간)」 ②단계) — applications
+   📥 신청사업 현황 (「앱 직접 접수(실시간)」 ②단계) — applications
    시민앱 신청이 Supabase 로 «직접» 들어와 여기서 실시간 접수·처리된다.
    공용 헬퍼: window.SangjuApply (apply_client.js). 상태값 4종은 PC와 동일.
    ⚠ 2026-08-24 이후 시민앱의 «신청 메일 발송(Web3Forms→PC 자동접수)»은 없어졌다.
@@ -5225,7 +5306,7 @@ function renderApplications() {
       list.innerHTML =
         '<div class="empty">둘러보기 예시 자료가 아직 준비되지 않았습니다. '
         + '실제 신청 접수 내역은 시민의 이름·연락처가 담긴 개인정보라, 담당자 계정으로 로그인하셔야 열립니다.<br>'
-        + '사업 관리·시민 정책제안 탭은 그대로 둘러보실 수 있습니다.</div>';
+        + '진행사업 현황·정책제안 현황 탭은 그대로 둘러보실 수 있습니다.</div>';
       $("#aCount").textContent = "";
       $("#aPager").innerHTML = "";
       announce("둘러보기 예시 자료가 아직 준비되지 않았습니다.");
@@ -5271,7 +5352,7 @@ function renderApplications() {
     const card = el("div", "pcard");
     // 키보드 접근: role=button + Enter/Space. 상태·사업명·신청자를 접근명에 포함(색 의존 금지).
     /* 🔴 «아직 확인하지 않음» — 아무도 이 접수를 열어 본 적이 없으면 「신규」 배지가 붙는다.
-       ⚠ 「신규」가 붙는 동안 「N일 경과」는 생략한다(세 앱 공통 «배지 차례 규약»).
+       ⚠ 「신규」가 붙는 동안 「N일 경과」는 생략한다(PC앱·공무원앱 공통(시민앱은 해당 없음) «배지 차례 규약»).
          신청은 OVERDUE_DAYS=7 이라 정책제안(1일)처럼 매번 겹치지는 않는다.
        🧪 둘러보기(게스트)에게는 아예 붙지 않는다 — readsIsNew() 안에서 걸러진다. */
     const isNew = readsIsNew(RK_A, r.id, r.created_at);
@@ -5284,7 +5365,7 @@ function renderApplications() {
       `읍면동 ${regionLabel(r.region)}`,        // 📍 값이 없으면 「미기재」로 읽힌다
       r.receipt_no ? `접수번호 ${r.receipt_no}` : "",
       r.citizen_reply ? "시민 안내문 공개중" : "",
-      // ⛔ 이 꼬리는 «맨 뒤»여야 한다 — 맨 앞으로 옮기면 음성명령 매칭이 어긋난다(세 앱 공통).
+      // ⛔ 이 꼬리는 «맨 뒤»여야 한다 — 맨 앞으로 옮기면 음성명령 매칭이 어긋난다(PC앱·공무원앱 공통(시민앱은 해당 없음)).
       isNew ? NEW_ALABEL : "",
     ].filter(Boolean).join(", ") + " — 접수 처리 열기";
     card.setAttribute("role", "button");
@@ -5310,7 +5391,7 @@ function renderApplications() {
         `<input type="checkbox" class="row-pick" data-id="${esc(rid)}"` +
         ` aria-label="${esc(pickName)} 선택"${A_SEL.has(rid) ? " checked" : ""}></label>`) +
       `<div class="pcard-main">
-        <!-- ⭐⭐ 배지 «차례» 규약 (2026-08-26 개정 · 세 앱 공통)
+        <!-- ⭐⭐ 배지 «차례» 규약 (2026-08-26 개정 · PC앱·공무원앱 공통(시민앱은 해당 없음))
                 (신규) → 상태 → (경과 — 신규가 붙었으면 생략) → (안내 공개중) → 분류(담당팀)
              ⭐ 2026-08-25 양호창님 — 「접수번호 배지가 과도하게 자리를 많이 차지한다. 제거해 줘」
                 그래서 «목록 카드»에서 🧾 접수번호 배지(.rc-tag)를 뺐다.
@@ -5326,7 +5407,7 @@ function renderApplications() {
         <div class="pcard-top">
           ${isNew ? NEW_TAG_HTML : ""}
           <span class="st-badge ast-${esc(st)}">${esc(st)}</span>
-          ${(od && !isNew) ? `<span class="od-tag"><span aria-hidden="true">⏳</span> ${od}일 경과</span>` : ""}
+          ${(od && !isNew) ? `<span class="od-tag tag-min" title="처리 기한 ${od}일 경과" aria-label="${od}일 경과"><span aria-hidden="true">⏳</span>${od}일<span class="tag-t"> 경과</span></span>` : ""}
           ${r.citizen_reply ? `<span class="cr-tag" title="시민 안내문 공개중"><span aria-hidden="true">💬</span> <span>시민 안내문 공개중</span></span>` : ""}
           ${r.team ? `<span class="cat-tag" title="${esc(r.team)}"><span>${esc(r.team)}</span></span>` : ""}
         </div>
@@ -5370,7 +5451,7 @@ function renderApplications() {
   renderAPager(rows.length, pages);
 }
 
-// 신청 접수 페이지 이동 — 정책제안·사업목록과 동일한 접근성 규약(nav·aria-label·aria-current)
+// 신청사업 현황 페이지 이동 — 정책제안·사업목록과 동일한 접근성 규약(nav·aria-label·aria-current)
 function renderAPager(total, pages) {
   const wrap = $("#aPager"); if (!wrap) return;
   wrap.innerHTML = "";
@@ -5397,7 +5478,7 @@ function renderAPager(total, pages) {
 async function openApplication(r) {
   /* 🔴 읽음 판정 «시점» — 상세를 연 «그 순간»(openProposal 과 같은 규약). 첫 줄에 둔다. */
   markOpened(RK_A, r, "#aList");
-  $("#amTitle").textContent = "📥 신청 접수 처리";
+  $("#amTitle").textContent = "📥 신청사업 처리";
   const st = r.status || "접수";
   const optHtml = A_STATUSES.map((s) => `<option value="${s}"${s === st ? " selected" : ""}>${s}</option>`).join("");
 

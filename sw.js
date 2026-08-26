@@ -25,7 +25,7 @@
 // 배포 버전 — 버전정보.json 의 "version" 및 version.js 의 APP_VERSION 과 항상 같은 값.
 // ⚠ 손으로 고치지 말고 루트의 `py -3 자원버전_동기화.py` 를 돌리면
 //    이 값과 index.html 의 ?v= 쿼리가 한 번에 맞춰진다.
-const ASSET_V = "0.7.6";
+const ASSET_V = "0.7.8";
 
 // v26 사유 (2026-08-19, 🔵손길) — index.html·style.css·app.js 를 «셋 다» 고쳤다.
 //   ① 폰(≤599px) «가로 띠» 로그인 배경을 낮춰 아이브로 대비를 4.45 → 5.90:1 로 올림 (style.css)
@@ -116,7 +116,8 @@ const ASSET_V = "0.7.6";
 //     받지만, 서비스워커가 «없는» 브라우저(첫 방문·SW 미지원)는 ?v= 가 그대로면 최대 10분 동안
 //     옛 a2hs.js 를 씁니다. ?v= 는 버전정보.json 이 단일 출처라 이 작업 범위(cloudui 전용)에서
 //     손대지 않았습니다 — version.js 는 세 앱이 글자 단위로 같아야 하기 때문입니다.
-const CACHE = "sangju-admin-v58";   // v58: 「신규」 배지 + 탭 «확인하지 않은 건수» 배지 (reads.js 새 파일 · app.js/style.css/index.html 동시 변경)
+const CACHE = "sangju-admin-v59";   // v59: 탭바 «두 줄» 결함 수정(≤419px 아이콘 접기) + 갈래 이름을 탭 이름으로 통일 + 배지 줄이기(.tag-min) + 배지 범례 「배지 안내」 (style.css/index.html/app.js/stats.js/version.js 동시 변경)
+// v58: 「신규」 배지 + 탭 «확인하지 않은 건수» 배지 (reads.js 새 파일 · app.js/style.css/index.html 동시 변경)
                                     //      + 이탈 경고 오탐 수정(처리메모 비동기 채움 · 서식 파일칸) — v58 이 아직 «배포 전»이라 함께 실린다
                                      //   바로잡음(문서 표지 정합) — ESSENTIAL 프리캐시 대상이라
                                      //   이름을 안 올리면 옛 날짜가 「개선사항」 화면에 계속 뜬다.
@@ -211,7 +212,7 @@ const ESSENTIAL = [
   vq("version.js"),
   vq("forms.js"),
   vq("apply_client.js"),
-  vq("reads.js"),               // ★ v58 추가 — 읽음/안읽음 저장 어댑터(세 앱 공통).
+  vq("reads.js"),               // ★ v58 추가 — 읽음/안읽음 저장 어댑터(PC앱·공무원앱 공통(시민앱은 해당 없음)).
                                //   ⛔ 빼지 마세요. 없으면 이미 설치된 앱이 옛 캐시를 물어
                                //      window.SangjuReads 가 undefined 가 되고 배지가 통째로 안 뜹니다.
   vq("sw-register.js"),        // CSP 때문에 인라인에서 분리한 서비스워커 등록 코드
