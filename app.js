@@ -1067,6 +1067,8 @@ async function loadRegionMeta() {
         } catch (e2) { resolve(null); }
       });
       if (!d) throw e1;
+      // 연결 안내(netguard.js) — «.json 만 막힘»을 작은 띠로 알린다(이용 지장 없음).
+      try { if (window.NetGuard) window.NetGuard.noteJsonFallback(); } catch (e3) { /* 무시 */ }
     }
     /* 🏷 분야 이름 — 이 한 줄이 «단일 출처»의 전부다(2026-08-24).
        예전에는 app.js 안 POLICY_CATEGORIES 의 키를 썼는데, config.py 가 25개로 바뀐 뒤에도
@@ -2023,6 +2025,10 @@ async function login() {
   if (error) {
     // role="alert" aria-live="assertive" 라 화면낭독기가 즉시 읽는다.
     $("#loginErr").textContent = loginErrMsg(error);
+    /* 닿지 못한 실패면 «자세히»로 연결 안내(netguard.js)를 열 수 있게 한다(행정망 차단 의심). */
+    if (window.NetGuard && errKind(error) === "conn") {
+      $("#loginErr").insertAdjacentHTML("beforeend", ' <button type="button" class="ng-more" data-ng-open>자세히</button>');
+    }
     $("#pw").value = "";
     $("#pw").focus();                             // 초점 유실 없이 다시 입력 가능
     return;
@@ -3136,7 +3142,7 @@ function errBoxHtml(error, retryId) {
     return `<div class="err-box" role="alert">
       <div class="err-title">⏸ 클라우드 서비스가 일시적으로 응답하지 않습니다.</div>
       <div class="err-desc">잠시 후 다시 시도해 주세요.<br>계속되면 인터넷 연결 또는 Supabase 프로젝트 상태를 확인해 주세요.</div>
-      ${btn}</div>`;
+      ${btn}${window.NetGuard ? '<button type="button" class="ng-more" data-ng-open>자세히</button>' : ""}</div>`;
   }
   if (kind === "perm") {
     return `<div class="err-box" role="alert">

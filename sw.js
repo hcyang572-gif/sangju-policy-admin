@@ -25,7 +25,7 @@
 // 배포 버전 — 버전정보.json 의 "version" 및 version.js 의 APP_VERSION 과 항상 같은 값.
 // ⚠ 손으로 고치지 말고 루트의 `py -3 자원버전_동기화.py` 를 돌리면
 //    이 값과 index.html 의 ?v= 쿼리가 한 번에 맞춰진다.
-const ASSET_V = "0.7.8";
+const ASSET_V = "0.7.10";
 
 // v26 사유 (2026-08-19, 🔵손길) — index.html·style.css·app.js 를 «셋 다» 고쳤다.
 //   ① 폰(≤599px) «가로 띠» 로그인 배경을 낮춰 아이브로 대비를 4.45 → 5.90:1 로 올림 (style.css)
@@ -116,7 +116,7 @@ const ASSET_V = "0.7.8";
 //     받지만, 서비스워커가 «없는» 브라우저(첫 방문·SW 미지원)는 ?v= 가 그대로면 최대 10분 동안
 //     옛 a2hs.js 를 씁니다. ?v= 는 버전정보.json 이 단일 출처라 이 작업 범위(cloudui 전용)에서
 //     손대지 않았습니다 — version.js 는 세 앱이 글자 단위로 같아야 하기 때문입니다.
-const CACHE = "sangju-admin-v60";   // v59: 탭바 «두 줄» 결함 수정(≤419px 아이콘 접기) + 갈래 이름을 탭 이름으로 통일 + 배지 줄이기(.tag-min) + 배지 범례 「배지 안내」 (style.css/index.html/app.js/stats.js/version.js 동시 변경)
+const CACHE = "sangju-admin-v61";   // v61: 연결 안내(netguard.js 새 파일·qr-admin.png·index.html·style.css·app.js) / v59: 탭바 «두 줄» 결함 수정(≤419px 아이콘 접기) + 갈래 이름을 탭 이름으로 통일 + 배지 줄이기(.tag-min) + 배지 범례 「배지 안내」 (style.css/index.html/app.js/stats.js/version.js 동시 변경)
 // v58: 「신규」 배지 + 탭 «확인하지 않은 건수» 배지 (reads.js 새 파일 · app.js/style.css/index.html 동시 변경)
                                     //      + 이탈 경고 오탐 수정(처리메모 비동기 채움 · 서식 파일칸) — v58 이 아직 «배포 전»이라 함께 실린다
                                      //   바로잡음(문서 표지 정합) — ESSENTIAL 프리캐시 대상이라
@@ -221,6 +221,7 @@ const ESSENTIAL = [
                                //   목록에 없어, 설치 후 오프라인·불안정망에서 아이콘이 이모지·빈자리로 남았다.
   vq("stats.js"),              // 「이달의 접수」 도넛 채우기(시각 레이어)
   vq("a2hs.js"),               // 「홈 화면에 추가」 안내(시각 레이어)
+  vq("netguard.js"),           // ★ v61 — 연결 안내. 오프라인 첫 화면에서도 떠야 하므로 ESSENTIAL
   "manifest.json",
 ];
 // 없어도 화면 골격은 뜨는 자원(그림). 실패해도 설치를 막지 않는다.
@@ -233,6 +234,7 @@ const OPTIONAL = [
   // ⚠ 2026-08-25 — 여기 있던 "assets/slogan-stack.png"(2줄형 원본)을 뺐다.
   //    화면 어디에서도 쓰지 않는다(헤더·로그인 카드는 slogan-wide.png). 파일은 남아 있다 —
   //    make_slogan_white.py 의 «원본»이라 지우지 않는다. 안 쓰는 것을 캐시하지 않을 뿐이다.
+  "assets/qr-admin.png",       // ★ v61 — 연결 안내 «휴대폰으로 열기» QR(netguard.js data-qr)
   "assets/slogan-wide.png",    // 2026 시정구호(1줄형 · 앱 헤더 + 로그인 폼 면, 둘 다 원색 그대로)
   // 📍 읍·면·동 목록(regions·region_groups·region_etc). 이것이 없으면 «차트만» 빠지고
   //    목록·상세·저장은 그대로 돈다 → ESSENTIAL 이 아니라 여기(OPTIONAL)에 둔다.
