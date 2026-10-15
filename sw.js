@@ -116,7 +116,7 @@ const ASSET_V = "0.7.8";
 //     받지만, 서비스워커가 «없는» 브라우저(첫 방문·SW 미지원)는 ?v= 가 그대로면 최대 10분 동안
 //     옛 a2hs.js 를 씁니다. ?v= 는 버전정보.json 이 단일 출처라 이 작업 범위(cloudui 전용)에서
 //     손대지 않았습니다 — version.js 는 세 앱이 글자 단위로 같아야 하기 때문입니다.
-const CACHE = "sangju-admin-v59";   // v59: 탭바 «두 줄» 결함 수정(≤419px 아이콘 접기) + 갈래 이름을 탭 이름으로 통일 + 배지 줄이기(.tag-min) + 배지 범례 「배지 안내」 (style.css/index.html/app.js/stats.js/version.js 동시 변경)
+const CACHE = "sangju-admin-v60";   // v59: 탭바 «두 줄» 결함 수정(≤419px 아이콘 접기) + 갈래 이름을 탭 이름으로 통일 + 배지 줄이기(.tag-min) + 배지 범례 「배지 안내」 (style.css/index.html/app.js/stats.js/version.js 동시 변경)
 // v58: 「신규」 배지 + 탭 «확인하지 않은 건수» 배지 (reads.js 새 파일 · app.js/style.css/index.html 동시 변경)
                                     //      + 이탈 경고 오탐 수정(처리메모 비동기 채움 · 서식 파일칸) — v58 이 아직 «배포 전»이라 함께 실린다
                                      //   바로잡음(문서 표지 정합) — ESSENTIAL 프리캐시 대상이라
