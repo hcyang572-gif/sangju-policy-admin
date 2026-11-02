@@ -177,15 +177,17 @@ window.SangjuApply = (function () {
        ㉠ 여기는 로그인한 공무원(authenticated)만 지나갑니다 — 게스트는 위에서 갈라졌습니다.
        ㉡ 칸 이름을 적어 두면, 그 SQL 이 아직 안 돌아간 환경에서 «없는 칸» 하나로
           42703 이 나 목록이 통째로 죽습니다(바로 아래 canceled_at 주석과 같은 사연). */
-    var res = await sb.from(TABLE).select("*").order("created_at", { ascending: false });
-    if (res.error) throw res.error;
+    // 📄 1,000행 상한 대비 쪽 넘김(파일 끝 sbFetchAll). 동률 대비 id 보조 정렬. 오류는 throw 그대로.
+    var data = await window.sbFetchAll(function () {
+      return sb.from(TABLE).select("*").order("created_at", { ascending: false }).order("id");
+    });
     // 🗑 시민이 스스로 취소한 접수는 «없는 것»으로 본다 (2026-08-21)
     //    supabase/신청취소_260821.sql — applications.canceled_at 이 채워지면 취소된 건.
     //    행 자체는 남겨 둔다(감사기록·복구용). 시민앱·PC앱도 같은 기준으로 거른다.
     //    ⚠ 서버 쿼리(.is("canceled_at", null))로 거르지 «않는» 이유: 그 SQL 을 아직
     //      실행하지 않은 환경에서는 컬럼이 없어 42703 으로 목록 전체가 죽는다.
     //      여기서 걸러 두면 컬럼이 있든 없든 목록은 언제나 뜬다.
-    return (res.data || []).filter(function (r) { return !(r && r.canceled_at); });
+    return (data || []).filter(function (r) { return !(r && r.canceled_at); });
   }
 
   // ── 공무원 상태변경 · 처리메모 · 시민 안내문 — patch = {status?, admin_memo?, citizen_reply?} ──
@@ -362,3 +364,38 @@ window.SangjuApply = (function () {
     errKind: errKind
   };
 })();
+
+// ════════════════════════════════════════════════════════════════════════
+//  📄 sbFetchAll — 1,000행 상한을 넘겨 «전부» 읽는 공통 헬퍼 (2026-11-03, S6-5 🔵손길)
+//  ────────────────────────────────────────────────────────────────────
+//  ⚠ Supabase(PostgREST)는 한 번 조회에 최대 1,000행(max_rows)만 준다. 넘치면 오류 없이
+//    «조용히» 잘린다. 2026-11-03 라이브 실측: proposal_comments 1,161행 → 한 번 조회 1,000,
+//    proposal_likes 9,986행 → 1,000. 목록 조회는 이 헬퍼로 쪽(range)을 넘기며 끝까지 읽는다.
+//
+//  쓰는 법: await sbFetchAll(function () {
+//             return sb.from("표").select("*").order("created_at", {ascending:false}).order("id");
+//           });
+//    · 인자는 «쿼리를 새로 만드는 함수»다(쿼리 객체는 한 번 await 하면 다시 못 쓴다).
+//      ⛔ .range()/.limit() 는 붙이지 말 것 — 헬퍼가 붙인다.
+//    · ⭐ 정렬 끝에 고유 칸(.order("id"))을 반드시 붙인다. 정렬값이 같은 행이 쪽 경계에 걸리면
+//      쪽마다 순서가 달라져 같은 행이 두 번 오거나 빠진다.
+//    · 오류는 그대로 throw(호출부의 기존 처리 유지). 무한 반복 방지로 최대 50쪽(5만 행)에서 멈춘다.
+//    · 받은 행이 1,000 미만이면 마지막 쪽으로 보고 멈춘다(서버 max_rows 가 1,000 이라는 전제 —
+//      서버 설정을 1,000 «아래»로 낮추면 PAGE_SIZE 도 함께 낮춰야 한다).
+//  ⚠ cloudui/apply_client.js · 모바일웹/apply_client.js 두 사본에 «같은 글자»로 둔다.
+// ════════════════════════════════════════════════════════════════════════
+window.sbFetchAll = async function sbFetchAll(makeQuery, opts) {
+  var size = (opts && opts.pageSize) || 1000;
+  var maxPages = (opts && opts.maxPages) || 50;
+  var out = [];
+  for (var p = 0; p < maxPages; p++) {
+    var from = p * size;
+    var res = await makeQuery().range(from, from + size - 1);
+    if (res && res.error) throw res.error;
+    var rows = (res && res.data) || [];
+    for (var i = 0; i < rows.length; i++) out.push(rows[i]);
+    if (rows.length < size) return out;
+  }
+  console.warn("[sbFetchAll] " + maxPages + "쪽 상한에 닿아 멈췄습니다(" + out.length + "행). 나머지는 잘렸을 수 있습니다.");
+  return out;
+};

@@ -2487,7 +2487,11 @@ function isMissingCatColumn(error) {
 
 async function loadBenefits() {
   showSkeleton("#list", 4);           // 첫 불러오기에만
-  const { data, error } = await sb.from("benefits").select("*").order("seq", { nullsFirst: false }).order("id");
+  // 📄 1,000행 상한 대비 쪽 넘김(apply_client.js 의 sbFetchAll) — 정렬은 그대로(이미 id 보조 정렬).
+  let data = null, error = null;
+  try {
+    data = await window.sbFetchAll(() => sb.from("benefits").select("*").order("seq", { nullsFirst: false }).order("id"));
+  } catch (e) { error = e; }
   if (error) {
     console.error(error);
     // 원인(연결/권한/미설정)별 안내 + 다시 시도 — "불러오기 실패"만 뜨던 문제 개선
@@ -3974,7 +3978,11 @@ async function loadProposals() {
      시민앱(모바일웹/proposals.js)에서는 anon 에게 pin_hash 권한이 없어 select("*") 가
      통째로 401(42501) 이 됐다. 여기(로그인 사용자)는 아직 전체 권한이 남아 있지만,
      같은 사고를 반복하지 않도록 같은 방식으로 맞춘다. */
-  const { data, error } = await sb.from("proposals").select(P_COLS).order("created_at", { ascending: false });
+  // 📄 1,000행 상한 대비 쪽 넘김(sbFetchAll) + 동률 대비 id 보조 정렬.
+  let data = null, error = null;
+  try {
+    data = await window.sbFetchAll(() => sb.from("proposals").select(P_COLS).order("created_at", { ascending: false }).order("id"));
+  } catch (e) { error = e; }
   if (error) {
     console.error(error);
     showLoadError("#pList", error, "pListRetry", loadProposals);
@@ -4007,8 +4015,8 @@ async function loadProposals() {
 async function loadReportCounts() {
   P_REPORTS = {};
   try {
-    const { data, error } = await sb.from("proposal_reports").select("proposal_id");
-    if (error) { return; }
+    // 📄 표 전체를 세므로 1,000행을 넘으면 잘린다 — 쪽 넘김(sbFetchAll). 실패는 아래 catch 가 조용히 삼킨다.
+    const data = await window.sbFetchAll(() => sb.from("proposal_reports").select("proposal_id").order("id"));
     (data || []).forEach((r) => { P_REPORTS[r.proposal_id] = (P_REPORTS[r.proposal_id] || 0) + 1; });
   } catch (e) { /* 무시 */ }
 }
@@ -4109,9 +4117,9 @@ async function loadProposalComments(id) {
   P_CMT_PID = id;
   let rows = null, err = null;
   try {
-    const res = await sb.from("proposal_comments").select("*")
-      .eq("proposal_id", id).order("created_at");
-    rows = res.data; err = res.error;
+    // 📄 1,000행 상한 대비 쪽 넘김(sbFetchAll) + 동률 대비 id 보조 정렬.
+    rows = await window.sbFetchAll(() => sb.from("proposal_comments").select("*")
+      .eq("proposal_id", id).order("created_at").order("id"));
   } catch (e) { err = e; }
   if (!box.isConnected) return;                 // 그 사이 모달이 닫혔다
   if (err) {
@@ -4132,9 +4140,9 @@ async function loadCommentReports(ids) {
   P_CMT_REPORTS = {};
   if (!ids || !ids.length) return;
   try {
-    const { data, error } = await sb.from("proposal_comment_reports")
-      .select("comment_id,reporter_key").in("comment_id", ids);
-    if (error) return;
+    // 📄 1,000행 상한 대비 쪽 넘김(sbFetchAll). 실패는 아래 catch 가 조용히 삼킨다(기존과 같음).
+    const data = await window.sbFetchAll(() => sb.from("proposal_comment_reports")
+      .select("comment_id,reporter_key").in("comment_id", ids).order("id"));
     const seen = {};
     (data || []).forEach((r) => {
       const k = r.comment_id;
@@ -4894,8 +4902,11 @@ async function openProposal(r) {
 async function loadReportDetail(proposalId) {
   const box = $("#pmReports");
   if (!box) return;
-  const { data, error } = await sb.from("proposal_reports")
-    .select("reason, created_at").eq("proposal_id", proposalId).order("created_at", { ascending: false });
+  let data = null, error = null;
+  try {   // 📄 1,000행 상한 대비 쪽 넘김(sbFetchAll) + 동률 대비 id 보조 정렬
+    data = await window.sbFetchAll(() => sb.from("proposal_reports")
+      .select("reason, created_at").eq("proposal_id", proposalId).order("created_at", { ascending: false }).order("id"));
+  } catch (e) { error = e; }
   if (error) { box.textContent = "신고 내역 조회 권한이 없습니다."; return; }
   if (!data || !data.length) { box.textContent = "신고 내역 없음"; return; }
   box.innerHTML = data.map((x) =>
@@ -5826,12 +5837,12 @@ async function listApplicationFiles(receiptNo) {
              msg: "어떤 접수 건인지 알 수 없어 첨부를 불러오지 않았습니다." };
   }
   try {
-    const res = await sb.from("application_files")
+    // 📄 1,000행 상한 대비 쪽 넘김(sbFetchAll) + 동률 대비 id 보조 정렬. 오류는 throw → 아래 catch.
+    const files = await window.sbFetchAll(() => sb.from("application_files")
       .select("id,receipt_no,file_name,storage_path,size,content_type,created_at")
       .eq("receipt_no", rc)
-      .order("created_at", { ascending: true });
-    if (res && res.error) throw res.error;
-    return { ok: true, files: (res && res.data) || [], kind: "", msg: "" };
+      .order("created_at", { ascending: true }).order("id"));
+    return { ok: true, files: files || [], kind: "", msg: "" };
   } catch (e) {
     const kind = errKind(e);
     if (kind === "setup") {
