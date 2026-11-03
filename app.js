@@ -3634,7 +3634,7 @@ const P_STATUSES = ["접수", "검토중", "반영", "불채택", "보류"];
       body_problem · body_idea · body_effect   시민이 나눠 적은 «문제/제안/기대효과»
       search_text    검색용 통합 글(서버가 만든다)
    ══════════════════════════════════════════════════════════════════════ */
-const P_COLS = "id,title,body,category,author_nick,region,status,admin_reply,like_count,is_hidden,created_at"
+const P_COLS = "id,title,body,category,author_nick,region,status,admin_reply,like_count,is_hidden,created_at,updated_at"
              + ",proposal_no,comment_count,body_problem,body_idea,body_effect,search_text";
 const REPLY_REQUIRED = new Set(["반영", "불채택"]); // 전환 시 답변/사유 필수
 let PALL = [], PCATS = [], P_SELCAT = new Set(), P_STATUS = "전체";
